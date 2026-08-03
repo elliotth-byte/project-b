@@ -1,0 +1,268 @@
+import { useState, useEffect } from "react";
+import { Btn, Card, Badge } from "./ui";
+import {
+  CONFESSIONAL_TAGS, fetchAllConfessionals, updateConfessional, subscribeConfessionalsTable,
+  subscribeConfessionalPrompt, setConfessionalPrompt, clearConfessionalPrompt,
+} from "../lib/confessionalsData";
+import PostToGroupMe from "./PostToGroupMe";
+
+export default function ConfessionalsHost({ gameId, round }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filterPlayer, setFilterPlayer] = useState("");
+  const [filterRound, setFilterRound] = useState("");
+  const [filterTag, setFilterTag] = useState("");
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [starredOnly, setStarredOnly] = useState(false);
+  const [search, setSearch] = useState("");
+  const [sortOrder, setSortOrder] = useState("newest");
+  const [groupBy, setGroupBy] = useState("none");
+  const [compact, setCompact] = useState(true);
+  const [promptDraft, setPromptDraft] = useState("");
+  const [prompt, setPrompt] = useState(null);
+  const [recapMode, setRecapMode] = useState(false);
+  const [recapSelected, setRecapSelected] = useState([]);
+  const [recapOpts, setRecapOpts] = useState({ names: true, anonymous: false, rounds: true, tags: false });
+
+  const reload = async () => {
+    const data = await fetchAllConfessionals(gameId);
+    setItems(data);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    reload();
+    const unsubscribe = subscribeConfessionalsTable(gameId, reload);
+    return unsubscribe;
+  }, [gameId]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeConfessionalPrompt(gameId, setPrompt);
+    return unsubscribe;
+  }, [gameId]);
+
+  const unreadCount = items.filter((c) => !c.read_by_host && !c.archived).length;
+  const archivedCount = items.filter((c) => c.archived).length;
+
+  const markRead = (id, val = true) => updateConfessional(id, { read_by_host: val }).then(reload);
+  const toggleStar = (c) => updateConfessional(c.id, { starred: !c.starred }).then(reload);
+  const toggleArchive = (c) => updateConfessional(c.id, { archived: !c.archived }).then(reload);
+  const markAllRead = async () => {
+    await Promise.all(items.filter((c) => !c.read_by_host).map((c) => updateConfessional(c.id, { read_by_host: true })));
+    reload();
+  };
+  const copyText = (c) => navigator.clipboard.writeText(`${c.player_name}${c.round ? ` (Round ${c.round})` : ""}: ${c.text}`);
+
+  const players = [...new Set(items.map((c) => c.player_name))].sort();
+  const rounds = [...new Set(items.map((c) => c.round).filter(Boolean))].sort((a, b) => a - b);
+
+  let filtered = items.filter((c) => !c.archived || filterPlayer === "__archived__");
+  if (filterPlayer && filterPlayer !== "__archived__") filtered = filtered.filter((c) => c.player_name === filterPlayer);
+  if (filterPlayer === "__archived__") filtered = items.filter((c) => c.archived);
+  if (filterRound) filtered = filtered.filter((c) => String(c.round) === filterRound);
+  if (filterTag) filtered = filtered.filter((c) => c.tags?.includes(filterTag));
+  if (unreadOnly) filtered = filtered.filter((c) => !c.read_by_host);
+  if (starredOnly) filtered = filtered.filter((c) => c.starred);
+  if (search.trim()) {
+    const s = search.trim().toLowerCase();
+    filtered = filtered.filter((c) => c.player_name.toLowerCase().includes(s) || c.text.toLowerCase().includes(s) || c.tags?.some((t) => t.toLowerCase().includes(s)));
+  }
+  filtered = [...filtered].sort((a, b) => sortOrder === "newest" ? new Date(b.created_at) - new Date(a.created_at) : new Date(a.created_at) - new Date(b.created_at));
+
+  const groups = (() => {
+    if (groupBy === "none") return [["", filtered]];
+    if (groupBy === "player") {
+      const m = {};
+      filtered.forEach((c) => { (m[c.player_name] = m[c.player_name] || []).push(c); });
+      return Object.entries(m);
+    }
+    if (groupBy === "round") {
+      const m = {};
+      filtered.forEach((c) => { const k = c.round ? `Round ${c.round}` : "No round"; (m[k] = m[k] || []).push(c); });
+      return Object.entries(m);
+    }
+    if (groupBy === "tag") {
+      const m = {};
+      filtered.forEach((c) => { (c.tags?.length ? c.tags : ["Untagged"]).forEach((t) => { (m[t] = m[t] || []).push(c); }); });
+      return Object.entries(m);
+    }
+    if (groupBy === "starred") {
+      return [["⭐ Starred", filtered.filter((c) => c.starred)], ["Not starred", filtered.filter((c) => !c.starred)]];
+    }
+    return [["", filtered]];
+  })();
+
+  const savePrompt = async () => { await setConfessionalPrompt(gameId, promptDraft.trim(), round); setPromptDraft(""); };
+  const deactivatePrompt = async () => { await clearConfessionalPrompt(gameId); };
+
+  const buildRecapText = () => {
+    const chosen = items.filter((c) => recapSelected.includes(c.id));
+    const lines = chosen.map((c) => {
+      const who = recapOpts.anonymous ? "Anonymous Confessional" : c.player_name;
+      const roundPart = recapOpts.rounds && c.round ? `, Round ${c.round}` : "";
+      const tagPart = recapOpts.tags && c.tags?.length ? ` [${c.tags.join(", ")}]` : "";
+      return `*${who}${roundPart}:*${tagPart}\n"${c.text}"`;
+    });
+    return `🎥 Project B Confessionals\n\n${lines.join("\n\n")}`;
+  };
+
+  if (loading) return <Card><p style={{ color: "#706050", fontStyle: "italic" }}>Loading...</p></Card>;
+
+  return (
+    <div style={{ display: "grid", gap: 16 }}>
+      <Card>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <h3 style={{ color: "#f0e6d3", margin: 0, fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🎥 Confessional Inbox</h3>
+          {unreadCount > 0 && <Badge color="#c45c3c">{unreadCount} unread</Badge>}
+        </div>
+        <p style={{ color: "#706050", fontSize: 12, margin: "0 0 10px", fontStyle: "italic" }}>
+          Private player confessionals. Visible only here — players can't see each other's, this is never posted automatically.
+        </p>
+
+        {/* Prompt */}
+        <div style={{ background: "#0a1020", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: "#a09080", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>Tonight's Prompt</div>
+          {prompt?.active ? (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 13, color: "#f0e6d3" }}>{prompt.prompt}</span>
+              <Btn small variant="ghost" onClick={deactivatePrompt}>Deactivate</Btn>
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 6 }}>
+              <input value={promptDraft} onChange={(e) => setPromptDraft(e.target.value)} placeholder="e.g. Who do you trust least after tonight?"
+                style={{ flex: 1, background: "#132038", border: "1px solid #253550", borderRadius: 6, padding: "6px 10px", color: "#f0e6d3", fontSize: 12 }} />
+              <Btn small onClick={savePrompt} disabled={!promptDraft.trim()}>Set Prompt</Btn>
+            </div>
+          )}
+        </div>
+
+        {/* Filters */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+          <select value={filterPlayer} onChange={(e) => setFilterPlayer(e.target.value)} style={selStyle}>
+            <option value="">All players</option>
+            {players.map((p) => <option key={p} value={p}>{p}</option>)}
+            <option value="__archived__">📦 Archived only</option>
+          </select>
+          <select value={filterRound} onChange={(e) => setFilterRound(e.target.value)} style={selStyle}>
+            <option value="">All rounds</option>
+            {rounds.map((r) => <option key={r} value={r}>Round {r}</option>)}
+          </select>
+          <select value={filterTag} onChange={(e) => setFilterTag(e.target.value)} style={selStyle}>
+            <option value="">All tags</option>
+            {CONFESSIONAL_TAGS.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)} style={selStyle}>
+            <option value="none">No grouping</option>
+            <option value="player">Group by player</option>
+            <option value="round">Group by round</option>
+            <option value="tag">Group by tag</option>
+            <option value="starred">Group by starred</option>
+          </select>
+          <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={selStyle}>
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+          </select>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 10 }}>
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search confessionals..."
+            style={{ ...selStyle, flex: 1, minWidth: 160 }} />
+          <label style={toggleLabel}><input type="checkbox" checked={unreadOnly} onChange={(e) => setUnreadOnly(e.target.checked)} /> Unread only</label>
+          <label style={toggleLabel}><input type="checkbox" checked={starredOnly} onChange={(e) => setStarredOnly(e.target.checked)} /> Starred only</label>
+          <button onClick={() => setCompact(!compact)} style={{ ...selStyle, cursor: "pointer" }}>{compact ? "Expanded View" : "Compact View"}</button>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Btn small variant="ghost" onClick={markAllRead} disabled={unreadCount === 0}>Mark All Read</Btn>
+          <Btn small variant="ghost" onClick={() => setRecapMode(!recapMode)}>{recapMode ? "Exit Recap Builder" : "Build Recap"}</Btn>
+          {archivedCount > 0 && (
+            <Btn small variant={filterPlayer === "__archived__" ? "success" : "ghost"} onClick={() => setFilterPlayer(filterPlayer === "__archived__" ? "" : "__archived__")}>
+              {filterPlayer === "__archived__" ? "◀ Back to Inbox" : `📦 View Archived (${archivedCount})`}
+            </Btn>
+          )}
+        </div>
+      </Card>
+
+      {recapMode && (
+        <Card style={{ borderColor: "rgba(74,122,196,0.3)" }}>
+          <h3 style={{ color: "#f0e6d3", margin: "0 0 8px", fontSize: 14 }}>Build Recap</h3>
+          <p style={{ fontSize: 11, color: "#706050", margin: "0 0 8px", fontStyle: "italic" }}>Check the confessionals to include, choose options, then post or copy.</p>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
+            <label style={toggleLabel}><input type="checkbox" checked={recapOpts.names} onChange={(e) => setRecapOpts({ ...recapOpts, names: e.target.checked, anonymous: e.target.checked ? false : recapOpts.anonymous })} /> Include names</label>
+            <label style={toggleLabel}><input type="checkbox" checked={recapOpts.anonymous} onChange={(e) => setRecapOpts({ ...recapOpts, anonymous: e.target.checked, names: e.target.checked ? false : recapOpts.names })} /> Anonymous instead</label>
+            <label style={toggleLabel}><input type="checkbox" checked={recapOpts.rounds} onChange={(e) => setRecapOpts({ ...recapOpts, rounds: e.target.checked })} /> Include round</label>
+            <label style={toggleLabel}><input type="checkbox" checked={recapOpts.tags} onChange={(e) => setRecapOpts({ ...recapOpts, tags: e.target.checked })} /> Include tags</label>
+          </div>
+          <div style={{ display: "grid", gap: 4, marginBottom: 10, maxHeight: 200, overflowY: "auto" }}>
+            {items.filter((c) => !c.archived).map((c) => (
+              <label key={c.id} style={{ display: "flex", gap: 6, alignItems: "flex-start", fontSize: 12, color: "#a09080" }}>
+                <input type="checkbox" checked={recapSelected.includes(c.id)} onChange={(e) => setRecapSelected(e.target.checked ? [...recapSelected, c.id] : recapSelected.filter((x) => x !== c.id))} style={{ marginTop: 3 }} />
+                <span>{c.starred && "⭐ "}<strong style={{ color: "#f0e6d3" }}>{c.player_name}</strong> — {c.text.slice(0, 80)}{c.text.length > 80 ? "..." : ""}</span>
+              </label>
+            ))}
+          </div>
+          {recapSelected.length > 0 && (
+            <>
+              <Btn small variant="ghost" onClick={() => navigator.clipboard.writeText(buildRecapText())} style={{ marginBottom: 8 }}>Copy Recap Text</Btn>
+              <PostToGroupMe gameId={gameId} icon="🎥" label="Post Recap to GroupMe" text={buildRecapText()} />
+            </>
+          )}
+        </Card>
+      )}
+
+      {groups.map(([label, groupItems]) => (
+        <div key={label || "all"}>
+          {label && <div style={{ fontSize: 12, fontWeight: 700, color: "#c9a84c", textTransform: "uppercase", letterSpacing: 0.5, margin: "4px 0 8px" }}>{label} ({groupItems.length})</div>}
+          <div style={{ display: "grid", gap: 8 }}>
+            {groupItems.length === 0 ? (
+              <p style={{ color: "#706050", fontSize: 12, fontStyle: "italic" }}>No confessionals match these filters.</p>
+            ) : groupItems.map((c) => (
+              <Card key={c.id} style={{
+                borderColor: !c.read_by_host ? "rgba(201,168,76,0.5)" : "#253550",
+                background: !c.read_by_host ? "rgba(201,168,76,0.06)" : "#0e1830",
+              }}>
+                {compact ? (
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+                    <span style={{ fontSize: 12, color: "#a09080" }}>
+                      {!c.read_by_host && <strong style={{ color: "#c9a84c" }}>● </strong>}
+                      <strong style={{ color: "#f0e6d3" }}>{c.player_name}</strong>
+                      {c.round ? ` · Round ${c.round}` : ""}{c.tags?.length ? ` · ${c.tags.join(", ")}` : ""}
+                      {" · "}"{c.text.length > 70 ? c.text.slice(0, 70) + "..." : c.text}"
+                    </span>
+                    {c.starred && <span>⭐</span>}
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#f0e6d3" }}>
+                        {!c.read_by_host && <strong style={{ color: "#c9a84c" }}>● </strong>}
+                        {c.player_name}{c.round ? ` · Round ${c.round}` : ""}
+                      </span>
+                      <span style={{ fontSize: 11, color: "#706050" }}>{new Date(c.created_at).toLocaleString()}</span>
+                    </div>
+                    {c.tags?.length > 0 && (
+                      <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
+                        {c.tags.map((t) => <Badge key={t} color="#4a7ac4">{t}</Badge>)}
+                      </div>
+                    )}
+                    <p style={{ fontSize: 14, color: "#f0e6d3", margin: "0 0 8px", lineHeight: 1.5 }}>{c.text}</p>
+                  </>
+                )}
+                <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                  <Btn small variant="ghost" onClick={() => markRead(c.id, !c.read_by_host)}>{c.read_by_host ? "Mark Unread" : "Mark Read"}</Btn>
+                  <Btn small variant={c.starred ? "success" : "ghost"} onClick={() => toggleStar(c)}>{c.starred ? "★ Starred" : "☆ Star"}</Btn>
+                  <Btn small variant="ghost" onClick={() => toggleArchive(c)}>{c.archived ? "Unarchive" : "Archive"}</Btn>
+                  <Btn small variant="ghost" onClick={() => copyText(c)}>Copy</Btn>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const selStyle = {
+  background: "#0a1020", border: "1px solid #253550", borderRadius: 6, padding: "6px 8px",
+  color: "#f0e6d3", fontSize: 12,
+};
+const toggleLabel = { display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#a09080", cursor: "pointer" };
