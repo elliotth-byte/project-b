@@ -1,12 +1,12 @@
 import { DEFAULT_PARTICIPATION, computeParticipants } from "../lib/challengeParticipants";
 
-const boxStyle = { background: "#0a1020", borderRadius: 8, padding: 10, marginBottom: 12 };
+const boxStyle = { background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 };
 const rowStyle = { display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 8 };
-const toggleLabel = { display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: "#a09080", cursor: "pointer" };
+const toggleLabel = { display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: "#a68fd6", cursor: "pointer" };
 const chip = (active) => ({
   fontSize: 11, padding: "3px 9px", borderRadius: 12, cursor: "pointer",
-  background: active ? "rgba(201,168,76,0.15)" : "transparent",
-  color: active ? "#c9a84c" : "#706050", border: `1px solid ${active ? "#c9a84c55" : "#253550"}`,
+  background: active ? "rgba(255,45,149,0.15)" : "transparent",
+  color: active ? "#ff2d95" : "#6b4f99", border: `1px solid ${active ? "#ff2d9555" : "#3d1f5c"}`,
 });
 
 // Drop this inside a ChallengeSetupCard (it renders as `children`, above
@@ -27,7 +27,7 @@ export default function ParticipantPicker({ alive, allPlayers, shieldedNames = [
 
   return (
     <div style={boxStyle}>
-      <div style={{ fontSize: 11, color: "#a09080", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+      <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
         Who's playing?
       </div>
 
@@ -43,7 +43,7 @@ export default function ParticipantPicker({ alive, allPlayers, shieldedNames = [
               {p.name}
             </button>
           ))}
-          {alive.length === 0 && <span style={{ fontSize: 11, color: "#706050", fontStyle: "italic" }}>No alive players.</span>}
+          {alive.length === 0 && <span style={{ fontSize: 11, color: "#6b4f99", fontStyle: "italic" }}>No alive players.</span>}
         </div>
       )}
 
@@ -62,7 +62,7 @@ export default function ParticipantPicker({ alive, allPlayers, shieldedNames = [
         </label>
       </div>
 
-      <div style={{ fontSize: 11.5, color: "#706050" }}>
+      <div style={{ fontSize: 11.5, color: "#6b4f99" }}>
         {participants.length} participant{participants.length === 1 ? "" : "s"}
         {spectators.length > 0 && <> · {spectators.length} spectator{spectators.length === 1 ? "" : "s"}</>}
       </div>

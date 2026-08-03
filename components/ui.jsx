@@ -1,13 +1,17 @@
-// Small shared UI pieces, styled to match the original artifact's look.
-// Pulled out so WordHost/WordPlayer need almost no changes from the original.
+// Shared UI pieces — 80s arcade / neon aesthetic. Centralizing the look
+// here means most of the app inherits it just by using Btn/Card/Badge,
+// rather than every screen needing its own neon styling.
+
+export const FONT_DISPLAY = "'Press Start 2P', 'Orbitron', monospace";
+export const FONT_UI = "'Orbitron', 'Segoe UI', sans-serif";
 
 export function Btn({ children, onClick, variant = "primary", disabled = false, small = false, style = {} }) {
   const variants = {
-    primary: { background: "linear-gradient(135deg, #c9a84c, #a5822f)", color: "#0c1425", border: "none" },
-    ghost: { background: "transparent", color: "#a09080", border: "1px solid #253550" },
-    danger: { background: "linear-gradient(135deg, #c45c3c, #9c3f26)", color: "#f0e6d3", border: "none" },
-    success: { background: "linear-gradient(135deg, #7a9a5c, #5c7a42)", color: "#f0e6d3", border: "none" },
-    slack: { background: "linear-gradient(135deg, #4a154b, #611f69)", color: "#fff", border: "none" },
+    primary: { background: "linear-gradient(135deg, #ff2d95, #b829ff)", color: "#05010f", border: "2px solid #ff8ac2", boxShadow: "0 0 16px #ff2d9588" },
+    ghost: { background: "transparent", color: "#a68fd6", border: "2px solid #3d1f5c", boxShadow: "none" },
+    danger: { background: "linear-gradient(135deg, #ff3860, #c9184a)", color: "#fff", border: "2px solid #ff87a3", boxShadow: "0 0 16px #ff386088" },
+    success: { background: "linear-gradient(135deg, #00ff9d, #00b377)", color: "#05010f", border: "2px solid #7dffce", boxShadow: "0 0 16px #00ff9d77" },
+    slack: { background: "linear-gradient(135deg, #00d9ff, #0099cc)", color: "#05010f", border: "2px solid #7fe9ff", boxShadow: "0 0 16px #00d9ff77" },
   };
   return (
     <button
@@ -15,15 +19,21 @@ export function Btn({ children, onClick, variant = "primary", disabled = false, 
       disabled={disabled}
       style={{
         ...variants[variant],
-        padding: small ? "6px 12px" : "10px 18px",
-        borderRadius: 8,
-        fontSize: small ? 12 : 14,
-        fontWeight: 700,
+        padding: small ? "7px 14px" : "12px 22px",
+        borderRadius: 10,
+        fontSize: small ? 11 : 13,
+        fontWeight: 800,
+        textTransform: "uppercase",
+        letterSpacing: 0.8,
         cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.5 : 1,
-        fontFamily: "'Palatino Linotype', Palatino, Georgia, serif",
+        opacity: disabled ? 0.4 : 1,
+        fontFamily: FONT_UI,
+        transition: "transform 0.1s, box-shadow 0.15s",
         ...style,
       }}
+      onMouseDown={(e) => { if (!disabled) e.currentTarget.style.transform = "scale(0.96)"; }}
+      onMouseUp={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
     >
       {children}
     </button>
@@ -35,10 +45,11 @@ export function Card({ children, style = {}, onClick }) {
     <div
       onClick={onClick}
       style={{
-        background: "#0e1830",
-        border: "1px solid #253550",
-        borderRadius: 12,
+        background: "linear-gradient(160deg, #150a28 0%, #0d0618 100%)",
+        border: "2px solid #3d1f5c",
+        borderRadius: 14,
         padding: 16,
+        boxShadow: "0 0 0 1px rgba(255,45,149,0.08), 0 4px 24px rgba(184,41,255,0.08)",
         ...style,
       }}
     >
@@ -49,10 +60,10 @@ export function Card({ children, style = {}, onClick }) {
 
 export function PausedBanner({ icon, title }) {
   return (
-    <Card style={{ borderColor: "rgba(201,168,76,0.3)", textAlign: "center" }}>
+    <Card style={{ borderColor: "#ff2d95", textAlign: "center" }}>
       <div style={{ fontSize: 28, marginBottom: 6 }}>{icon}</div>
-      <div style={{ color: "#c9a84c", fontWeight: 700 }}>{title} is paused</div>
-      <div style={{ color: "#706050", fontSize: 12, marginTop: 4 }}>The host will resume shortly.</div>
+      <div style={{ color: "#ff2d95", fontWeight: 800, textTransform: "uppercase", letterSpacing: 1 }}>{title} is paused</div>
+      <div style={{ color: "#6b4f99", fontSize: 12, marginTop: 4 }}>The host will resume shortly.</div>
     </Card>
   );
 }
@@ -65,26 +76,32 @@ export function PauseResumeControls({ paused, onPause, onResume }) {
   );
 }
 
-// A small pill/tag — used by Zombie for the round counter, reusable elsewhere.
-export function Badge({ children, color = "#c9a84c" }) {
-  const c = { "#c9a84c": [201, 168, 76], "#c45c3c": [196, 92, 60], "#d4a843": [212, 168, 67], "#7a9a5c": [122, 154, 92] };
-  const rgb = c[color] || [201, 168, 76];
+// A small pill/tag, used throughout for round numbers, statuses, etc.
+export function Badge({ children, color = "#ff2d95" }) {
+  const c = {
+    "#ff2d95": [255, 45, 149], "#c9a84c": [255, 45, 149], // legacy gold callers now render pink
+    "#ff3860": [255, 56, 96], "#c45c3c": [255, 56, 96], // legacy red
+    "#00ff9d": [0, 255, 157], "#7a9a5c": [0, 255, 157], // legacy green
+    "#00d9ff": [0, 217, 255], "#d4a843": [0, 217, 255],
+  };
+  const rgb = c[color] || [255, 45, 149];
   return (
     <span style={{
-      display: "inline-block", background: `rgba(${rgb},0.13)`, color, padding: "2px 10px",
-      borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase",
-      border: `1px solid rgba(${rgb},0.27)`,
+      display: "inline-block", background: `rgba(${rgb},0.16)`, color: `rgb(${rgb})`, padding: "3px 11px",
+      borderRadius: 20, fontSize: 11, fontWeight: 800, letterSpacing: 0.6, textTransform: "uppercase",
+      border: `1px solid rgba(${rgb},0.55)`, fontFamily: "'Orbitron', sans-serif",
+      textShadow: `0 0 6px rgba(${rgb},0.6)`,
     }}>
       {children}
     </span>
   );
 }
 
-// A playing card face — used by Casino, reusable by anything else with cards.
+// A playing card face — used by the Power of Chaos card-fan flavor moment.
 export function CardFace({ c }) {
   return (
     <span style={{
-      display: "inline-block", background: "#f0e6d3", color: ["♥", "♦"].includes(c.s) ? "#c0392b" : "#1a1a1a",
+      display: "inline-block", background: "#f5f0ff", color: ["♥", "♦"].includes(c.s) ? "#ff3860" : "#150a28",
       borderRadius: 5, padding: "3px 6px", fontSize: 14, fontWeight: 700, margin: 2, minWidth: 20, textAlign: "center",
     }}>
       {c.r}{c.s}
@@ -92,13 +109,13 @@ export function CardFace({ c }) {
   );
 }
 
-// The generic "not started yet" card every mini-game host shows before
-// clicking start — reusable across all of them.
+// The generic "not started yet" card a challenge setup screen can show
+// before clicking start.
 export function ChallengeSetupCard({ icon, title, blurb, children, onStart, startLabel = "Start Challenge", disabled }) {
   return (
     <Card>
-      <h3 style={{ color: "#f0e6d3", margin: "0 0 8px", fontSize: 14, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>{icon} {title} — Setup</h3>
-      <p style={{ color: "#a09080", fontSize: 13, margin: "0 0 14px", fontStyle: "italic" }}>{blurb}</p>
+      <h3 style={{ color: "#f5f0ff", margin: "0 0 8px", fontSize: 14, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 1 }}>{icon} {title} — Setup</h3>
+      <p style={{ color: "#a68fd6", fontSize: 13, margin: "0 0 14px", fontStyle: "italic" }}>{blurb}</p>
       {children}
       <Btn onClick={onStart} disabled={disabled}>{startLabel}</Btn>
     </Card>

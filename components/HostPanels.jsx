@@ -66,19 +66,19 @@ export default function HostPanels({ gameId, players }) {
   return (
     <div>
       <div style={{ marginBottom: 12 }}>
-        <p style={{ color: "#a09080", fontSize: 13, margin: 0 }}>
+        <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>
           {alive.length} alive out of {approvedPlayers.length}
         </p>
       </div>
 
-      <div style={{ display: "flex", gap: 2, marginBottom: 16, borderBottom: "1px solid #253550", overflowX: "auto" }}>
+      <div style={{ display: "flex", gap: 2, marginBottom: 16, borderBottom: "1px solid #3d1f5c", overflowX: "auto" }}>
         {TABS.map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)} style={{
-            background: tab === t.key ? "rgba(201,168,76,0.13)" : "transparent",
-            color: tab === t.key ? "#c9a84c" : "#a09080",
+            background: tab === t.key ? "rgba(255,45,149,0.13)" : "transparent",
+            color: tab === t.key ? "#ff2d95" : "#a68fd6",
             border: "none", borderRadius: "8px 8px 0 0", padding: "8px 14px",
             fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
-            borderBottom: tab === t.key ? "2px solid #c9a84c" : "2px solid transparent",
+            borderBottom: tab === t.key ? "2px solid #ff2d95" : "2px solid transparent",
           }}>
             {t.label}
           </button>
@@ -89,17 +89,17 @@ export default function HostPanels({ gameId, players }) {
         <div style={{ display: "grid", gap: 16 }}>
           {(!round || round.phase === PHASES.LOBBY) ? (
             <Card style={{ textAlign: "center" }}>
-              <h3 style={{ color: "#f0e6d3", margin: "0 0 8px", fontSize: 16, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>Ready to begin</h3>
-              <p style={{ color: "#a09080", fontSize: 13, margin: "0 0 14px" }}>
+              <h3 style={{ color: "#f5f0ff", margin: "0 0 8px", fontSize: 16, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>Ready to begin</h3>
+              <p style={{ color: "#a68fd6", fontSize: 13, margin: "0 0 14px" }}>
                 Approve your players in the Admin tab, then start Round 1 whenever everyone's ready.
               </p>
               <Btn onClick={startSeason} disabled={starting || alive.length < 3}>{starting ? "Starting..." : "Start Round 1"}</Btn>
-              {alive.length < 3 && <p style={{ color: "#c45c3c", fontSize: 11, marginTop: 8 }}>Need at least 3 approved players.</p>}
+              {alive.length < 3 && <p style={{ color: "#ff3860", fontSize: 11, marginTop: 8 }}>Need at least 3 approved players.</p>}
             </Card>
           ) : round.phase === PHASES.ENDED ? (
-            <Card style={{ textAlign: "center", borderColor: "rgba(201,168,76,0.5)" }}>
+            <Card style={{ textAlign: "center", borderColor: "rgba(255,45,149,0.5)" }}>
               <div style={{ fontSize: 40, marginBottom: 8 }}>🏆</div>
-              <h3 style={{ color: "#c9a84c", margin: "0 0 4px", fontSize: 20, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>
+              <h3 style={{ color: "#ff2d95", margin: "0 0 4px", fontSize: 20, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
                 {round.winnerName || "Someone"} wins Project B!
               </h3>
             </Card>

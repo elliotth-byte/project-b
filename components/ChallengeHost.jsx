@@ -25,7 +25,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   const [config, setConfig] = useState(DEFAULT_PARTICIPATION);
   const [gameType, setGameType] = useState("manual");
   const [durationMin, setDurationMin] = useState(Math.round((settings?.challengeDurationSec || 900) / 60));
-  const [selectedReentrant, setSelectedReentrant] = useState("");
+  const [selectedReentrants, setSelectedReentrants] = useState([]);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -60,17 +60,16 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     setBusy(true);
     const { participants } = computeParticipants(config, { alive: alivePicker, allPlayers: allPicker });
     let participantIds = participants.map((p) => p.id);
-    let reentryAttemptId = null;
-    if (selectedReentrant) {
-      reentryAttemptId = selectedReentrant;
-      await markCompeting(gameId, selectedReentrant);
-      if (!participantIds.includes(selectedReentrant)) participantIds = [...participantIds, selectedReentrant];
+    const reentryAttemptIds = [...selectedReentrants];
+    for (const id of reentryAttemptIds) {
+      await markCompeting(gameId, id);
+      if (!participantIds.includes(id)) participantIds = [...participantIds, id];
     }
     const now = Date.now();
-    const endsAt = now + durationMin * 60 * 1000;
+    const endsAt = settings?.infiniteTime ? null : now + durationMin * 60 * 1000;
     await storageSet(gameId, KEY_CHALLENGE, {
       round: round.round, active: true, startedAt: now, endsAt,
-      participantIds, reentryAttemptId, placements: [], finalized: false,
+      participantIds, reentryAttemptIds, placements: [], finalized: false,
       gameType, gameConfig: gameConfigWithDefaults(gameType),
     });
     await storageUpdate(gameId, KEY_ROUND, (fresh) => ({ ...(fresh || {}), phaseStartedAt: now, phaseEndsAt: endsAt }));
@@ -105,7 +104,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   };
 
   if (round?.phase !== "challenge") {
-    return <Card><p style={{ color: "#706050", fontStyle: "italic" }}>Not in the Challenge phase right now.</p></Card>;
+    return <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>Not in the Challenge phase right now.</p></Card>;
   }
 
   const participants = challenge?.participantIds
@@ -119,8 +118,8 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   if (!challenge?.active) {
     return (
       <Card>
-        <h3 style={{ color: "#f0e6d3", margin: "0 0 8px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>⚔️ Challenge — Setup</h3>
-        <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+        <h3 style={{ color: "#f5f0ff", margin: "0 0 8px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>⚔️ Challenge — Setup</h3>
+        <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
           Pick a challenge. Digital ones play out live on each player's own screen and score themselves; Manual / In-Person just tracks who's competing and how long they have while you run the challenge yourselves.
         </p>
 
@@ -129,52 +128,53 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
             <button key={key} onClick={() => pickGameType(key)} style={{
               display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
               padding: "10px 8px", borderRadius: 8, cursor: "pointer",
-              background: gameType === key ? "rgba(201,168,76,0.15)" : "#0a1020",
-              border: `1px solid ${gameType === key ? "#c9a84c" : "#253550"}`,
-              color: gameType === key ? "#c9a84c" : "#a09080",
+              background: gameType === key ? "rgba(255,45,149,0.15)" : "#0d0618",
+              border: `1px solid ${gameType === key ? "#ff2d95" : "#3d1f5c"}`,
+              color: gameType === key ? "#ff2d95" : "#a68fd6",
             }}>
               <span style={{ fontSize: 20 }}>{g.icon}</span>
               <span style={{ fontSize: 11, fontWeight: 600, textAlign: "center" }}>{g.label}</span>
             </button>
           ))}
         </div>
-        <p style={{ fontSize: 11.5, color: "#706050", margin: "0 0 14px", fontStyle: "italic" }}>{GAME_REGISTRY[gameType].blurb}</p>
+        <p style={{ fontSize: 11.5, color: "#6b4f99", margin: "0 0 14px", fontStyle: "italic" }}>{GAME_REGISTRY[gameType].blurb}</p>
 
         <ParticipantPicker alive={alivePicker} allPlayers={allPicker} value={config} onChange={setConfig} />
 
         {requesters.length > 0 && (
-          <div style={{ background: "#0a1020", borderRadius: 8, padding: 10, marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: "#a09080", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+          <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
               Exiled players requesting re-entry this round
             </div>
-            <p style={{ fontSize: 11, color: "#706050", margin: "0 0 8px", fontStyle: "italic" }}>
-              Each exiled player gets exactly one re-entry attempt, ever. Pick at most one to compete this round — if they finish 1st, they return AND this round becomes a double elimination.
+            <p style={{ fontSize: 11, color: "#6b4f99", margin: "0 0 8px", fontStyle: "italic" }}>
+              Each exiled player gets exactly one re-entry attempt, ever. Any number of them can try in the SAME challenge — but only whoever actually finishes 1st overall returns (and makes this round a double elimination); everyone else who tried and didn't get 1st uses up their one shot for good.
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              <button onClick={() => setSelectedReentrant("")} style={{
-                fontSize: 11, padding: "4px 10px", borderRadius: 12, cursor: "pointer",
-                background: !selectedReentrant ? "rgba(201,168,76,0.15)" : "transparent",
-                border: `1px solid ${!selectedReentrant ? "#c9a84c" : "#253550"}`,
-                color: !selectedReentrant ? "#c9a84c" : "#706050",
-              }}>None this round</button>
-              {requesters.map((r) => (
-                <button key={r.playerId} onClick={() => setSelectedReentrant(r.playerId)} style={{
-                  fontSize: 11, padding: "4px 10px", borderRadius: 12, cursor: "pointer",
-                  background: selectedReentrant === r.playerId ? "rgba(196,92,60,0.15)" : "transparent",
-                  border: `1px solid ${selectedReentrant === r.playerId ? "#c45c3c" : "#253550"}`,
-                  color: selectedReentrant === r.playerId ? "#c45c3c" : "#a09080",
-                }}>{r.name}</button>
-              ))}
+              {requesters.map((r) => {
+                const selected = selectedReentrants.includes(r.playerId);
+                return (
+                  <button key={r.playerId} onClick={() => setSelectedReentrants((prev) => selected ? prev.filter((id) => id !== r.playerId) : [...prev, r.playerId])} style={{
+                    fontSize: 11, padding: "4px 10px", borderRadius: 12, cursor: "pointer",
+                    background: selected ? "rgba(255,56,96,0.15)" : "transparent",
+                    border: `1px solid ${selected ? "#ff3860" : "#3d1f5c"}`,
+                    color: selected ? "#ff3860" : "#a68fd6",
+                  }}>{selected ? "✓ " : ""}{r.name}</button>
+                );
+              })}
             </div>
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
-          <label style={{ fontSize: 12, color: "#a09080" }}>Duration:</label>
-          <input type="number" min={1} value={durationMin} onChange={(e) => setDurationMin(Number(e.target.value) || 1)}
-            style={{ width: 70, background: "#0a1020", border: "1px solid #253550", borderRadius: 6, padding: "6px 10px", color: "#f0e6d3", fontSize: 13 }} />
-          <span style={{ fontSize: 12, color: "#a09080" }}>minutes</span>
-        </div>
+        {settings?.infiniteTime ? (
+          <p style={{ color: "#ff2d95", fontSize: 12, margin: "0 0 12px" }}>∞ Infinite time is on — this challenge runs until you end it. (Change this in Admin → Round Lengths.)</p>
+        ) : (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+            <label style={{ fontSize: 12, color: "#a68fd6" }}>Duration:</label>
+            <input type="number" min={1} value={durationMin} onChange={(e) => setDurationMin(Number(e.target.value) || 1)}
+              style={{ width: 70, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 10px", color: "#f5f0ff", fontSize: 13 }} />
+            <span style={{ fontSize: 12, color: "#a68fd6" }}>minutes</span>
+          </div>
+        )}
 
         <Btn onClick={startChallenge} disabled={busy}>{busy ? "Starting..." : "Start Challenge"}</Btn>
       </Card>
@@ -190,28 +190,28 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   return (
     <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <h3 style={{ color: "#f0e6d3", margin: 0, fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>
+        <h3 style={{ color: "#f5f0ff", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
           {registryEntry?.icon} {registryEntry?.label} — In Progress
         </h3>
-        {challenge.reentryAttemptId && <Badge color="#c45c3c">Re-entry attempt in progress</Badge>}
+        {challenge.reentryAttemptIds?.length > 0 && <Badge color="#ff3860">{challenge.reentryAttemptIds.length} re-entry attempt{challenge.reentryAttemptIds.length > 1 ? "s" : ""} in progress</Badge>}
       </div>
-      <p style={{ color: "#706050", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+      <p style={{ color: "#6b4f99", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
         1st place wins immunity{round.finalFour ? " — everyone else is automatically nominated (Final Four)." : "; the top 3 each get to make a nomination at the Fates Ceremony."}
       </p>
 
       {isDigital ? (
         <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
-          <div style={{ fontSize: 11, color: "#a09080", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Live leaderboard</div>
+          <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Live leaderboard</div>
           {liveRanking.map((r) => {
             const s = scores[r.playerId];
-            const isReentrant = challenge.reentryAttemptId === r.playerId;
+            const isReentrant = challenge.reentryAttemptIds?.includes(r.playerId);
             return (
-              <div key={r.playerId} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0a1020", borderRadius: 6, padding: "6px 10px" }}>
-                <Badge color={r.place === 1 ? "#c9a84c" : "#a09080"}>#{r.place}</Badge>
-                <span style={{ flex: 1, fontSize: 13, color: "#f0e6d3" }}>
-                  {r.name}{isReentrant && <span style={{ color: "#c45c3c", fontSize: 11 }}> (re-entry attempt)</span>}
+              <div key={r.playerId} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0d0618", borderRadius: 6, padding: "6px 10px" }}>
+                <Badge color={r.place === 1 ? "#ff2d95" : "#a68fd6"}>#{r.place}</Badge>
+                <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff" }}>
+                  {r.name}{isReentrant && <span style={{ color: "#ff3860", fontSize: 11 }}> (re-entry attempt)</span>}
                 </span>
-                <span style={{ fontSize: 12, color: "#a09080" }}>
+                <span style={{ fontSize: 12, color: "#a68fd6" }}>
                   {s
                     ? (s.foundCount != null
                         ? `${s.foundCount}/${challenge.gameConfig?.differences || 5} found`
@@ -227,16 +227,16 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
         <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
           {participants.map((p) => {
             const current = (challenge.placements || []).find((pl) => pl.playerId === p.id);
-            const isReentrant = challenge.reentryAttemptId === p.id;
+            const isReentrant = challenge.reentryAttemptIds?.includes(p.id);
             return (
               <div key={p.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <span style={{ flex: 1, fontSize: 13, color: "#f0e6d3" }}>
-                  {p.display_name}{isReentrant && <span style={{ color: "#c45c3c", fontSize: 11 }}> (re-entry attempt)</span>}
+                <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff" }}>
+                  {p.display_name}{isReentrant && <span style={{ color: "#ff3860", fontSize: 11 }}> (re-entry attempt)</span>}
                 </span>
                 <input type="number" min={1} max={participants.length} value={current?.place || ""}
                   onChange={(e) => setPlace(p.id, e.target.value)}
                   placeholder="place"
-                  style={{ width: 70, background: "#0a1020", border: "1px solid #253550", borderRadius: 6, padding: "5px 8px", color: "#f0e6d3", fontSize: 13, textAlign: "center" }} />
+                  style={{ width: 70, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "5px 8px", color: "#f5f0ff", fontSize: 13, textAlign: "center" }} />
               </div>
             );
           })}
@@ -247,7 +247,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
         {!isDigital && <Btn small variant="ghost" onClick={clearResults}>Clear Results</Btn>}
         <Btn small onClick={finishNow} disabled={!complete || busy}>{busy ? "Working..." : "Finish Challenge Now"}</Btn>
       </div>
-      {!isDigital && !complete && <p style={{ color: "#706050", fontSize: 11, fontStyle: "italic", margin: "0 0 12px" }}>Every competitor needs a distinct place (1, 2, 3, ...) before this can finish.</p>}
+      {!isDigital && !complete && <p style={{ color: "#6b4f99", fontSize: 11, fontStyle: "italic", margin: "0 0 12px" }}>Every competitor needs a distinct place (1, 2, 3, ...) before this can finish.</p>}
 
       <PostToGroupMe gameId={gameId} icon={registryEntry?.icon || "⚔️"} label="Challenge Announcement"
         text={`${registryEntry?.icon || "⚔️"} ${registryEntry?.label} underway! ${participants.length} competing. 1st place wins immunity${round.finalFour ? " — this is the FINAL FOUR, everyone else is automatically nominated." : "."}`} />

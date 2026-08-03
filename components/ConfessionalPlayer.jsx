@@ -45,17 +45,17 @@ export default function ConfessionalPlayer({ gameId, player, round }) {
   };
 
   return (
-    <Card style={{ marginBottom: 20, borderColor: "rgba(124,58,237,0.35)", background: "linear-gradient(160deg, #150c1e 0%, #0e1830 100%)" }}>
-      <h3 style={{ color: "#c9a84c", margin: "0 0 4px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🎥 Confessional</h3>
-      <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+    <Card style={{ marginBottom: 20, borderColor: "rgba(124,58,237,0.35)", background: "linear-gradient(160deg, #150a28 0%, #150a28 100%)" }}>
+      <h3 style={{ color: "#ff2d95", margin: "0 0 4px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🎥 Confessional</h3>
+      <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
         This is your private room. Tell the host what you're thinking, plotting, noticing, or feeling.
         Confessionals are visible only to you and the host — no other player can ever see them.
       </p>
 
       {prompt && (
-        <div style={{ background: "rgba(201,168,76,0.1)", border: "1px solid rgba(201,168,76,0.3)", borderRadius: 8, padding: "10px 12px", marginBottom: 12 }}>
-          <div style={{ fontSize: 10, color: "#c9a84c", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Tonight's prompt</div>
-          <div style={{ fontSize: 13, color: "#f0e6d3" }}>{prompt.prompt}</div>
+        <div style={{ background: "rgba(255,45,149,0.1)", border: "1px solid rgba(255,45,149,0.3)", borderRadius: 8, padding: "10px 12px", marginBottom: 12 }}>
+          <div style={{ fontSize: 10, color: "#ff2d95", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Tonight's prompt</div>
+          <div style={{ fontSize: 13, color: "#f5f0ff" }}>{prompt.prompt}</div>
         </div>
       )}
 
@@ -63,9 +63,9 @@ export default function ConfessionalPlayer({ gameId, player, round }) {
         value={text} onChange={(e) => setText(e.target.value)} rows={4}
         placeholder="Step into the confessional. What are you thinking? Who do you trust? Who are you lying to? What just happened?"
         style={{
-          width: "100%", background: "#0a1020", border: "1px solid #253550", borderRadius: 8, padding: "10px 12px",
-          color: "#f0e6d3", fontSize: 14, resize: "vertical", boxSizing: "border-box", marginBottom: 8,
-          fontFamily: "'Palatino Linotype', Palatino, Georgia, serif", lineHeight: 1.5,
+          width: "100%", background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "10px 12px",
+          color: "#f5f0ff", fontSize: 14, resize: "vertical", boxSizing: "border-box", marginBottom: 8,
+          fontFamily: "'Orbitron', 'Segoe UI', sans-serif", lineHeight: 1.5,
         }}
       />
 
@@ -73,30 +73,30 @@ export default function ConfessionalPlayer({ gameId, player, round }) {
         {CONFESSIONAL_TAGS.map((t) => (
           <button key={t} onClick={() => toggleTag(t)} style={{
             fontSize: 11, padding: "4px 10px", borderRadius: 12, cursor: "pointer",
-            background: selectedTags.includes(t) ? "rgba(201,168,76,0.15)" : "#0a1020",
-            border: `1px solid ${selectedTags.includes(t) ? "#c9a84c" : "#253550"}`,
-            color: selectedTags.includes(t) ? "#c9a84c" : "#a09080",
+            background: selectedTags.includes(t) ? "rgba(255,45,149,0.15)" : "#0d0618",
+            border: `1px solid ${selectedTags.includes(t) ? "#ff2d95" : "#3d1f5c"}`,
+            color: selectedTags.includes(t) ? "#ff2d95" : "#a68fd6",
           }}>{t}</button>
         ))}
       </div>
 
       <Btn onClick={submit} disabled={!text.trim() || submitting}>{submitting ? "Submitting..." : "Submit Confessional"}</Btn>
-      {confirmed && <p style={{ color: "#7a9a5c", fontSize: 12, marginTop: 8 }}>✓ Sent to the host. Thank you for sharing.</p>}
+      {confirmed && <p style={{ color: "#00ff9d", fontSize: 12, marginTop: 8 }}>✓ Sent to the host. Thank you for sharing.</p>}
 
       {mine.length > 0 && (
-        <div style={{ marginTop: 14, borderTop: "1px solid #253550", paddingTop: 10 }}>
-          <button onClick={() => setShowHistory(!showHistory)} style={{ background: "none", border: "none", color: "#706050", fontSize: 11, cursor: "pointer" }}>
+        <div style={{ marginTop: 14, borderTop: "1px solid #3d1f5c", paddingTop: 10 }}>
+          <button onClick={() => setShowHistory(!showHistory)} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 11, cursor: "pointer" }}>
             {showHistory ? "▲ Hide" : "▼ Show"} your past confessionals ({mine.length})
           </button>
           {showHistory && (
             <div style={{ marginTop: 8, display: "grid", gap: 6, maxHeight: 220, overflowY: "auto" }}>
               {mine.map((c) => (
-                <div key={c.id} style={{ background: "#0a1020", borderRadius: 6, padding: "8px 10px" }}>
-                  <div style={{ fontSize: 10, color: "#706050", marginBottom: 3 }}>
+                <div key={c.id} style={{ background: "#0d0618", borderRadius: 6, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 10, color: "#6b4f99", marginBottom: 3 }}>
                     {c.round ? `Round ${c.round} · ` : ""}{new Date(c.created_at).toLocaleString()}
                     {c.tags?.length > 0 && ` · ${c.tags.join(", ")}`}
                   </div>
-                  <div style={{ fontSize: 12, color: "#a09080" }}>{c.text}</div>
+                  <div style={{ fontSize: 12, color: "#a68fd6" }}>{c.text}</div>
                 </div>
               ))}
             </div>

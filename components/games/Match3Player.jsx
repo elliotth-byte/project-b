@@ -99,19 +99,19 @@ export default function Match3Player({ gameId, round, challenge, player }) {
   return (
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <h3 style={{ color: "#c9a84c", margin: 0, fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>💎 Match 3</h3>
+        <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>💎 Match 3</h3>
         <Badge>{score} pts</Badge>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${SIZE}, 42px)`, gap: 3, margin: "0 auto", width: "fit-content" }}>
         {grid.map((v, i) => (
           <button key={i} onClick={() => clickTile(i)} style={{
             width: 42, height: 42, fontSize: 22, borderRadius: 6, cursor: "pointer",
-            background: selected === i ? "rgba(201,168,76,0.25)" : "#0a1020",
-            border: `2px solid ${selected === i ? "#c9a84c" : "#253550"}`,
+            background: selected === i ? "rgba(255,45,149,0.25)" : "#0d0618",
+            border: `2px solid ${selected === i ? "#ff2d95" : "#3d1f5c"}`,
           }}>{GEMS[v]}</button>
         ))}
       </div>
-      <p style={{ color: "#706050", fontSize: 11, marginTop: 8, fontStyle: "italic" }}>Tap two adjacent gems to swap them.</p>
+      <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 8, fontStyle: "italic" }}>Tap two adjacent gems to swap them.</p>
     </Card>
   );
 }

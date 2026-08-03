@@ -3,12 +3,11 @@ import * as Tone from "tone";
 import { MOODS, buildEngine, STORAGE_KEY_MUSIC_MOOD } from "../lib/musicEngine";
 import { storageSet, subscribeGameState } from "../lib/gameStorage";
 
-// ─── Ambient Music Player ───
+// ─── The Radio ───
 // Each person's browser generates and plays its own audio locally (nothing
-// is streamed) — only the *choice of mood* is synced, so everyone's ambient
-// music matches. The original polled shared storage every 5s for mood
-// changes; this uses a realtime subscription instead, same as everything
-// else in this project.
+// is streamed) — only the *choice of station* is synced, so everyone's
+// radio matches. Uses a realtime subscription for station changes instead
+// of polling.
 export default function MusicPlayer({ gameId, isHost = false }) {
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(0.4);
@@ -81,12 +80,12 @@ export default function MusicPlayer({ gameId, isHost = false }) {
     <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 1000 }}>
       {showControls && (
         <div style={{
-          background: "#132038", border: "1px solid #253550", borderRadius: 12,
+          background: "#1a0a2e", border: "1px solid #3d1f5c", borderRadius: 12,
           padding: "14px 16px", marginBottom: 8, minWidth: 200,
           boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
         }}>
-          <div style={{ fontSize: 11, color: "#c9a84c", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>
-            Ambience
+          <div style={{ fontSize: 11, color: "#ff2d95", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>
+            📻 Radio
           </div>
           {isHost ? (
             <div style={{ display: "grid", gap: 4, marginBottom: 10 }}>
@@ -95,50 +94,50 @@ export default function MusicPlayer({ gameId, isHost = false }) {
                   key={m.id}
                   onClick={() => changeMood(m.id)}
                   style={{
-                    background: mood === m.id ? "rgba(201,168,76,0.15)" : "#0a1020",
-                    border: `1px solid ${mood === m.id ? "#c9a84c" : "#253550"}`,
+                    background: mood === m.id ? "rgba(255,45,149,0.15)" : "#0d0618",
+                    border: `1px solid ${mood === m.id ? "#ff2d95" : "#3d1f5c"}`,
                     borderRadius: 8, padding: "6px 10px", cursor: "pointer",
                     display: "flex", alignItems: "center", gap: 8, transition: "all 0.15s",
                   }}
                 >
                   <span style={{ fontSize: 14 }}>{m.icon}</span>
-                  <span style={{ fontSize: 11, color: mood === m.id ? "#c9a84c" : "#a09080", fontWeight: mood === m.id ? 700 : 400 }}>
+                  <span style={{ fontSize: 11, color: mood === m.id ? "#ff2d95" : "#a68fd6", fontWeight: mood === m.id ? 700 : 400 }}>
                     {m.label}
                   </span>
                 </button>
               ))}
             </div>
           ) : (
-            <div style={{ fontSize: 12, color: "#a09080", marginBottom: 10 }}>
+            <div style={{ fontSize: 12, color: "#a68fd6", marginBottom: 10 }}>
               {currentMood.icon} {currentMood.label}
             </div>
           )}
           <input
             type="range" min="0" max="1" step="0.05" value={volume}
             onChange={(e) => setVolume(parseFloat(e.target.value))}
-            style={{ width: "100%", accentColor: "#c9a84c" }}
+            style={{ width: "100%", accentColor: "#ff2d95" }}
           />
-          <div style={{ fontSize: 10, color: "#706050", textAlign: "center", marginTop: 4 }}>
+          <div style={{ fontSize: 10, color: "#6b4f99", textAlign: "center", marginTop: 4 }}>
             {Math.round(volume * 100)}%
           </div>
         </div>
       )}
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
         {showControls && (
-          <button onClick={() => setShowControls(false)} style={{ background: "none", border: "none", color: "#706050", fontSize: 11, cursor: "pointer" }}>✕</button>
+          <button onClick={() => setShowControls(false)} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 11, cursor: "pointer" }}>✕</button>
         )}
         <button
           onClick={() => { if (!playing) startMusic(); else stopMusic(); }}
           style={{
             width: 44, height: 44, borderRadius: "50%",
-            background: playing ? "linear-gradient(135deg, #c9a84c, #b8943e)" : "linear-gradient(135deg, #132038, #1a2845)",
-            border: `1px solid ${playing ? "#c9a84c" : "#253550"}`,
-            color: playing ? "#0c1425" : "#706050", fontSize: 18, cursor: "pointer",
+            background: playing ? "linear-gradient(135deg, #ff2d95, #b829ff)" : "linear-gradient(135deg, #1a0a2e, #1a0a2e)",
+            border: `1px solid ${playing ? "#ff2d95" : "#3d1f5c"}`,
+            color: playing ? "#05010f" : "#6b4f99", fontSize: 18, cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: playing ? "0 0 20px rgba(201,168,76,0.3)" : "0 4px 16px rgba(0,0,0,0.4)",
+            boxShadow: playing ? "0 0 20px rgba(255,45,149,0.3)" : "0 4px 16px rgba(0,0,0,0.4)",
             transition: "all 0.3s",
           }}
-          title="Play/pause ambient music"
+          title="Play/pause radio"
         >
           {playing ? "♫" : "♪"}
         </button>
@@ -146,8 +145,8 @@ export default function MusicPlayer({ gameId, isHost = false }) {
           <button
             onClick={() => setShowControls(true)}
             style={{
-              width: 28, height: 28, borderRadius: "50%", background: "#132038", border: "1px solid #253550",
-              color: "#706050", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              width: 28, height: 28, borderRadius: "50%", background: "#1a0a2e", border: "1px solid #3d1f5c",
+              color: "#6b4f99", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
             }}
             title="Music settings"
           >⚙</button>

@@ -50,14 +50,14 @@ export default function WhackMolePlayer({ gameId, round, challenge, player }) {
   return (
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-        <h3 style={{ color: "#c9a84c", margin: 0, fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🔨 Whack-a-Mole</h3>
-        <Badge color={remainingSec <= 10 ? "#c45c3c" : "#c9a84c"}>{remainingSec}s · {score} pts</Badge>
+        <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🔨 Whack-a-Mole</h3>
+        <Badge color={remainingSec != null && remainingSec <= 10 ? "#ff3860" : "#ff2d95"}>{remainingSec != null ? `${remainingSec}s` : "∞"} · {score} pts</Badge>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 70px)", gap: 8, margin: "0 auto", width: "fit-content" }}>
         {Array.from({ length: HOLES }).map((_, i) => (
           <button key={i} onClick={() => whack(i)} style={{
             width: 70, height: 70, borderRadius: "50%", fontSize: 32, cursor: "pointer",
-            background: "#0a1020", border: "3px solid #253550", overflow: "hidden",
+            background: "#0d0618", border: "3px solid #3d1f5c", overflow: "hidden",
           }}>
             {activeHole === i ? "🐹" : ""}
           </button>

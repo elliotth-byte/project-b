@@ -106,31 +106,31 @@ export default function ConfessionalsHost({ gameId, round }) {
     return `🎥 Project B Confessionals\n\n${lines.join("\n\n")}`;
   };
 
-  if (loading) return <Card><p style={{ color: "#706050", fontStyle: "italic" }}>Loading...</p></Card>;
+  if (loading) return <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>Loading...</p></Card>;
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <h3 style={{ color: "#f0e6d3", margin: 0, fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🎥 Confessional Inbox</h3>
-          {unreadCount > 0 && <Badge color="#c45c3c">{unreadCount} unread</Badge>}
+          <h3 style={{ color: "#f5f0ff", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🎥 Confessional Inbox</h3>
+          {unreadCount > 0 && <Badge color="#ff3860">{unreadCount} unread</Badge>}
         </div>
-        <p style={{ color: "#706050", fontSize: 12, margin: "0 0 10px", fontStyle: "italic" }}>
+        <p style={{ color: "#6b4f99", fontSize: 12, margin: "0 0 10px", fontStyle: "italic" }}>
           Private player confessionals. Visible only here — players can't see each other's, this is never posted automatically.
         </p>
 
         {/* Prompt */}
-        <div style={{ background: "#0a1020", borderRadius: 8, padding: 10, marginBottom: 12 }}>
-          <div style={{ fontSize: 11, color: "#a09080", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>Tonight's Prompt</div>
+        <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>Tonight's Prompt</div>
           {prompt?.active ? (
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 13, color: "#f0e6d3" }}>{prompt.prompt}</span>
+              <span style={{ fontSize: 13, color: "#f5f0ff" }}>{prompt.prompt}</span>
               <Btn small variant="ghost" onClick={deactivatePrompt}>Deactivate</Btn>
             </div>
           ) : (
             <div style={{ display: "flex", gap: 6 }}>
               <input value={promptDraft} onChange={(e) => setPromptDraft(e.target.value)} placeholder="e.g. Who do you trust least after tonight?"
-                style={{ flex: 1, background: "#132038", border: "1px solid #253550", borderRadius: 6, padding: "6px 10px", color: "#f0e6d3", fontSize: 12 }} />
+                style={{ flex: 1, background: "#1a0a2e", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 10px", color: "#f5f0ff", fontSize: 12 }} />
               <Btn small onClick={savePrompt} disabled={!promptDraft.trim()}>Set Prompt</Btn>
             </div>
           )}
@@ -182,9 +182,9 @@ export default function ConfessionalsHost({ gameId, round }) {
       </Card>
 
       {recapMode && (
-        <Card style={{ borderColor: "rgba(74,122,196,0.3)" }}>
-          <h3 style={{ color: "#f0e6d3", margin: "0 0 8px", fontSize: 14 }}>Build Recap</h3>
-          <p style={{ fontSize: 11, color: "#706050", margin: "0 0 8px", fontStyle: "italic" }}>Check the confessionals to include, choose options, then post or copy.</p>
+        <Card style={{ borderColor: "rgba(0,217,255,0.3)" }}>
+          <h3 style={{ color: "#f5f0ff", margin: "0 0 8px", fontSize: 14 }}>Build Recap</h3>
+          <p style={{ fontSize: 11, color: "#6b4f99", margin: "0 0 8px", fontStyle: "italic" }}>Check the confessionals to include, choose options, then post or copy.</p>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
             <label style={toggleLabel}><input type="checkbox" checked={recapOpts.names} onChange={(e) => setRecapOpts({ ...recapOpts, names: e.target.checked, anonymous: e.target.checked ? false : recapOpts.anonymous })} /> Include names</label>
             <label style={toggleLabel}><input type="checkbox" checked={recapOpts.anonymous} onChange={(e) => setRecapOpts({ ...recapOpts, anonymous: e.target.checked, names: e.target.checked ? false : recapOpts.names })} /> Anonymous instead</label>
@@ -193,9 +193,9 @@ export default function ConfessionalsHost({ gameId, round }) {
           </div>
           <div style={{ display: "grid", gap: 4, marginBottom: 10, maxHeight: 200, overflowY: "auto" }}>
             {items.filter((c) => !c.archived).map((c) => (
-              <label key={c.id} style={{ display: "flex", gap: 6, alignItems: "flex-start", fontSize: 12, color: "#a09080" }}>
+              <label key={c.id} style={{ display: "flex", gap: 6, alignItems: "flex-start", fontSize: 12, color: "#a68fd6" }}>
                 <input type="checkbox" checked={recapSelected.includes(c.id)} onChange={(e) => setRecapSelected(e.target.checked ? [...recapSelected, c.id] : recapSelected.filter((x) => x !== c.id))} style={{ marginTop: 3 }} />
-                <span>{c.starred && "⭐ "}<strong style={{ color: "#f0e6d3" }}>{c.player_name}</strong> — {c.text.slice(0, 80)}{c.text.length > 80 ? "..." : ""}</span>
+                <span>{c.starred && "⭐ "}<strong style={{ color: "#f5f0ff" }}>{c.player_name}</strong> — {c.text.slice(0, 80)}{c.text.length > 80 ? "..." : ""}</span>
               </label>
             ))}
           </div>
@@ -210,20 +210,20 @@ export default function ConfessionalsHost({ gameId, round }) {
 
       {groups.map(([label, groupItems]) => (
         <div key={label || "all"}>
-          {label && <div style={{ fontSize: 12, fontWeight: 700, color: "#c9a84c", textTransform: "uppercase", letterSpacing: 0.5, margin: "4px 0 8px" }}>{label} ({groupItems.length})</div>}
+          {label && <div style={{ fontSize: 12, fontWeight: 700, color: "#ff2d95", textTransform: "uppercase", letterSpacing: 0.5, margin: "4px 0 8px" }}>{label} ({groupItems.length})</div>}
           <div style={{ display: "grid", gap: 8 }}>
             {groupItems.length === 0 ? (
-              <p style={{ color: "#706050", fontSize: 12, fontStyle: "italic" }}>No confessionals match these filters.</p>
+              <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No confessionals match these filters.</p>
             ) : groupItems.map((c) => (
               <Card key={c.id} style={{
-                borderColor: !c.read_by_host ? "rgba(201,168,76,0.5)" : "#253550",
-                background: !c.read_by_host ? "rgba(201,168,76,0.06)" : "#0e1830",
+                borderColor: !c.read_by_host ? "rgba(255,45,149,0.5)" : "#3d1f5c",
+                background: !c.read_by_host ? "rgba(255,45,149,0.06)" : "#150a28",
               }}>
                 {compact ? (
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
-                    <span style={{ fontSize: 12, color: "#a09080" }}>
-                      {!c.read_by_host && <strong style={{ color: "#c9a84c" }}>● </strong>}
-                      <strong style={{ color: "#f0e6d3" }}>{c.player_name}</strong>
+                    <span style={{ fontSize: 12, color: "#a68fd6" }}>
+                      {!c.read_by_host && <strong style={{ color: "#ff2d95" }}>● </strong>}
+                      <strong style={{ color: "#f5f0ff" }}>{c.player_name}</strong>
                       {c.round ? ` · Round ${c.round}` : ""}{c.tags?.length ? ` · ${c.tags.join(", ")}` : ""}
                       {" · "}"{c.text.length > 70 ? c.text.slice(0, 70) + "..." : c.text}"
                     </span>
@@ -232,18 +232,18 @@ export default function ConfessionalsHost({ gameId, round }) {
                 ) : (
                   <>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#f0e6d3" }}>
-                        {!c.read_by_host && <strong style={{ color: "#c9a84c" }}>● </strong>}
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#f5f0ff" }}>
+                        {!c.read_by_host && <strong style={{ color: "#ff2d95" }}>● </strong>}
                         {c.player_name}{c.round ? ` · Round ${c.round}` : ""}
                       </span>
-                      <span style={{ fontSize: 11, color: "#706050" }}>{new Date(c.created_at).toLocaleString()}</span>
+                      <span style={{ fontSize: 11, color: "#6b4f99" }}>{new Date(c.created_at).toLocaleString()}</span>
                     </div>
                     {c.tags?.length > 0 && (
                       <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
-                        {c.tags.map((t) => <Badge key={t} color="#4a7ac4">{t}</Badge>)}
+                        {c.tags.map((t) => <Badge key={t} color="#00d9ff">{t}</Badge>)}
                       </div>
                     )}
-                    <p style={{ fontSize: 14, color: "#f0e6d3", margin: "0 0 8px", lineHeight: 1.5 }}>{c.text}</p>
+                    <p style={{ fontSize: 14, color: "#f5f0ff", margin: "0 0 8px", lineHeight: 1.5 }}>{c.text}</p>
                   </>
                 )}
                 <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
@@ -262,7 +262,7 @@ export default function ConfessionalsHost({ gameId, round }) {
 }
 
 const selStyle = {
-  background: "#0a1020", border: "1px solid #253550", borderRadius: 6, padding: "6px 8px",
-  color: "#f0e6d3", fontSize: 12,
+  background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 8px",
+  color: "#f5f0ff", fontSize: 12,
 };
-const toggleLabel = { display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#a09080", cursor: "pointer" };
+const toggleLabel = { display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#a68fd6", cursor: "pointer" };

@@ -4,8 +4,8 @@ import Link from "next/link";
 export default function HomeLink() {
   return (
     <Link href="/" style={{
-      color: "#a09080", fontSize: 12, textDecoration: "none",
-      fontFamily: "'Palatino Linotype', Palatino, Georgia, serif",
+      color: "#a68fd6", fontSize: 12, textDecoration: "none",
+      fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
     }}>
       🃏 Home
     </Link>

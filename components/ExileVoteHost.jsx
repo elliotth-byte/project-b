@@ -44,9 +44,9 @@ export default function ExileVoteHost({ gameId, players, round }) {
   }, [votes, alive]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (round?.phase !== "exile") {
-    return <Card><p style={{ color: "#706050", fontStyle: "italic" }}>Not in the Exile Vote phase right now.</p></Card>;
+    return <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>Not in the Exile Vote phase right now.</p></Card>;
   }
-  if (!exile) return <Card><p style={{ color: "#706050", fontStyle: "italic" }}>Loading...</p></Card>;
+  if (!exile) return <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>Loading...</p></Card>;
 
   const chaosHolder = players.find((p) => p.id === exile.chaosHolderId);
   const voteRows = Object.entries(votes).map(([voterId, v]) => ({ voterId, targetId: v.targetId }));
@@ -124,58 +124,58 @@ export default function ExileVoteHost({ gameId, players, round }) {
   const needsTieBreak = outcome.needsTieBreak;
 
   return (
-    <Card style={{ borderColor: "rgba(201,168,76,0.3)" }}>
+    <Card style={{ borderColor: "rgba(255,45,149,0.3)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <h3 style={{ color: "#c9a84c", margin: 0, fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>
+        <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
           🃏 Exile Vote — Round {round.round}
         </h3>
-        {exile.mode === "save" && <Badge color="#c45c3c">Double Elimination · Vote to SAVE</Badge>}
+        {exile.mode === "save" && <Badge color="#ff3860">Double Elimination · Vote to SAVE</Badge>}
       </div>
-      <p style={{ color: "#706050", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+      <p style={{ color: "#6b4f99", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
         Nominees: {exile.nominees.map((n) => n.name).join(", ")}.{" "}
         {exile.mode === "save"
           ? "Everyone votes for who to SAVE. Whoever the Power of Chaos nullifies, and whoever has the fewest save votes among the rest, are both exiled."
           : "Everyone votes for who to eliminate. Whoever the Power of Chaos nullifies can't be exiled no matter how many votes they get."}
       </p>
 
-      <div style={{ background: "#0a1020", borderRadius: 8, padding: 10, marginBottom: 12 }}>
-        <div style={{ fontSize: 11, color: "#a09080", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
-          🃏 Power of Chaos: <span style={{ color: "#c45c3c" }}>{chaosHolder?.display_name || "—"}</span>
+      <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+        <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+          🃏 Power of Chaos: <span style={{ color: "#ff3860" }}>{chaosHolder?.display_name || "—"}</span>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
-          <span style={{ fontSize: 12, color: "#a09080" }}>Nullify votes for:</span>
+          <span style={{ fontSize: 12, color: "#a68fd6" }}>Nullify votes for:</span>
           <select value={exile.chaosNullifiedNomineeId || ""} onChange={(e) => setNullified(e.target.value)}
-            style={{ background: "#132038", border: "1px solid #253550", borderRadius: 6, padding: "5px 8px", color: "#f0e6d3", fontSize: 12 }}>
+            style={{ background: "#1a0a2e", border: "1px solid #3d1f5c", borderRadius: 6, padding: "5px 8px", color: "#f5f0ff", fontSize: 12 }}>
             <option value="">— no one yet —</option>
             {exile.nominees.map((n) => <option key={n.playerId} value={n.playerId}>{n.name}</option>)}
           </select>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <Btn small variant="ghost" onClick={drawCard}>🃏 Fan of Cards — Draw</Btn>
-          {exile.cardDrawnText && <span style={{ fontSize: 12, color: "#c9a84c" }}>{exile.cardDrawnText}</span>}
+          {exile.cardDrawnText && <span style={{ fontSize: 12, color: "#ff2d95" }}>{exile.cardDrawnText}</span>}
         </div>
       </div>
 
       {exile.votingOpen ? (
         <Btn variant="danger" onClick={closeVoting} small>Close Voting</Btn>
       ) : (
-        <Badge color="#7a9a5c">Voting closed</Badge>
+        <Badge color="#00ff9d">Voting closed</Badge>
       )}
 
       <div style={{ marginTop: 12, marginBottom: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#a09080", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
           Votes: {voteRows.length}/{alive.length} in
         </div>
         <div style={{ display: "grid", gap: 6 }}>
           {alive.map((voter) => (
             <div key={voter.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <span style={{ width: 100, fontSize: 12, fontWeight: 700, color: "#f0e6d3", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ width: 100, fontSize: 12, fontWeight: 700, color: "#f5f0ff", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {voter.display_name}
               </span>
               <select
                 value={drafts[voter.id] || ""}
                 onChange={(e) => { dirtyRef.current.add(voter.id); setDrafts((d) => ({ ...d, [voter.id]: e.target.value })); commitVote(voter.id, e.target.value); }}
-                style={{ flex: 1, background: "#0a1020", border: "1px solid #253550", borderRadius: 6, padding: "4px 8px", color: "#f0e6d3", fontSize: 12 }}
+                style={{ flex: 1, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "4px 8px", color: "#f5f0ff", fontSize: 12 }}
               >
                 <option value="">—</option>
                 {exile.nominees.map((n) => <option key={n.playerId} value={n.playerId}>{n.name}</option>)}
@@ -186,8 +186,8 @@ export default function ExileVoteHost({ gameId, players, round }) {
       </div>
 
       {needsTieBreak && (
-        <Card style={{ borderColor: "rgba(196,92,60,0.5)", marginBottom: 12 }}>
-          <p style={{ color: "#c45c3c", fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>
+        <Card style={{ borderColor: "rgba(255,56,96,0.5)", marginBottom: 12 }}>
+          <p style={{ color: "#ff3860", fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>
             🃏 It's tied — {chaosHolder?.display_name || "the Power of Chaos holder"} must break the tie.
           </p>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -201,14 +201,14 @@ export default function ExileVoteHost({ gameId, players, round }) {
       )}
 
       {!exile.votingOpen && voteRows.length > 0 && (
-        <div style={{ borderTop: "1px solid #253550", paddingTop: 12, marginBottom: 12 }}>
+        <div style={{ borderTop: "1px solid #3d1f5c", paddingTop: 12, marginBottom: 12 }}>
           {!revealOrder ? (
             <Btn onClick={startReveal}>Start Dramatic Reveal</Btn>
           ) : (
             <div>
               <div style={{ display: "grid", gap: 8, marginBottom: 10 }}>
                 {revealOrder.slice(0, revealIndex + 1).map((row, i) => (
-                  <div key={row.voterId} style={{ fontSize: 13, color: "#f0e6d3", background: "#0a1020", border: "1px solid #253550", borderRadius: 8, padding: "8px 12px", opacity: i === revealIndex ? 1 : 0.6 }}>
+                  <div key={row.voterId} style={{ fontSize: 13, color: "#f5f0ff", background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "8px 12px", opacity: i === revealIndex ? 1 : 0.6 }}>
                     {players.find((p) => p.id === row.voterId)?.display_name}: {row.targetName}
                   </div>
                 ))}

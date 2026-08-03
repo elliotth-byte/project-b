@@ -22,9 +22,9 @@ export default function FatesHost({ gameId, players, round }) {
   }, [gameId, round?.round]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (round?.phase !== "fates") {
-    return <Card><p style={{ color: "#706050", fontStyle: "italic" }}>Not in the Fates Ceremony phase right now.</p></Card>;
+    return <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>Not in the Fates Ceremony phase right now.</p></Card>;
   }
-  if (!fates) return <Card><p style={{ color: "#706050", fontStyle: "italic" }}>Loading...</p></Card>;
+  if (!fates) return <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>Loading...</p></Card>;
 
   const winnerId = (challenge?.placements || []).find((p) => p.place === 1)?.playerId || null;
   const winnerName = players.find((p) => p.id === winnerId)?.display_name;
@@ -49,8 +49,8 @@ export default function FatesHost({ gameId, players, round }) {
 
   return (
     <Card>
-      <h3 style={{ color: "#f0e6d3", margin: "0 0 4px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>⚖️ Fates Ceremony — Round {round.round}</h3>
-      <p style={{ color: "#706050", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+      <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>⚖️ Fates Ceremony — Round {round.round}</h3>
+      <p style={{ color: "#6b4f99", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
         {winnerName ? `${winnerName} won immunity and can't be nominated.` : ""} Nominations happen in finishing order — 1st among the top 3, then 2nd, then 3rd.
       </p>
 
@@ -60,11 +60,11 @@ export default function FatesHost({ gameId, players, round }) {
           return (
             <div key={nominator.playerId} style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <Badge>#{nominator.place}</Badge>
-              <span style={{ width: 110, fontSize: 13, fontWeight: 700, color: "#f0e6d3", flexShrink: 0 }}>{nominator.name}</span>
+              <span style={{ width: 110, fontSize: 13, fontWeight: 700, color: "#f5f0ff", flexShrink: 0 }}>{nominator.name}</span>
               <select
                 value={currentNominee}
                 onChange={(e) => setNomination(nominator.playerId, e.target.value)}
-                style={{ flex: 1, background: "#0a1020", border: "1px solid #253550", borderRadius: 6, padding: "6px 10px", color: "#f0e6d3", fontSize: 12 }}
+                style={{ flex: 1, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 10px", color: "#f5f0ff", fontSize: 12 }}
               >
                 <option value="">— choose nominee —</option>
                 {alive.map((p) => {
@@ -84,7 +84,7 @@ export default function FatesHost({ gameId, players, round }) {
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
         <Btn small onClick={finishNow} disabled={!complete || busy}>{busy ? "Working..." : "Lock Nominations & Continue"}</Btn>
       </div>
-      {!complete && <p style={{ color: "#706050", fontSize: 11, fontStyle: "italic", margin: "0 0 12px" }}>Every one of the top 3 needs to submit a nomination first.</p>}
+      {!complete && <p style={{ color: "#6b4f99", fontSize: 11, fontStyle: "italic", margin: "0 0 12px" }}>Every one of the top 3 needs to submit a nomination first.</p>}
 
       <PostToGroupMe gameId={gameId} icon="⚖️" label="Fates Ceremony Announcement"
         text={`⚖️ The Fates Ceremony has begun. ${fates.nominatorOrder.map((n) => n.name).join(", ")} will each nominate one player for exile.`} />

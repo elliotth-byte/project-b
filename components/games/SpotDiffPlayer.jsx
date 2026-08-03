@@ -28,7 +28,7 @@ export default function SpotDiffPlayer({ gameId, round, challenge, player }) {
       drawScene(b, W, H, scene.sceneB);
       differences.forEach((d) => {
         if (d.found) {
-          b.strokeStyle = "#7a9a5c"; b.lineWidth = 3;
+          b.strokeStyle = "#00ff9d"; b.lineWidth = 3;
           b.beginPath(); b.arc(d.x, d.y, d.r, 0, Math.PI * 2); b.stroke();
         }
       });
@@ -77,12 +77,12 @@ export default function SpotDiffPlayer({ gameId, round, challenge, player }) {
   return (
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <h3 style={{ color: "#c9a84c", margin: 0, fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🔍 Spot the Difference</h3>
+        <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🔍 Spot the Difference</h3>
         <Badge>{foundCount}/{differences.length} found</Badge>
       </div>
-      <p style={{ color: "#706050", fontSize: 11, margin: "0 0 6px" }}>Top: original. Bottom: tap where it's different.</p>
-      <canvas ref={canvasARef} width={W} height={H} style={{ background: "#060e1a", borderRadius: 8, border: "1px solid #253550", marginBottom: 6, display: "block", margin: "0 auto 6px" }} />
-      <canvas ref={canvasBRef} width={W} height={H} onClick={onClickB} style={{ background: "#060e1a", borderRadius: 8, border: "1px solid #253550", cursor: "crosshair", display: "block", margin: "0 auto" }} />
+      <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 6px" }}>Top: original. Bottom: tap where it's different.</p>
+      <canvas ref={canvasARef} width={W} height={H} style={{ background: "#0d0618", borderRadius: 8, border: "1px solid #3d1f5c", marginBottom: 6, display: "block", margin: "0 auto 6px" }} />
+      <canvas ref={canvasBRef} width={W} height={H} onClick={onClickB} style={{ background: "#0d0618", borderRadius: 8, border: "1px solid #3d1f5c", cursor: "crosshair", display: "block", margin: "0 auto" }} />
     </Card>
   );
 }

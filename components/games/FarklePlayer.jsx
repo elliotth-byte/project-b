@@ -64,12 +64,12 @@ export default function FarklePlayer({ gameId, round, challenge, player }) {
 
   return (
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
-      <h3 style={{ color: "#c9a84c", margin: "0 0 8px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🎲 Farkle</h3>
+      <h3 style={{ color: "#ff2d95", margin: "0 0 8px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🎲 Farkle</h3>
       <div style={{ display: "flex", justifyContent: "center", gap: 14, marginBottom: 10 }}>
-        <Badge color="#c9a84c">Banked: {runningTotal}</Badge>
-        <Badge color="#7a9a5c">This turn: {turnScore}</Badge>
+        <Badge color="#ff2d95">Banked: {runningTotal}</Badge>
+        <Badge color="#00ff9d">This turn: {turnScore}</Badge>
       </div>
-      <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 12px", minHeight: 32 }}>{message}</p>
+      <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", minHeight: 32 }}>{message}</p>
       {lastRoll && (
         <div style={{ fontSize: 30, marginBottom: 12, letterSpacing: 4 }}>
           {lastRoll.map((v, i) => <span key={i}>{DIE_FACES[v]}</span>)}

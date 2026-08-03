@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 import { signOut, displayNameFromUser } from "../lib/auth";
+import ColorPicker from "../components/ColorPicker";
 import ChallengePlayer from "../components/ChallengePlayer";
 import FatesPlayer from "../components/FatesPlayer";
 import ExileVotePlayer from "../components/ExileVotePlayer";
@@ -84,13 +85,13 @@ export default function PlayPage() {
     (async () => {
       const { data: existing } = await supabase
         .from("players")
-        .select("id, display_name, alive, elimination_type, approved")
+        .select("id, display_name, alive, elimination_type, approved, color")
         .eq("game_id", gameId)
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (existing) {
-        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, approved: existing.approved });
+        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, approved: existing.approved, color: existing.color });
         setJoined(true);
         return;
       }
@@ -98,11 +99,11 @@ export default function PlayPage() {
       const { data: created, error } = await supabase
         .from("players")
         .insert({ game_id: gameId, user_id: user.id, display_name: displayNameFromUser(user), approved: false })
-        .select("id, display_name, alive, elimination_type, approved")
+        .select("id, display_name, alive, elimination_type, approved, color")
         .single();
       if (error) setJoinError("Couldn't join this game: " + error.message);
       else {
-        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, approved: created.approved });
+        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, approved: created.approved, color: created.color });
         setJoined(true);
       }
     })();
@@ -113,8 +114,8 @@ export default function PlayPage() {
   useEffect(() => {
     if (!myPlayer?.id) return;
     const load = async () => {
-      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, approved").eq("id", myPlayer.id).maybeSingle();
-      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, approved: data.approved }));
+      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, approved, color").eq("id", myPlayer.id).maybeSingle();
+      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, approved: data.approved, color: data.color }));
     };
     const channel = supabase
       .channel(`self-player-${myPlayer.id}`)
@@ -130,7 +131,7 @@ export default function PlayPage() {
   if (!gameId) {
     return (
       <div style={pageStyle}>
-        <p style={{ color: "#a09080" }}>Ask the host for your join link — it looks like <code>/play?game=...</code>.</p>
+        <p style={{ color: "#a68fd6" }}>Ask the host for your join link — it looks like <code>/play?game=...</code>.</p>
       </div>
     );
   }
@@ -145,39 +146,43 @@ export default function PlayPage() {
     <div style={{ ...pageStyle, alignItems: "flex-start", flexDirection: "column" }}>
       <div style={{ display: "flex", justifyContent: "space-between", width: "100%", maxWidth: 400, margin: "0 auto 12px" }}>
         <HomeLink />
-        <span style={{ color: "#a09080", fontSize: 13 }}>Playing as {playerName || "..."}</span>
-        <button onClick={signOut} style={{ background: "none", border: "none", color: "#706050", fontSize: 12, cursor: "pointer" }}>Log out</button>
+        <span style={{ color: "#a68fd6", fontSize: 13 }}>Playing as {playerName || "..."}</span>
+        <button onClick={signOut} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 12, cursor: "pointer" }}>Log out</button>
       </div>
 
       <div style={{ maxWidth: 400, width: "100%", margin: "0 auto" }}>
         {gameInfo && (
           <div style={{ textAlign: "center", marginBottom: 14 }}>
-            <div style={{ fontFamily: "'Palatino Linotype', Palatino, Georgia, serif", fontSize: 16, fontWeight: 700 }}>{gameInfo.name}</div>
-            {gameInfo.subtitle && <div style={{ color: "#a09080", fontSize: 12, fontStyle: "italic", marginTop: 1 }}>{gameInfo.subtitle}</div>}
+            <div style={{ fontFamily: "'Orbitron', 'Segoe UI', sans-serif", fontSize: 16, fontWeight: 700 }}>{gameInfo.name}</div>
+            {gameInfo.subtitle && <div style={{ color: "#a68fd6", fontSize: 12, fontStyle: "italic", marginTop: 1 }}>{gameInfo.subtitle}</div>}
           </div>
         )}
-        {joinError && <p style={{ color: "#c45c3c" }}>{joinError}</p>}
+        {joinError && <p style={{ color: "#ff3860" }}>{joinError}</p>}
 
-        {joined && myPlayer && !myPlayer.approved && (
+        {joined && myPlayer && !myPlayer.color && (
+          <ColorPicker player={myPlayer} allPlayers={allPlayers} onPicked={(hex) => setMyPlayer((p) => p && ({ ...p, color: hex }))} />
+        )}
+
+        {joined && myPlayer && myPlayer.color && !myPlayer.approved && (
           <div style={{
             marginBottom: 20, textAlign: "center", padding: "28px 20px",
-            background: "linear-gradient(160deg, #1a1030 0%, #132038 100%)",
-            border: "2px solid #c9a84c", borderRadius: 12,
+            background: "linear-gradient(160deg, #1a0a2e 0%, #1a0a2e 100%)",
+            border: "2px solid #ff2d95", borderRadius: 12,
           }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>⏳</div>
-            <p style={{ color: "#f0e6d3", fontSize: 16, fontWeight: 600, margin: "0 0 6px", fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>
+            <p style={{ color: "#f5f0ff", fontSize: 16, fontWeight: 600, margin: "0 0 6px", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
               Waiting for the host to let you in
             </p>
-            <p style={{ color: "#a09080", fontSize: 13, margin: 0, fontStyle: "italic" }}>
+            <p style={{ color: "#a68fd6", fontSize: 13, margin: 0, fontStyle: "italic" }}>
               You've joined, but the host needs to approve you first. This page updates automatically once you're approved.
             </p>
           </div>
         )}
 
         {gameEnded && approved && (
-          <div style={{ marginBottom: 20, textAlign: "center", padding: "28px 20px", background: "linear-gradient(160deg, #1a1030 0%, #132038 100%)", border: "2px solid #c9a84c", borderRadius: 12 }}>
+          <div style={{ marginBottom: 20, textAlign: "center", padding: "28px 20px", background: "linear-gradient(160deg, #1a0a2e 0%, #1a0a2e 100%)", border: "2px solid #ff2d95", borderRadius: 12 }}>
             <div style={{ fontSize: 36, marginBottom: 8 }}>🏆</div>
-            <p style={{ color: "#f0e6d3", fontSize: 18, fontWeight: 700, margin: 0, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>
+            <p style={{ color: "#f5f0ff", fontSize: 18, fontWeight: 700, margin: 0, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
               {round.winnerName} wins Project B!
             </p>
           </div>
@@ -186,26 +191,26 @@ export default function PlayPage() {
         {exiled && approved && !gameEnded && (
           <div style={{
             marginBottom: 20, textAlign: "center", padding: "24px 20px",
-            background: "linear-gradient(160deg, #1a0e0e 0%, #14090c 100%)",
-            border: "2px solid #c45c3c", borderRadius: 12, boxShadow: "0 0 24px rgba(196,92,60,0.25)",
+            background: "linear-gradient(160deg, #200a1a 0%, #120612 100%)",
+            border: "2px solid #ff3860", borderRadius: 12, boxShadow: "0 0 24px rgba(255,56,96,0.25)",
           }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>💀</div>
-            <p style={{ color: "#f0e6d3", fontSize: 17, fontWeight: 600, margin: 0, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>
+            <p style={{ color: "#f5f0ff", fontSize: 17, fontWeight: 600, margin: 0, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
               You have been exiled.
             </p>
           </div>
         )}
 
-        {approved && playerName && round && !gameEnded && (
+        {approved && myPlayer.color && playerName && round && !gameEnded && (
           <>
-            <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #253550" }}>
+            <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #3d1f5c" }}>
               {TABS.map((t) => (
                 <button key={t.key} onClick={() => setTab(t.key)} style={{
-                  flex: 1, background: tab === t.key ? "rgba(201,168,76,0.13)" : "transparent",
-                  color: tab === t.key ? "#c9a84c" : "#a09080",
+                  flex: 1, background: tab === t.key ? "rgba(255,45,149,0.13)" : "transparent",
+                  color: tab === t.key ? "#ff2d95" : "#a68fd6",
                   border: "none", borderRadius: "8px 8px 0 0", padding: "10px 6px",
                   fontSize: 13, fontWeight: 600, cursor: "pointer",
-                  borderBottom: tab === t.key ? "2px solid #c9a84c" : "2px solid transparent",
+                  borderBottom: tab === t.key ? "2px solid #ff2d95" : "2px solid transparent",
                 }}>
                   {t.label}
                 </button>
@@ -222,10 +227,10 @@ export default function PlayPage() {
                   <ChallengeErrorBoundary label="Fates Ceremony"><FatesPlayer gameId={gameId} player={player} players={allPlayers} round={round} /></ChallengeErrorBoundary>
                 )}
                 {round.phase === PHASES.EXILE && !exiled && (
-                  <ChallengeErrorBoundary label="Exile Vote"><ExileVotePlayer gameId={gameId} player={player} round={round} /></ChallengeErrorBoundary>
+                  <ChallengeErrorBoundary label="Exile Vote"><ExileVotePlayer gameId={gameId} player={player} round={round} players={allPlayers} /></ChallengeErrorBoundary>
                 )}
                 {round.phase === PHASES.FINALE && (
-                  <ChallengeErrorBoundary label="Finale"><FinalePlayer gameId={gameId} player={player} round={round} /></ChallengeErrorBoundary>
+                  <ChallengeErrorBoundary label="Finale"><FinalePlayer gameId={gameId} player={player} round={round} players={allPlayers} /></ChallengeErrorBoundary>
                 )}
               </>
             )}
@@ -244,6 +249,6 @@ export default function PlayPage() {
 }
 
 const pageStyle = {
-  minHeight: "100vh", background: "linear-gradient(180deg, #0c1425, #0f1a30)", color: "#f0e6d3",
-  fontFamily: "'Palatino Linotype', Palatino, Georgia, serif", padding: 24,
+  minHeight: "100vh", background: "linear-gradient(180deg, #05010f, #1a0a2e)", color: "#f5f0ff",
+  fontFamily: "'Orbitron', 'Segoe UI', sans-serif", padding: 24,
 };

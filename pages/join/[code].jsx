@@ -34,11 +34,11 @@ export default function JoinByCode() {
       <div style={{ textAlign: "center", maxWidth: 320 }}>
         {preview && !error && (
           <>
-            <div style={{ fontFamily: "'Palatino Linotype', Palatino, Georgia, serif", fontSize: 18, fontWeight: 700, marginBottom: 2 }}>{preview.name}</div>
-            {preview.subtitle && <div style={{ color: "#a09080", fontSize: 12.5, fontStyle: "italic", marginBottom: 10 }}>{preview.subtitle}</div>}
+            <div style={{ fontFamily: "'Orbitron', 'Segoe UI', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 2 }}>{preview.name}</div>
+            {preview.subtitle && <div style={{ color: "#a68fd6", fontSize: 12.5, fontStyle: "italic", marginBottom: 10 }}>{preview.subtitle}</div>}
           </>
         )}
-        <p style={{ color: error ? "#c45c3c" : "#a09080", fontSize: 14 }}>
+        <p style={{ color: error ? "#ff3860" : "#a68fd6", fontSize: 14 }}>
           {error || "Finding your game..."}
         </p>
       </div>
@@ -47,7 +47,7 @@ export default function JoinByCode() {
 }
 
 const pageStyle = {
-  minHeight: "100vh", background: "linear-gradient(180deg, #0c1425, #0f1a30)", color: "#f0e6d3",
-  fontFamily: "'Palatino Linotype', Palatino, Georgia, serif", display: "flex",
+  minHeight: "100vh", background: "linear-gradient(180deg, #05010f, #1a0a2e)", color: "#f5f0ff",
+  fontFamily: "'Orbitron', 'Segoe UI', sans-serif", display: "flex",
   alignItems: "center", justifyContent: "center", padding: 24,
 };

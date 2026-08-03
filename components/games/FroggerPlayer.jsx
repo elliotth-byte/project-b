@@ -82,10 +82,10 @@ export default function FroggerPlayer({ gameId, round, challenge, player }) {
       if (ctx) {
         ctx.clearRect(0, 0, W, H);
         ctx.fillStyle = "#0f2818"; ctx.fillRect(0, 0, W, CELL);
-        ctx.fillStyle = "#1a2438";
+        ctx.fillStyle = "#1a0a2e";
         LANES.forEach((row) => ctx.fillRect(0, row * CELL, W, CELL));
-        ctx.fillStyle = "#0f1a30"; ctx.fillRect(0, (ROWS - 1) * CELL, W, CELL);
-        ctx.fillStyle = "#c45c3c";
+        ctx.fillStyle = "#1a0a2e"; ctx.fillRect(0, (ROWS - 1) * CELL, W, CELL);
+        ctx.fillStyle = "#ff3860";
         st.cars.forEach((car) => ctx.fillRect(car.x, car.row * CELL + 8, car.width, CELL - 16));
         ctx.font = "26px sans-serif";
         ctx.fillText("🐸", st.frog.col * CELL + 5, st.frog.row * CELL + 30);
@@ -112,19 +112,19 @@ export default function FroggerPlayer({ gameId, round, challenge, player }) {
   return (
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <h3 style={{ color: "#c9a84c", margin: 0, fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🐸 Frogger</h3>
+        <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🐸 Frogger</h3>
         <Badge>{"❤️".repeat(lives)} · {score} crossings</Badge>
       </div>
-      <canvas ref={canvasRef} width={W} height={H} style={{ background: "#0a1020", borderRadius: 10, border: "1px solid #253550" }} />
+      <canvas ref={canvasRef} width={W} height={H} style={{ background: "#0d0618", borderRadius: 10, border: "1px solid #3d1f5c" }} />
       <div style={{ display: "grid", gridTemplateColumns: "44px 44px 44px", gridTemplateRows: "40px 40px", gap: 4, margin: "10px auto 0", width: "fit-content" }}>
         <div /><button onClick={() => move(0, -1)} style={arrowStyle}>↑</button><div />
         <button onClick={() => move(-1, 0)} style={arrowStyle}>←</button>
         <button onClick={() => move(0, 1)} style={arrowStyle}>↓</button>
         <button onClick={() => move(1, 0)} style={arrowStyle}>→</button>
       </div>
-      <p style={{ color: "#706050", fontSize: 11, marginTop: 8, fontStyle: "italic" }}>Arrow keys work too.</p>
+      <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 8, fontStyle: "italic" }}>Arrow keys work too.</p>
     </Card>
   );
 }
 
-const arrowStyle = { width: 44, height: 40, borderRadius: 8, background: "#0a1020", border: "1px solid #253550", color: "#f0e6d3", fontSize: 16, cursor: "pointer" };
+const arrowStyle = { width: 44, height: 40, borderRadius: 8, background: "#0d0618", border: "1px solid #3d1f5c", color: "#f5f0ff", fontSize: 16, cursor: "pointer" };

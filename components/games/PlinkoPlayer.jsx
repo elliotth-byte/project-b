@@ -26,7 +26,7 @@ export default function PlinkoPlayer({ gameId, round, challenge, player }) {
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = "#253550";
+    ctx.fillStyle = "#3d1f5c";
     for (let r = 0; r < ROWS; r++) {
       const pegsInRow = r + 3;
       for (let p = 0; p < pegsInRow; p++) {
@@ -35,10 +35,10 @@ export default function PlinkoPlayer({ gameId, round, challenge, player }) {
         ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
       }
     }
-    ctx.fillStyle = "#0e1830";
+    ctx.fillStyle = "#150a28";
     ctx.fillRect(0, H - 34, W, 34);
     SLOTS.forEach((v, i) => {
-      ctx.fillStyle = "#c9a84c";
+      ctx.fillStyle = "#ff2d95";
       ctx.font = "bold 11px sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(String(v), colX(i), H - 14);
@@ -46,7 +46,7 @@ export default function PlinkoPlayer({ gameId, round, challenge, player }) {
     const b = ballRef.current;
     const y = 30 + b.row * ((H - 90) / ROWS);
     const x = colX(b.col);
-    ctx.fillStyle = "#c45c3c";
+    ctx.fillStyle = "#ff3860";
     ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
   };
 
@@ -96,11 +96,11 @@ export default function PlinkoPlayer({ gameId, round, challenge, player }) {
   return (
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <h3 style={{ color: "#c9a84c", margin: 0, fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🔴 Plinko</h3>
+        <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🔴 Plinko</h3>
         <Badge>{shotsLeft} shots left · {score} pts</Badge>
       </div>
-      <canvas ref={canvasRef} width={W} height={H} style={{ background: "#060e1a", borderRadius: 10, border: "1px solid #253550" }} />
-      {lastResult != null && !dropping && <p style={{ color: "#7a9a5c", fontSize: 13, margin: "8px 0 0" }}>Landed on {lastResult} points!</p>}
+      <canvas ref={canvasRef} width={W} height={H} style={{ background: "#0d0618", borderRadius: 10, border: "1px solid #3d1f5c" }} />
+      {lastResult != null && !dropping && <p style={{ color: "#00ff9d", fontSize: 13, margin: "8px 0 0" }}>Landed on {lastResult} points!</p>}
       <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 10 }}>
         <button disabled={dropping} onClick={() => setStartCol((c) => Math.max(0, c - 1))} style={arrowStyle}>←</button>
         <Btn onClick={drop} disabled={dropping || shotsLeft <= 0}>{dropping ? "Dropping..." : "Drop Chip"}</Btn>
@@ -110,4 +110,4 @@ export default function PlinkoPlayer({ gameId, round, challenge, player }) {
   );
 }
 
-const arrowStyle = { width: 44, height: 36, borderRadius: 8, background: "#0a1020", border: "1px solid #253550", color: "#f0e6d3", fontSize: 16, cursor: "pointer" };
+const arrowStyle = { width: 44, height: 36, borderRadius: 8, background: "#0d0618", border: "1px solid #3d1f5c", color: "#f5f0ff", fontSize: 16, cursor: "pointer" };

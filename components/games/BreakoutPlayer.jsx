@@ -71,9 +71,9 @@ export default function BreakoutPlayer({ gameId, round, challenge, player }) {
 
       if (ctx) {
         ctx.clearRect(0, 0, W, H);
-        ctx.fillStyle = "#c9a84c";
+        ctx.fillStyle = "#ff2d95";
         for (const b of st.bricks) if (b.alive) ctx.fillRect(b.c * BRICK_W + 1, b.r * BRICK_H + 20, BRICK_W - 2, BRICK_H - 2);
-        ctx.fillStyle = "#f0e6d3";
+        ctx.fillStyle = "#f5f0ff";
         ctx.fillRect(st.paddleX, H - 20, PADDLE_W, PADDLE_H);
         ctx.beginPath(); ctx.arc(st.ballX, st.ballY, BALL_R, 0, Math.PI * 2); ctx.fill();
       }
@@ -112,21 +112,21 @@ export default function BreakoutPlayer({ gameId, round, challenge, player }) {
   return (
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <h3 style={{ color: "#c9a84c", margin: 0, fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🧱 Breakout</h3>
+        <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🧱 Breakout</h3>
         <Badge>{"❤️".repeat(lives)} · {score} pts</Badge>
       </div>
       <canvas
         ref={canvasRef} width={W} height={H}
         onMouseMove={onPointerMove} onTouchMove={onPointerMove}
-        style={{ background: "#060e1a", borderRadius: 10, border: "1px solid #253550", touchAction: "none" }}
+        style={{ background: "#0d0618", borderRadius: 10, border: "1px solid #3d1f5c", touchAction: "none" }}
       />
       <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 8 }}>
         <button onClick={() => movePaddle(-24)} style={arrowStyle}>←</button>
         <button onClick={() => movePaddle(24)} style={arrowStyle}>→</button>
       </div>
-      <p style={{ color: "#706050", fontSize: 11, marginTop: 6, fontStyle: "italic" }}>Drag on the board, or use the arrows.</p>
+      <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 6, fontStyle: "italic" }}>Drag on the board, or use the arrows.</p>
     </Card>
   );
 }
 
-const arrowStyle = { width: 60, height: 36, borderRadius: 8, background: "#0a1020", border: "1px solid #253550", color: "#f0e6d3", fontSize: 16, cursor: "pointer" };
+const arrowStyle = { width: 60, height: 36, borderRadius: 8, background: "#0d0618", border: "1px solid #3d1f5c", color: "#f5f0ff", fontSize: 16, cursor: "pointer" };

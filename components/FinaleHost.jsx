@@ -25,9 +25,9 @@ export default function FinaleHost({ gameId, players, round }) {
   }, [gameId]);
 
   if (round?.phase !== "finale") {
-    return <Card><p style={{ color: "#706050", fontStyle: "italic" }}>Not in the Finale yet.</p></Card>;
+    return <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>Not in the Finale yet.</p></Card>;
   }
-  if (!finale) return <Card><p style={{ color: "#706050", fontStyle: "italic" }}>Loading...</p></Card>;
+  if (!finale) return <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>Loading...</p></Card>;
 
   const exiledPlayers = players.filter((p) => p.approved && !p.alive);
   const chaosHolder = players.find((p) => p.id === finale.chaosHolderId);
@@ -81,20 +81,20 @@ export default function FinaleHost({ gameId, players, round }) {
   };
 
   return (
-    <Card style={{ borderColor: "rgba(201,168,76,0.4)" }}>
-      <h3 style={{ color: "#c9a84c", margin: "0 0 4px", fontSize: 16, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🔥 Finale</h3>
-      <p style={{ color: "#706050", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+    <Card style={{ borderColor: "rgba(255,45,149,0.4)" }}>
+      <h3 style={{ color: "#ff2d95", margin: "0 0 4px", fontSize: 16, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🔥 Finale</h3>
+      <p style={{ color: "#6b4f99", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
         Finalists: {finale.finalists.map((f) => f.name).join(", ")}. Every exiled player votes FOR a winner. The nullified finalist can never win; whoever has the most votes between the other two wins.
       </p>
 
-      <div style={{ background: "#0a1020", borderRadius: 8, padding: 10, marginBottom: 12 }}>
-        <div style={{ fontSize: 11, color: "#a09080", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
-          🃏 Power of Chaos (drawn from the exiled): <span style={{ color: "#c45c3c" }}>{chaosHolder?.display_name || "—"}</span>
+      <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+        <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+          🃏 Power of Chaos (drawn from the exiled): <span style={{ color: "#ff3860" }}>{chaosHolder?.display_name || "—"}</span>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ fontSize: 12, color: "#a09080" }}>Nullify votes for:</span>
+          <span style={{ fontSize: 12, color: "#a68fd6" }}>Nullify votes for:</span>
           <select value={finale.nullifiedFinalistId || ""} onChange={(e) => setNullified(e.target.value)}
-            style={{ background: "#132038", border: "1px solid #253550", borderRadius: 6, padding: "5px 8px", color: "#f0e6d3", fontSize: 12 }}>
+            style={{ background: "#1a0a2e", border: "1px solid #3d1f5c", borderRadius: 6, padding: "5px 8px", color: "#f5f0ff", fontSize: 12 }}>
             <option value="">— no one yet —</option>
             {finale.finalists.map((f) => <option key={f.playerId} value={f.playerId}>{f.name}</option>)}
           </select>
@@ -104,36 +104,36 @@ export default function FinaleHost({ gameId, players, round }) {
       {finale.votingOpen ? (
         <Btn variant="danger" small onClick={closeVoting}>Close Voting</Btn>
       ) : (
-        <Badge color="#7a9a5c">Voting closed</Badge>
+        <Badge color="#00ff9d">Voting closed</Badge>
       )}
 
       <div style={{ marginTop: 12, marginBottom: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#a09080", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
           Exiled players voting: {voteRows.length}/{exiledPlayers.length} in
         </div>
         <div style={{ display: "grid", gap: 6 }}>
           {exiledPlayers.map((voter) => (
             <div key={voter.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <span style={{ width: 100, fontSize: 12, fontWeight: 700, color: "#f0e6d3", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ width: 100, fontSize: 12, fontWeight: 700, color: "#f5f0ff", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {voter.display_name}
               </span>
               <select
                 value={votes[voter.id]?.targetId || ""}
                 onChange={(e) => commitVote(voter.id, e.target.value)}
-                style={{ flex: 1, background: "#0a1020", border: "1px solid #253550", borderRadius: 6, padding: "4px 8px", color: "#f0e6d3", fontSize: 12 }}
+                style={{ flex: 1, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "4px 8px", color: "#f5f0ff", fontSize: 12 }}
               >
                 <option value="">—</option>
                 {finale.finalists.map((f) => <option key={f.playerId} value={f.playerId}>{f.name}</option>)}
               </select>
             </div>
           ))}
-          {exiledPlayers.length === 0 && <p style={{ color: "#706050", fontSize: 12, fontStyle: "italic" }}>No exiled players yet to vote — this can happen in a short game.</p>}
+          {exiledPlayers.length === 0 && <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No exiled players yet to vote — this can happen in a short game.</p>}
         </div>
       </div>
 
       {outcome.needsTieBreak && (
-        <Card style={{ borderColor: "rgba(196,92,60,0.5)", marginBottom: 12 }}>
-          <p style={{ color: "#c45c3c", fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>
+        <Card style={{ borderColor: "rgba(255,56,96,0.5)", marginBottom: 12 }}>
+          <p style={{ color: "#ff3860", fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>
             🃏 It's tied — {chaosHolder?.display_name || "the Power of Chaos holder"} must choose the winner.
           </p>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>

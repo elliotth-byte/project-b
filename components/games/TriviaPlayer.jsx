@@ -59,22 +59,22 @@ export default function TriviaPlayer({ gameId, round, challenge, player }) {
   return (
     <Card style={{ marginBottom: 20 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <h3 style={{ color: "#c9a84c", margin: 0, fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>❓ Trivia</h3>
-        <Badge color={secLeft <= 3 ? "#c45c3c" : "#c9a84c"}>{secLeft}s</Badge>
+        <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>❓ Trivia</h3>
+        <Badge color={secLeft <= 3 ? "#ff3860" : "#ff2d95"}>{secLeft}s</Badge>
       </div>
-      <p style={{ color: "#706050", fontSize: 11, margin: "0 0 8px" }}>Question {index + 1} of {questions.length} — {correctCount} correct so far</p>
-      <p style={{ color: "#f0e6d3", fontSize: 16, fontWeight: 600, margin: "0 0 14px", fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>{current.q}</p>
+      <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 8px" }}>Question {index + 1} of {questions.length} — {correctCount} correct so far</p>
+      <p style={{ color: "#f5f0ff", fontSize: 16, fontWeight: 600, margin: "0 0 14px", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>{current.q}</p>
       <div style={{ display: "grid", gap: 8 }}>
         {current.options.map((opt, i) => {
-          let bg = "#0a1020", border = "#253550", color = "#f0e6d3";
+          let bg = "#0d0618", border = "#3d1f5c", color = "#f5f0ff";
           if (revealed) {
-            if (i === current.answer) { bg = "rgba(122,154,92,0.15)"; border = "#7a9a5c"; color = "#7a9a5c"; }
-            else if (i === selected) { bg = "rgba(196,92,60,0.15)"; border = "#c45c3c"; color = "#c45c3c"; }
+            if (i === current.answer) { bg = "rgba(0,255,157,0.15)"; border = "#00ff9d"; color = "#00ff9d"; }
+            else if (i === selected) { bg = "rgba(255,56,96,0.15)"; border = "#ff3860"; color = "#ff3860"; }
           }
           return (
             <button key={i} onClick={() => lockAnswer(i)} disabled={revealed} style={{
               textAlign: "left", padding: "10px 14px", borderRadius: 8, cursor: revealed ? "default" : "pointer",
-              background: bg, border: `2px solid ${border}`, color, fontSize: 14, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif",
+              background: bg, border: `2px solid ${border}`, color, fontSize: 14, fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
             }}>{opt}</button>
           );
         })}

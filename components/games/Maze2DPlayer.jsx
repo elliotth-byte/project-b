@@ -74,10 +74,10 @@ export default function Maze2DPlayer({ gameId, round, challenge, player }) {
 
   return (
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
-      <h3 style={{ color: "#c9a84c", margin: "0 0 8px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🧩 2D Maze</h3>
+      <h3 style={{ color: "#ff2d95", margin: "0 0 8px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🧩 2D Maze</h3>
       <div style={{
         display: "grid", gridTemplateColumns: `repeat(${SIZE}, ${cell}px)`, gridTemplateRows: `repeat(${SIZE}, ${cell}px)`,
-        margin: "0 auto 12px", border: "2px solid #253550", width: "fit-content", background: "#060e1a",
+        margin: "0 auto 12px", border: "2px solid #3d1f5c", width: "fit-content", background: "#0d0618",
       }}>
         {maze.map((row, r) => row.map((wall, c) => {
           const isPlayer = pos.r === r && pos.c === c;
@@ -85,7 +85,7 @@ export default function Maze2DPlayer({ gameId, round, challenge, player }) {
           return (
             <div key={`${r}-${c}`} style={{
               width: cell, height: cell,
-              background: wall ? "#253550" : isPlayer ? "#c9a84c" : isGoal ? "#7a9a5c" : "#0a1020",
+              background: wall ? "#3d1f5c" : isPlayer ? "#ff2d95" : isGoal ? "#00ff9d" : "#0d0618",
             }}>
               {isPlayer ? "🧍" : isGoal ? "🚩" : ""}
             </div>
@@ -103,12 +103,12 @@ export default function Maze2DPlayer({ gameId, round, challenge, player }) {
         <button onClick={() => move(1, 0)} style={arrowStyle}>↓</button>
         <div />
       </div>
-      <p style={{ color: "#706050", fontSize: 11, marginTop: 8, fontStyle: "italic" }}>Arrow keys work too.</p>
+      <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 8, fontStyle: "italic" }}>Arrow keys work too.</p>
     </Card>
   );
 }
 
 const arrowStyle = {
-  width: 44, height: 44, borderRadius: 8, background: "#0a1020", border: "1px solid #253550",
-  color: "#f0e6d3", fontSize: 18, cursor: "pointer",
+  width: 44, height: 44, borderRadius: 8, background: "#0d0618", border: "1px solid #3d1f5c",
+  color: "#f5f0ff", fontSize: 18, cursor: "pointer",
 };

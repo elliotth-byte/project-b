@@ -32,22 +32,24 @@ export default function RoundTimerBanner({ round }) {
   const overdue = remaining !== null && remaining <= 0;
 
   return (
-    <Card style={{ textAlign: "center", borderColor: overdue ? "rgba(196,92,60,0.5)" : "rgba(201,168,76,0.3)" }}>
+    <Card style={{ textAlign: "center", borderColor: overdue ? "rgba(255,56,96,0.5)" : "rgba(255,45,149,0.3)" }}>
       <div style={{ display: "flex", justifyContent: "center", gap: 10, alignItems: "center", marginBottom: 4 }}>
-        <span style={{ fontSize: 15, fontWeight: 700, color: "#f0e6d3", fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: "#f5f0ff", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
           {PHASE_LABEL[round.phase] || round.phase}
         </span>
         <Badge>Round {round.round}</Badge>
-        {round.finalFour && <Badge color="#c45c3c">Final Four</Badge>}
-        {round.doubleElimination && <Badge color="#c45c3c">Double Elimination</Badge>}
+        {round.finalFour && <Badge color="#ff3860">Final Four</Badge>}
+        {round.doubleElimination && <Badge color="#ff3860">Double Elimination</Badge>}
       </div>
-      {remaining !== null && (
-        <div style={{ fontSize: 28, fontWeight: 700, color: overdue ? "#c45c3c" : "#c9a84c", fontFamily: "'Courier New', monospace" }}>
+      {round.phaseEndsAt ? (
+        <div style={{ fontSize: 28, fontWeight: 700, color: overdue ? "#ff3860" : "#ff2d95", fontFamily: "'Courier New', monospace" }}>
           {overdue ? "Time's up" : formatRemaining(remaining)}
         </div>
+      ) : (
+        <div style={{ fontSize: 20, fontWeight: 700, color: "#ff2d95", fontFamily: "'Courier New', monospace" }}>∞ No Time Limit</div>
       )}
       {overdue && (
-        <p style={{ color: "#a09080", fontSize: 12, fontStyle: "italic", margin: "4px 0 0" }}>
+        <p style={{ color: "#a68fd6", fontSize: 12, fontStyle: "italic", margin: "4px 0 0" }}>
           Advancing automatically once everything for this phase is in...
         </p>
       )}

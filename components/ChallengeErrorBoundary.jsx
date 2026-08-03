@@ -21,17 +21,17 @@ export default class ChallengeErrorBoundary extends Component {
     if (this.state.error) {
       return (
         <div style={{
-          background: "#1a0e0e", border: "1px solid rgba(196,92,60,0.4)", borderRadius: 10,
-          padding: 14, fontSize: 13, color: "#c45c3c",
+          background: "#200a1a", border: "1px solid rgba(255,56,96,0.4)", borderRadius: 10,
+          padding: 14, fontSize: 13, color: "#ff3860",
         }}>
           <strong>{this.props.label || "This mission"} hit an error and couldn't render.</strong>
-          <p style={{ fontSize: 11, color: "#a09080", margin: "6px 0" }}>
+          <p style={{ fontSize: 11, color: "#a68fd6", margin: "6px 0" }}>
             This usually means there's old saved data for this mission from before an update changed its
             format. If you're the host, clearing it (Supabase → Table Editor → delete the row in
             <code> game_state</code> with this mission's key) should fix it. Either way, the rest of the
             console keeps working.
           </p>
-          <p style={{ fontSize: 10, color: "#706050", fontFamily: "monospace", margin: "6px 0" }}>{String(this.state.error?.message || this.state.error)}</p>
+          <p style={{ fontSize: 10, color: "#6b4f99", fontFamily: "monospace", margin: "6px 0" }}>{String(this.state.error?.message || this.state.error)}</p>
           <Btn small variant="ghost" onClick={() => this.setState({ error: null })}>Try again</Btn>
         </div>
       );

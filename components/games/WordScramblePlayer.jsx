@@ -61,10 +61,10 @@ export default function WordScramblePlayer({ gameId, round, challenge, player })
 
   return (
     <Card style={{ marginBottom: 20 }}>
-      <h3 style={{ color: "#c9a84c", margin: "0 0 8px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🔤 Word Scramble</h3>
+      <h3 style={{ color: "#ff2d95", margin: "0 0 8px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🔤 Word Scramble</h3>
       <div style={{
         position: "relative", width: arenaW, height: arenaH, margin: "0 auto 12px",
-        background: "#060e1a", borderRadius: 10, border: "1px solid #253550", overflow: "hidden",
+        background: "#0d0618", borderRadius: 10, border: "1px solid #3d1f5c", overflow: "hidden",
       }}>
         {visibleLetters.map((l, i) => (
           <div key={i} style={{
@@ -83,12 +83,12 @@ export default function WordScramblePlayer({ gameId, round, challenge, player })
               <div style={{ flex: 1, padding: "8px 12px", borderRadius: 8, fontSize: 15, fontWeight: 700, color: WORD_COLORS[i], background: `${WORD_COLORS[i]}12`, border: `1px solid ${WORD_COLORS[i]}44` }}>✓ {word}</div>
             ) : (
               <input value={answers[i]} onChange={(e) => handleInput(i, e.target.value)} placeholder={`${word.length} letters`} maxLength={word.length}
-                style={{ flex: 1, background: "#0a1020", border: `1px solid ${WORD_COLORS[i]}55`, borderRadius: 8, padding: "8px 12px", color: WORD_COLORS[i], fontSize: 15, fontWeight: 700, outline: "none", letterSpacing: 2, textTransform: "uppercase" }} />
+                style={{ flex: 1, background: "#0d0618", border: `1px solid ${WORD_COLORS[i]}55`, borderRadius: 8, padding: "8px 12px", color: WORD_COLORS[i], fontSize: 15, fontWeight: 700, outline: "none", letterSpacing: 2, textTransform: "uppercase" }} />
             )}
           </div>
         ))}
       </div>
-      <div style={{ textAlign: "center", marginTop: 8, fontSize: 11, color: "#706050" }}>{solved.size}/{words.length} words found</div>
+      <div style={{ textAlign: "center", marginTop: 8, fontSize: 11, color: "#6b4f99" }}>{solved.size}/{words.length} words found</div>
     </Card>
   );
 }

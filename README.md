@@ -72,13 +72,46 @@ actually drives the game from phase to phase.
   re-entry attempt as a normal round (top-3 nominate) rather than
   Final-Four rules, even if exactly 4 are currently alive.
 
+## Recent changes: aesthetic, radio, player colors, multi-attempt re-entry, infinite time
+
+- **80s neon arcade look** — new palette and fonts (Orbitron / Press Start 2P)
+  live in `components/ui.jsx` (Btn/Card/Badge, inherited almost everywhere)
+  and were swept across every other file. Canvas-drawn gameplay colors
+  inside the mini-games (car colors, bricks, pegs, gems) were left alone —
+  only app chrome (backgrounds, borders, text, buttons) changed.
+- **The radio's back** — `lib/musicEngine.js` now generates upbeat 80s
+  synth-pop / retrowave / EDM / chiptune instead of dark ambient, behind
+  the exact same `buildEngine(mood)` interface, so `MusicPlayer.jsx`
+  (labeled "📻 Radio" now) needed zero changes.
+- **Player colors** — `sql/add-player-color.sql` adds `players.color`.
+  `lib/playerColors.js` holds the 12-color neon palette; `ColorPicker.jsx`
+  is shown once, right after a player joins, letting them claim any
+  color no one else in the game has taken yet.
+- **Memory wall voting** — `components/MemoryWall.jsx` is a shared grid of
+  big, chunky, color-coded tiles (Big Brother-style), used for every
+  "pick a player" moment on the player side: Fates nominations, the Exile
+  Vote, and the Finale vote. The host's own dropdowns for entering/
+  monitoring votes stayed as compact tables — that's a different job
+  (one person tracking many votes at once) than a player making one big
+  decision.
+- **Multiple simultaneous re-entry attempts** — any number of exiled
+  players can now opt into the same challenge at once (`ChallengeHost.jsx`
+  multi-select instead of single-select). Only whoever actually finishes
+  1st overall returns; everyone else who tried still uses up their one
+  shot, exactly as before — this only changes how many can try per
+  challenge, not the underlying rule.
+- **Infinite time toggle** — a new "∞ Infinite time" checkbox in Admin →
+  Round Lengths removes the automatic timer from every phase; the host
+  advances Challenge/Fates/Exile Vote/Finale manually via each screen's
+  "Finish Now" / "Lock & Continue" / "Reveal Winner" button instead.
+
 ## Setup
 
 1. **Supabase**: create a project. In the SQL Editor, run every file in
    `sql/` **in this order**: `schema.sql`, `add-player-approval.sql`,
    `add-join-codes.sql`, `add-season-subtitle.sql`, `add-season-archive.sql`,
    `add-game-hosts.sql`, `add-elimination-type.sql`, `add-confessionals.sql`,
-   `add-scheduled-groupme-posts.sql`.
+   `add-scheduled-groupme-posts.sql`, `add-player-color.sql`.
 2. **Copy `.env.local.example` to `.env.local`** and fill in your Supabase
    URL/keys, your GroupMe bot ID (create one at
    [dev.groupme.com/bots](https://dev.groupme.com/bots) for the group you
