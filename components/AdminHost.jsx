@@ -65,7 +65,10 @@ export default function AdminHost({ gameId, players, round }) {
       storageDelete(gameId, KEY_EXILE_HISTORY), storageDelete(gameId, KEY_CHALLENGE_HISTORY),
       storageDelete(gameId, "pb:finale-votes"),
     ];
-    for (let r = 1; r <= maxRound; r++) deletes.push(storageDelete(gameId, `pb:exile-votes:${r}`));
+    for (let r = 1; r <= maxRound; r++) {
+      deletes.push(storageDelete(gameId, `pb:exile-votes:${r}`));
+      deletes.push(storageDelete(gameId, `pb:challenge-scores:${r}`));
+    }
     await Promise.all(deletes);
     await initRound(gameId);
 

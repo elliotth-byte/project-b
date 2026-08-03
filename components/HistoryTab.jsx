@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, Badge } from "./ui";
 import { subscribeGameState } from "../lib/gameStorage";
 import { KEY_CHALLENGE_HISTORY, KEY_EXILE_HISTORY, KEY_REENTRY } from "../lib/gameState";
+import { GAME_REGISTRY } from "../lib/challengeGames";
 
 export default function HistoryTab({ gameId, players }) {
   const [challengeHistory, setChallengeHistory] = useState([]);
@@ -42,7 +43,9 @@ export default function HistoryTab({ gameId, players }) {
             </h3>
             {c && (
               <div style={{ marginBottom: e ? 10 : 0 }}>
-                <div style={{ fontSize: 11, color: "#a09080", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Challenge</div>
+                <div style={{ fontSize: 11, color: "#a09080", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+                  Challenge{c.gameType && GAME_REGISTRY[c.gameType] && ` — ${GAME_REGISTRY[c.gameType].icon} ${GAME_REGISTRY[c.gameType].label}`}
+                </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {[...(c.placements || [])].sort((a, b) => a.place - b.place).map((p) => (
                     <span key={p.playerId} style={{ fontSize: 12, color: p.place === 1 ? "#c9a84c" : "#a09080", fontWeight: p.place === 1 ? 700 : 500 }}>

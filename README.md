@@ -91,6 +91,43 @@ actually drives the game from phase to phase.
    → Environment Variables (this is what actually makes it "a new Vercel
    project").
 
+## The 10 built-in mini-games
+
+The Challenge phase isn't limited to real-world/in-person challenges —
+`components/ChallengeHost.jsx` lets the host pick any of these instead.
+Players play on their own screens; each game reports its own score, which
+`lib/challengeScores.js` automatically turns into finishing places the
+instant the challenge timer runs out (see `lib/roundEngine.js`) — no
+manual entry needed.
+
+| Game | Icon | Rule | Default length |
+|---|---|---|---|
+| Match 3 | 💎 | Swap adjacent gems, clear lines of 3+. Highest score wins. | 3 minutes |
+| Frogger | 🐸 | Cross the road, avoid the cars. 3 lives — most crossings wins. | 3 minutes |
+| Word Scramble | 🔤 | Unscramble your own set of 7 floating words. Fastest wins. | 5 minutes |
+| 2D Maze | 🧩 | Navigate a generated maze from start to finish. Fastest wins. | 5 minutes |
+| Farkle | 🎲 | Solo push-your-luck dice scoring. Highest banked total wins. | 5 minutes |
+| Trivia | ❓ | 10 questions, 10 seconds each. Most correct wins; ties go to whoever answered faster overall. | ~2 minutes |
+| Breakout | 🧱 | Paddle-and-ball brick breaker. 3 lives — most bricks broken wins. | 3 minutes |
+| Plinko | 🔴 | Drop 3 chips through the pegs into scoring slots. Highest total wins. | 2 minutes |
+| Spot the Difference | 🔍 | Find all 5 differences between two procedurally generated scenes. Most found wins; ties go to whoever finished faster. | 3 minutes |
+| Whack-a-Mole | 🔨 | 60 seconds, tap every mole you can. Most whacks wins. | 60 seconds |
+
+Each game's own duration/lives/shots/questions/differences are stored per
+challenge in `pb:challenge.gameConfig` (see `lib/challengeGames.js` for
+defaults) — the host can still override the overall time limit when
+starting the challenge. Every game is genuinely playable but intentionally
+simple (no external art/asset dependencies, plain Canvas/DOM) — treat them
+as solid, functional first drafts rather than polished arcade titles;
+swapping in nicer visuals later doesn't require touching the scoring or
+placement logic at all, since that all lives in `lib/challengeScores.js`
+and is identical for every game.
+
+Adding an 11th game later is 3 steps: write a `components/games/YourGamePlayer.jsx`
+that calls `reportScore(...)` as it plays, add an entry to
+`GAME_REGISTRY` in `lib/challengeGames.js`, and add it to the
+`GAME_COMPONENTS` map in `components/ChallengePlayer.jsx`.
+
 ## Automatic phase advancement — how it actually works
 
 Vercel's **Hobby plan only runs cron jobs once per day**, which isn't
