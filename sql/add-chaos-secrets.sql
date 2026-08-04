@@ -31,6 +31,12 @@ alter publication supabase_realtime add table chaos_secrets;
 -- Checks (via a definer function, so this doesn't need its own broad
 -- read access to game_state) whether the CURRENT user is whoever
 -- game_state currently says holds the Power of Chaos for this context.
+--
+-- chaosHolderId (stored in game_state) is a players.id, not an auth user
+-- id — so this has to join players to translate it to that player's
+-- user_id before comparing to auth.uid(). (This was wrong in an earlier
+-- version of this file — see sql/fix-chaos-holder-check.sql if you already
+-- ran the old one.)
 create or replace function public.is_current_chaos_holder(p_game_id uuid, p_context text)
 returns boolean
 language sql
@@ -40,15 +46,19 @@ as $$
   select case
     when p_context = 'finale' then
       coalesce(
-        (select (value->>'chaosHolderId') = auth.uid()::text
-         from game_state where game_id = p_game_id and key = 'pb:finale'),
+        (select p.user_id = auth.uid()
+         from game_state gs
+         join players p on p.id = (gs.value->>'chaosHolderId')::uuid
+         where gs.game_id = p_game_id and gs.key = 'pb:finale'),
         false
       )
     else
       coalesce(
-        (select (value->>'chaosHolderId') = auth.uid()::text
-         from game_state where game_id = p_game_id and key = 'pb:exile'
-           and (value->>'round') = split_part(p_context, ':', 2)),
+        (select p.user_id = auth.uid()
+         from game_state gs
+         join players p on p.id = (gs.value->>'chaosHolderId')::uuid
+         where gs.game_id = p_game_id and gs.key = 'pb:exile'
+           and (gs.value->>'round') = split_part(p_context, ':', 2)),
         false
       )
   end;

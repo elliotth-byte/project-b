@@ -7,6 +7,7 @@ import ChallengePlayer from "../components/ChallengePlayer";
 import FatesPlayer from "../components/FatesPlayer";
 import ExileVotePlayer from "../components/ExileVotePlayer";
 import FinalePlayer from "../components/FinalePlayer";
+import CeremonyPlayer from "../components/CeremonyPlayer";
 import ChaosPowerPlayer from "../components/ChaosPowerPlayer";
 import ConfessionalPlayer from "../components/ConfessionalPlayer";
 import MusicPlayer from "../components/MusicPlayer";
@@ -18,6 +19,7 @@ import { useRoundWatcher } from "../lib/useRoundWatcher";
 
 const TABS = [
   { key: "game", label: "🎲 Game" },
+  { key: "ceremony", label: "⚖️ Ceremony" },
   { key: "confessional", label: "🎥 Confessional" },
 ];
 
@@ -34,6 +36,12 @@ export default function PlayPage() {
   const [gameInfo, setGameInfo] = useState(null);
 
   useRoundWatcher(gameId);
+
+  // Once the game ends there's nothing left to do on the Game tab — default
+  // players over to Ceremony so they land on the recap instead of an empty tab.
+  useEffect(() => {
+    if (round?.phase === PHASES.ENDED) setTab((t) => (t === "game" ? "ceremony" : t));
+  }, [round?.phase]);
 
   useEffect(() => {
     if (!gameId) return;
@@ -236,7 +244,7 @@ export default function PlayPage() {
           </div>
         )}
 
-        {approved && myPlayer.color && playerName && round && !gameEnded && (
+        {approved && myPlayer.color && playerName && round && (
           <>
             <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #3d1f5c" }}>
               {TABS.map((t) => (
@@ -252,7 +260,7 @@ export default function PlayPage() {
               ))}
             </div>
 
-            {tab === "game" && (
+            {tab === "game" && !gameEnded && (
               <>
                 <div style={{ marginBottom: 16 }}><RoundTimerBanner round={round} /></div>
                 {round.phase === PHASES.CHALLENGE && (
@@ -274,6 +282,18 @@ export default function PlayPage() {
                   </ChallengeErrorBoundary>
                 )}
               </>
+            )}
+
+            {tab === "game" && gameEnded && (
+              <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", textAlign: "center" }}>
+                The game has ended — check the Ceremony tab for the full recap.
+              </p>
+            )}
+
+            {tab === "ceremony" && (
+              <ChallengeErrorBoundary label="Ceremony">
+                <CeremonyPlayer gameId={gameId} players={allPlayers} round={round} />
+              </ChallengeErrorBoundary>
             )}
 
             {tab === "confessional" && (

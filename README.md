@@ -135,6 +135,25 @@ actually drives the game from phase to phase.
   now archives the full vote-by-vote breakdown (previously it only kept
   the final outcome), so rounds played before this change won't appear
   in it.
+- **Fixed:** `is_current_chaos_holder()` compared a `players.id` straight
+  against `auth.uid()` — two different UUIDs for the same person — so the
+  actual Power of Chaos holder could never read their own secret pick via
+  `chaos_secrets`. See `sql/fix-chaos-holder-check.sql`.
+- **New: a player-facing Ceremony tab** (`components/CeremonyPlayer.jsx`).
+  Previously `FatesPlayer.jsx`/`ExileVotePlayer.jsx`/`FinalePlayer.jsx`
+  only rendered while their phase was live and vanished the moment the
+  round moved on — players had no way to look back at a nomination, vote
+  breakdown, or Chaos reveal afterward, including once the game ended.
+  The new tab in `pages/play.jsx` stays available for the whole game
+  (tabs no longer disappear at game-over) and shows every past round's
+  Fates Ceremony (who nominated whom, in finishing order) and Exile Vote
+  (nominees, Chaos holder, nullification, vote-by-vote breakdown, who was
+  exiled) plus the Finale, sourced from `pb:exile-history` / `pb:finale`
+  so it only ever shows what's actually been revealed — never a live,
+  in-progress tally. `lib/roundEngine.js` now also carries each round's
+  Fates nomination detail (`fatesNominatorOrder`/`fatesNominations`) into
+  that history record, since it otherwise gets overwritten the moment the
+  next round's Fates Ceremony starts.
 
 
 
@@ -144,6 +163,14 @@ actually drives the game from phase to phase.
    `add-game-hosts.sql`, `add-elimination-type.sql`, `add-confessionals.sql`,
    `add-scheduled-groupme-posts.sql`, `add-player-color.sql`,
    `add-player-color-policy.sql`, `add-chaos-secrets.sql`.
+
+   **Already have a project running?** If you ran `add-chaos-secrets.sql`
+   before this note was added, also run `sql/fix-chaos-holder-check.sql`
+   once — it patches a bug where the player actually holding the Power of
+   Chaos could never read their own secret pick (the RLS check compared a
+   `players.id` straight against `auth.uid()`, which are different UUIDs
+   for the same person). Fresh installs following the order above already
+   get the fixed version and can skip this file.
 2. **Copy `.env.local.example` to `.env.local`** and fill in your Supabase
    URL/keys, your GroupMe bot ID (create one at
    [dev.groupme.com/bots](https://dev.groupme.com/bots) for the group you
