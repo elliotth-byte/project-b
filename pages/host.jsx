@@ -300,12 +300,13 @@ export default function HostPage() {
     );
   }
 
-  if (!isHost(user)) {
+ if (!isHost(user)) {
     return (
       <div style={pageStyle}>
         <div style={{ textAlign: "center" }}>
           <div style={{ marginBottom: 16 }}><HomeLink /></div>
           <p>This account isn't marked as a host. Set <code>role: "host"</code> in this user's metadata in Supabase, or use a dedicated host account.</p>
+          <button onClick={signOut} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 12, cursor: "pointer", marginTop: 12 }}>Log out and try a different account</button>
         </div>
       </div>
     );
