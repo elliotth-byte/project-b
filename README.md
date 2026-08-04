@@ -105,13 +105,45 @@ actually drives the game from phase to phase.
   advances Challenge/Fates/Exile Vote/Finale manually via each screen's
   "Finish Now" / "Lock & Continue" / "Reveal Winner" button instead.
 
-## Setup
+## Recent changes: voting overhaul (Chaos secrecy, reasons, in-app tiebreaker, reveal toggle, voting spreadsheet)
+
+- **The Power of Chaos pick is now genuinely secret**, not just hidden in
+  the UI. `sql/add-chaos-secrets.sql` adds a dedicated `chaos_secrets`
+  table whose RLS policies only ever let the host or the current holder
+  read it — every other player, even with dev tools open, gets nothing
+  back. `components/ChaosPowerPlayer.jsx` is the holder's own screen for
+  using it (works for both the Exile Vote and the Finale, since it's the
+  same mechanic); `lib/chaosSecrets.js` is the storage layer.
+- **Vote reasoning** — `ExileVotePlayer.jsx` and `FinalePlayer.jsx` both
+  now have an optional "why?" text field alongside the vote itself,
+  shown back to the voter as confirmation and revealed later during the
+  host's reveal sequence.
+- **Tiebreaks are cast in-app** by the actual Chaos holder now
+  (`ChaosPowerPlayer.jsx`), computed client-side from the live votes the
+  moment voting closes. The host's own tie-break buttons in
+  `ExileVoteHost.jsx`/`FinaleHost.jsx` are kept as a manual fallback, not
+  the primary path.
+- **Reveal toggle**: at the end of a vote, the host now picks "🎭 Reveal
+  In-App" (the existing step-by-step dramatic reveal) or "📱 Just Post to
+  GroupMe" (composes and posts a full text summary — votes, reasons, the
+  Chaos pick — in one message, then lets the host finalize immediately).
+- **Voting history spreadsheet** — `components/VotingHistorySpreadsheet.jsx`,
+  shown at the bottom of the History tab, flattens every past exile vote
+  and the finale into one table (voter, target, reason, Chaos holder,
+  who was nullified, tie-breaks, outcome) with a one-click CSV download.
+  This only works going forward from this update — `lib/roundEngine.js`
+  now archives the full vote-by-vote breakdown (previously it only kept
+  the final outcome), so rounds played before this change won't appear
+  in it.
+
+
 
 1. **Supabase**: create a project. In the SQL Editor, run every file in
    `sql/` **in this order**: `schema.sql`, `add-player-approval.sql`,
    `add-join-codes.sql`, `add-season-subtitle.sql`, `add-season-archive.sql`,
    `add-game-hosts.sql`, `add-elimination-type.sql`, `add-confessionals.sql`,
-   `add-scheduled-groupme-posts.sql`, `add-player-color.sql`.
+   `add-scheduled-groupme-posts.sql`, `add-player-color.sql`,
+   `add-player-color-policy.sql`, `add-chaos-secrets.sql`.
 2. **Copy `.env.local.example` to `.env.local`** and fill in your Supabase
    URL/keys, your GroupMe bot ID (create one at
    [dev.groupme.com/bots](https://dev.groupme.com/bots) for the group you

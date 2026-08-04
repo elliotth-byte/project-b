@@ -39,6 +39,11 @@ export default function HostPage() {
 
   useEffect(() => {
     setOrigin(window.location.origin);
+    // getSession() reads from local storage directly rather than making a
+    // network round trip like getUser() does — avoids a race right after
+    // a fresh signInHost()/signUpHost() where the session can be
+    // persisted a beat before/after getUser()'s response lands. See the
+    // same fix in pages/play.jsx for the fuller explanation.
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user || null));
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
@@ -300,7 +305,7 @@ export default function HostPage() {
     );
   }
 
- if (!isHost(user)) {
+  if (!isHost(user)) {
     return (
       <div style={pageStyle}>
         <div style={{ textAlign: "center" }}>
@@ -520,7 +525,7 @@ export default function HostPage() {
         {/* key={game.id} forces a clean remount of all host panels/polling
             when switching seasons, instead of every tab's internal state
             (and in-flight polls) carrying over from the previous season. */}
-        {game && <HostPanels key={game.id} gameId={game.id} players={players} />}
+        {game && <HostPanels key={game.id} gameId={game.id} players={players} gameName={game.name} />}
       </div>
       {game && <MusicPlayer key={`music-${game.id}`} gameId={game.id} isHost={true} />}
     </div>

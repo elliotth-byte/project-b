@@ -3,7 +3,9 @@ import { Btn, Card, Badge } from "./ui";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_FINALE } from "../lib/gameState";
 import { computeFinaleOutcome } from "../lib/exileLogic";
+import { FINALE_CONTEXT, subscribeChaosSecret } from "../lib/chaosSecrets";
 import PostToGroupMe from "./PostToGroupMe";
+import { postToGroupMe } from "../lib/groupmeClient";
 import { requestAdvance } from "../lib/advanceNow";
 
 const VOTES_KEY = "pb:finale-votes";
@@ -11,7 +13,9 @@ const VOTES_KEY = "pb:finale-votes";
 export default function FinaleHost({ gameId, players, round }) {
   const [finale, setFinale] = useState(null);
   const [votes, setVotes] = useState({});
+  const [nullifiedId, setNullifiedId] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [postedToGroupMe, setPostedToGroupMe] = useState(false);
   const dirtyRef = useRef(new Set());
 
   useEffect(() => {
@@ -24,6 +28,11 @@ export default function FinaleHost({ gameId, players, round }) {
     return unsubscribe;
   }, [gameId]);
 
+  useEffect(() => {
+    const unsubscribe = subscribeChaosSecret(gameId, FINALE_CONTEXT, setNullifiedId);
+    return unsubscribe;
+  }, [gameId]);
+
   if (round?.phase !== "finale") {
     return <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>Not in the Finale yet.</p></Card>;
   }
@@ -33,17 +42,9 @@ export default function FinaleHost({ gameId, players, round }) {
   const chaosHolder = players.find((p) => p.id === finale.chaosHolderId);
   const byId = {};
   finale.finalists.forEach((f) => (byId[f.playerId] = f.name));
-  const voteRows = Object.entries(votes).map(([voterId, v]) => ({ voterId, targetId: v.targetId }));
+  const voteRows = Object.entries(votes).map(([voterId, v]) => ({ voterId, targetId: v.targetId, reason: v.reason }));
   const finalistIds = finale.finalists.map((f) => f.playerId);
-  const outcome = computeFinaleOutcome(voteRows, finale.nullifiedFinalistId, finalistIds);
-
-  const setNullified = async (finalistId) => {
-    await storageUpdate(gameId, KEY_FINALE, (fresh) => {
-      if (!fresh) return null;
-      fresh.nullifiedFinalistId = finalistId || null;
-      return fresh;
-    });
-  };
+  const outcome = computeFinaleOutcome(voteRows, nullifiedId, finalistIds);
 
   const commitVote = async (voterId, targetId) => {
     dirtyRef.current.add(voterId);
@@ -52,7 +53,7 @@ export default function FinaleHost({ gameId, players, round }) {
     await storageUpdate(gameId, VOTES_KEY, (fresh) => {
       const existing = fresh || {};
       if (!targetId) { delete existing[voterId]; return existing; }
-      existing[voterId] = { targetId, targetName, voterName, time: new Date().toLocaleTimeString() };
+      existing[voterId] = { ...(existing[voterId] || {}), targetId, targetName, voterName, time: new Date().toLocaleTimeString() };
       return existing;
     });
     dirtyRef.current.delete(voterId);
@@ -66,6 +67,8 @@ export default function FinaleHost({ gameId, players, round }) {
     });
   };
 
+  // Fallback only — the expected path is the chaos holder breaking the
+  // tie themselves from their own screen (see ChaosPowerPlayer.jsx).
   const setTieBreak = async (finalistId) => {
     await storageUpdate(gameId, KEY_FINALE, (fresh) => {
       if (!fresh) return null;
@@ -80,6 +83,17 @@ export default function FinaleHost({ gameId, players, round }) {
     setBusy(false);
   };
 
+  const postSummaryToGroupMe = async () => {
+    setBusy(true);
+    const lines = voteRows.map((r) => `${players.find((p) => p.id === r.voterId)?.display_name || "?"} → ${byId[r.targetId] || "?"}${r.reason ? ` ("${r.reason}")` : ""}`);
+    const chaosLine = nullifiedId ? `🃏 ${chaosHolder?.display_name || "The Power of Chaos"} nullified ${byId[nullifiedId] || "?"} — they can't win.` : "";
+    const text = `🔥 Finale votes — ${finale.finalists.map((f) => f.name).join(", ")}\n\n${lines.join("\n")}\n\n${chaosLine}`.trim();
+    const res = await postToGroupMe(gameId, text);
+    setBusy(false);
+    if (!res.ok) { alert("Couldn't post to GroupMe: " + res.error); return; }
+    setPostedToGroupMe(true);
+  };
+
   return (
     <Card style={{ borderColor: "rgba(255,45,149,0.4)" }}>
       <h3 style={{ color: "#ff2d95", margin: "0 0 4px", fontSize: 16, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🔥 Finale</h3>
@@ -91,14 +105,9 @@ export default function FinaleHost({ gameId, players, round }) {
         <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
           🃏 Power of Chaos (drawn from the exiled): <span style={{ color: "#ff3860" }}>{chaosHolder?.display_name || "—"}</span>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ fontSize: 12, color: "#a68fd6" }}>Nullify votes for:</span>
-          <select value={finale.nullifiedFinalistId || ""} onChange={(e) => setNullified(e.target.value)}
-            style={{ background: "#1a0a2e", border: "1px solid #3d1f5c", borderRadius: 6, padding: "5px 8px", color: "#f5f0ff", fontSize: 12 }}>
-            <option value="">— no one yet —</option>
-            {finale.finalists.map((f) => <option key={f.playerId} value={f.playerId}>{f.name}</option>)}
-          </select>
-        </div>
+        <p style={{ fontSize: 12, color: nullifiedId ? "#00ff9d" : "#a68fd6", margin: 0 }}>
+          {nullifiedId ? "✓ Their pick is locked in — secret until the reveal." : `Waiting on ${chaosHolder?.display_name || "them"} to choose, from their own screen.`}
+        </p>
       </div>
 
       {finale.votingOpen ? (
@@ -125,6 +134,7 @@ export default function FinaleHost({ gameId, players, round }) {
                 <option value="">—</option>
                 {finale.finalists.map((f) => <option key={f.playerId} value={f.playerId}>{f.name}</option>)}
               </select>
+              {votes[voter.id]?.reason && <span style={{ fontSize: 10, color: "#6b4f99" }} title={votes[voter.id].reason}>💬</span>}
             </div>
           ))}
           {exiledPlayers.length === 0 && <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No exiled players yet to vote — this can happen in a short game.</p>}
@@ -134,8 +144,9 @@ export default function FinaleHost({ gameId, players, round }) {
       {outcome.needsTieBreak && (
         <Card style={{ borderColor: "rgba(255,56,96,0.5)", marginBottom: 12 }}>
           <p style={{ color: "#ff3860", fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>
-            🃏 It's tied — {chaosHolder?.display_name || "the Power of Chaos holder"} must choose the winner.
+            🃏 It's tied — waiting on {chaosHolder?.display_name || "the Power of Chaos holder"} to choose the winner from their own screen.
           </p>
+          <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 8px", fontStyle: "italic" }}>Host fallback, if needed:</p>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {outcome.tied.map((id) => (
               <Btn key={id} small variant={finale.tieBreakChoiceId === id ? "success" : "ghost"} onClick={() => setTieBreak(id)}>{byId[id]}</Btn>
@@ -144,9 +155,14 @@ export default function FinaleHost({ gameId, players, round }) {
         </Card>
       )}
 
-      <Btn onClick={finishNow} disabled={busy || outcome.needsTieBreak || finale.votingOpen}>
-        {busy ? "Working..." : "Reveal Winner"}
-      </Btn>
+      {!finale.votingOpen && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+          <Btn onClick={finishNow} disabled={busy || outcome.needsTieBreak}>{busy ? "Working..." : "🎭 Reveal Winner In-App"}</Btn>
+          <Btn variant="slack" onClick={postSummaryToGroupMe} disabled={busy || outcome.needsTieBreak || postedToGroupMe}>
+            {postedToGroupMe ? "✓ Posted to GroupMe" : busy ? "Posting..." : "📱 Just Post to GroupMe"}
+          </Btn>
+        </div>
+      )}
 
       <div style={{ marginTop: 12 }}>
         <PostToGroupMe gameId={gameId} icon="🔥" label="Finale Announcement"

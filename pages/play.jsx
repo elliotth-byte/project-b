@@ -7,6 +7,7 @@ import ChallengePlayer from "../components/ChallengePlayer";
 import FatesPlayer from "../components/FatesPlayer";
 import ExileVotePlayer from "../components/ExileVotePlayer";
 import FinalePlayer from "../components/FinalePlayer";
+import ChaosPowerPlayer from "../components/ChaosPowerPlayer";
 import ConfessionalPlayer from "../components/ConfessionalPlayer";
 import MusicPlayer from "../components/MusicPlayer";
 import HomeLink from "../components/HomeLink";
@@ -66,6 +67,16 @@ export default function PlayPage() {
   }, [gameId]);
 
   useEffect(() => {
+    // getSession() reads the session that's already sitting in local
+    // storage — no network round trip. getUser() (what this used to call)
+    // instead re-validates against the Auth server over the network,
+    // which introduced a real race: a brand-new signup's session can be
+    // persisted to storage a beat before getUser()'s network response
+    // comes back, and vice versa depending on timing, occasionally
+    // leaving this page briefly treating a genuinely-logged-in new
+    // player as logged out (or racing ahead of a fully-attached
+    // session when the join-insert below fires). getSession() doesn't
+    // have that gap.
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user || null));
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
@@ -96,6 +107,14 @@ export default function PlayPage() {
         return;
       }
 
+      // Wait for a real, current session — widened to ~6s of retries
+      // (up from ~1.5s) since a short window turned out to not be
+      // enough for at least one signup. Also: use session.user.id, not
+      // the `user.id` closed over from React state, for the actual
+      // insert — if that state is ever a beat stale relative to
+      // whatever the client's current session really is, this guarantees
+      // the id we send matches exactly what auth.uid() will resolve to
+      // server-side, since it comes from the same freshly-fetched session.
       let session = null;
       for (let attempt = 0; attempt < 15 && !session; attempt++) {
         const { data } = await supabase.auth.getSession();
@@ -243,10 +262,16 @@ export default function PlayPage() {
                   <ChallengeErrorBoundary label="Fates Ceremony"><FatesPlayer gameId={gameId} player={player} players={allPlayers} round={round} /></ChallengeErrorBoundary>
                 )}
                 {round.phase === PHASES.EXILE && !exiled && (
-                  <ChallengeErrorBoundary label="Exile Vote"><ExileVotePlayer gameId={gameId} player={player} round={round} players={allPlayers} /></ChallengeErrorBoundary>
+                  <ChallengeErrorBoundary label="Exile Vote">
+                    <ChaosPowerPlayer gameId={gameId} round={round} player={player} players={allPlayers} />
+                    <ExileVotePlayer gameId={gameId} player={player} round={round} players={allPlayers} />
+                  </ChallengeErrorBoundary>
                 )}
                 {round.phase === PHASES.FINALE && (
-                  <ChallengeErrorBoundary label="Finale"><FinalePlayer gameId={gameId} player={player} round={round} players={allPlayers} /></ChallengeErrorBoundary>
+                  <ChallengeErrorBoundary label="Finale">
+                    <ChaosPowerPlayer gameId={gameId} round={round} player={player} players={allPlayers} />
+                    <FinalePlayer gameId={gameId} player={player} round={round} players={allPlayers} />
+                  </ChallengeErrorBoundary>
                 )}
               </>
             )}

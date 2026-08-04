@@ -83,9 +83,15 @@ on games for insert
 with check (host_id = auth.uid());
 
 -- Players can see other players in the same game as them (needed for rosters/leaderboards).
+-- The extra `or user_id = auth.uid()` matters more than it looks: without
+-- it, a brand-new player's very first join (an INSERT ... RETURNING under
+-- the hood, since the app asks for the row back) fails RLS, because at
+-- that exact instant is_game_player()'s own-table lookup can't see a row
+-- that's still mid-insert. Checking your own user_id directly, with no
+-- table lookup involved, sidesteps that entirely.
 create policy "read players in your game"
 on players for select
-using (is_game_host(game_id) or is_game_player(game_id));
+using (is_game_host(game_id) or is_game_player(game_id) or user_id = auth.uid());
 
 -- A signed-in user can add themselves as a player to a game (self-serve "join").
 create policy "join a game as yourself"

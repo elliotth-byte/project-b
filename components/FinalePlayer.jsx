@@ -9,6 +9,7 @@ const VOTES_KEY = "pb:finale-votes";
 export default function FinalePlayer({ gameId, player, round, players }) {
   const [finale, setFinale] = useState(null);
   const [choice, setChoice] = useState("");
+  const [reason, setReason] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [existing, setExisting] = useState(null);
 
@@ -52,7 +53,12 @@ export default function FinalePlayer({ gameId, player, round, players }) {
     return (
       <Card style={{ marginBottom: 20, textAlign: "center" }}>
         <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#00ff9d", marginBottom: 6 }}>Vote Cast</div>
-        <p style={{ color: "#f5f0ff", fontSize: 15, margin: 0 }}>You voted for <strong style={{ color: "#ff2d95" }}>{existing?.targetName}</strong> to win.</p>
+        <p style={{ color: "#f5f0ff", fontSize: 15, margin: "0 0 10px" }}>You voted for <strong style={{ color: "#ff2d95" }}>{existing?.targetName}</strong> to win.</p>
+        {existing?.reason && (
+          <p style={{ color: "#a68fd6", fontSize: 12, fontStyle: "italic", margin: 0, padding: "8px 12px", background: "#0d0618", borderRadius: 8 }}>
+            "{existing.reason}"
+          </p>
+        )}
       </Card>
     );
   }
@@ -62,7 +68,7 @@ export default function FinalePlayer({ gameId, player, round, players }) {
     const targetName = finale.finalists.find((f) => f.playerId === choice)?.name || "";
     const res = await storageUpdate(gameId, VOTES_KEY, (fresh) => {
       const existingMap = fresh || {};
-      existingMap[player.id] = { targetId: choice, targetName, voterName: player.name, time: new Date().toLocaleTimeString() };
+      existingMap[player.id] = { targetId: choice, targetName, voterName: player.name, reason: reason.trim() || null, time: new Date().toLocaleTimeString() };
       return existingMap;
     });
     if (res.ok) { setExisting(res.value[player.id]); setSubmitted(true); }
@@ -74,8 +80,21 @@ export default function FinalePlayer({ gameId, player, round, players }) {
         <div style={{ fontSize: 12, letterSpacing: 6, textTransform: "uppercase", color: "#ff2d95", marginBottom: 8 }}>🔥</div>
         <h2 style={{ color: "#f5f0ff", fontFamily: "'Orbitron', 'Segoe UI', sans-serif", marginBottom: 4 }}>Vote for the Winner</h2>
       </div>
-      <Card style={{ marginBottom: 16 }}>
+      <Card style={{ marginBottom: 14 }}>
         <MemoryWall candidates={finale.finalists} players={players} selectedId={choice} onSelect={setChoice} />
+      </Card>
+      <Card style={{ marginBottom: 18 }}>
+        <label style={{ display: "block", fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+          Why? (optional — shown when votes are revealed)
+        </label>
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          maxLength={280}
+          rows={3}
+          placeholder="Say your piece..."
+          style={{ width: "100%", background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "10px 12px", color: "#f5f0ff", fontSize: 13, fontFamily: "'Orbitron', 'Segoe UI', sans-serif", resize: "vertical" }}
+        />
       </Card>
       <button onClick={submit} disabled={!choice} style={{
         width: "100%", background: choice ? "linear-gradient(135deg, #ff2d95, #b829ff)" : "#3d1f5c",

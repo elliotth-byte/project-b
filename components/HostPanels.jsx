@@ -20,13 +20,12 @@ const BASE_TABS = [
   { key: "admin", label: "🛠 Admin" },
 ];
 
-export default function HostPanels({ gameId, players }) {
+export default function HostPanels({ gameId, players, gameName }) {
   const [tab, setTab] = useState("round");
   const [round, setRound] = useState(null);
   const [settings, setSettingsState] = useState(null);
   const [unreadConfessionals, setUnreadConfessionals] = useState(0);
   const [starting, setStarting] = useState(false);
-  const [startError, setStartError] = useState("");
 
   useEffect(() => {
     const unsubscribe = subscribeRound(gameId, setRound);
@@ -57,6 +56,8 @@ export default function HostPanels({ gameId, players }) {
     if (t.key === "admin" && pendingCount > 0) return { ...t, label: `${t.label} (${pendingCount})` };
     return t;
   });
+
+  const [startError, setStartError] = useState("");
 
   const startSeason = async () => {
     setStarting(true);
@@ -135,7 +136,7 @@ export default function HostPanels({ gameId, players }) {
 
       {tab === "history" && (
         <ChallengeErrorBoundary label="History">
-          <HistoryTab gameId={gameId} players={approvedPlayers} />
+          <HistoryTab gameId={gameId} players={approvedPlayers} gameName={gameName} />
         </ChallengeErrorBoundary>
       )}
 

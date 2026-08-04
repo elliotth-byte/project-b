@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import { Card, Badge } from "./ui";
 import { subscribeGameState } from "../lib/gameStorage";
-import { KEY_CHALLENGE_HISTORY, KEY_EXILE_HISTORY, KEY_REENTRY } from "../lib/gameState";
+import { KEY_CHALLENGE_HISTORY, KEY_EXILE_HISTORY, KEY_REENTRY, KEY_FINALE } from "../lib/gameState";
 import { GAME_REGISTRY } from "../lib/challengeGames";
+import VotingHistorySpreadsheet from "./VotingHistorySpreadsheet";
 
-export default function HistoryTab({ gameId, players }) {
+export default function HistoryTab({ gameId, players, gameName }) {
   const [challengeHistory, setChallengeHistory] = useState([]);
   const [exileHistory, setExileHistory] = useState([]);
   const [reentry, setReentry] = useState([]);
+  const [finaleState, setFinaleState] = useState(null);
 
   useEffect(() => {
     const unsubscribe = subscribeGameState(gameId, KEY_CHALLENGE_HISTORY, (v) => setChallengeHistory(v || []));
@@ -19,6 +21,10 @@ export default function HistoryTab({ gameId, players }) {
   }, [gameId]);
   useEffect(() => {
     const unsubscribe = subscribeGameState(gameId, KEY_REENTRY, (v) => setReentry(v || []));
+    return unsubscribe;
+  }, [gameId]);
+  useEffect(() => {
+    const unsubscribe = subscribeGameState(gameId, KEY_FINALE, setFinaleState);
     return unsubscribe;
   }, [gameId]);
 
@@ -66,6 +72,11 @@ export default function HistoryTab({ gameId, players }) {
                     <> — <strong style={{ color: "#ff3860" }}>{e.exiledIds.map((id) => byId[id] || "?").join(", ")}</strong> exiled</>
                   )}
                 </p>
+                {e.nullifiedId && (
+                  <p style={{ fontSize: 11, color: "#a68fd6", margin: "4px 0 0", fontStyle: "italic" }}>
+                    🃏 Power of Chaos nullified {byId[e.nullifiedId] || "?"}
+                  </p>
+                )}
               </div>
             )}
           </Card>
@@ -87,6 +98,8 @@ export default function HistoryTab({ gameId, players }) {
           </div>
         </Card>
       )}
+
+      <VotingHistorySpreadsheet exileHistory={exileHistory} finaleState={finaleState} players={players} gameName={gameName} />
     </div>
   );
 }
