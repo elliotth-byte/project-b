@@ -66,7 +66,7 @@ export default function PlayPage() {
   }, [gameId]);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user || null));
+    supabase.auth.getSession().then(({ data }) => setUser(data.session?.user || null));
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
     });
