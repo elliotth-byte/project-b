@@ -10,10 +10,14 @@ export default function ColorPicker({ player, allPlayers, onPicked }) {
   const pick = async (hex) => {
     if (taken.has(hex)) return;
     setSaving(hex);
-    const { error } = await supabase.from("players").update({ color: hex }).eq("id", player.id);
+    const { data, error } = await supabase.from("players").update({ color: hex }).eq("id", player.id).select().maybeSingle();
     setSaving(null);
     if (error) {
-      alert("Couldn't claim that color — someone may have just taken it. Try another.");
+      alert("Couldn't claim that color: " + error.message);
+      return;
+    }
+    if (!data) {
+      alert("Couldn't claim that color — the update didn't apply. This is likely a permissions issue on the host's end (missing RLS policy) rather than something you did wrong.");
       return;
     }
     onPicked?.(hex);
