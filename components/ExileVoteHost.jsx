@@ -138,6 +138,12 @@ export default function ExileVoteHost({ gameId, players, round }) {
 
   const tied = outcome.tied || [];
   const needsTieBreak = outcome.needsTieBreak;
+  // needsTieBreak alone stays true forever once a tie exists — it's a pure
+  // function of the vote tally, which doesn't change just because someone
+  // broke the tie. The buttons below need to unblock once a choice has
+  // actually been made (matches lib/roundEngine.js's own check, which is
+  // exactly `needsTieBreak && !exile.tieBreakChoiceId`).
+  const tieBreakUnresolved = needsTieBreak && !exile.tieBreakChoiceId;
 
   return (
     <Card style={{ borderColor: "rgba(255,45,149,0.3)" }}>
@@ -198,10 +204,16 @@ export default function ExileVoteHost({ gameId, players, round }) {
       </div>
 
       {needsTieBreak && (
-        <Card style={{ borderColor: "rgba(255,56,96,0.5)", marginBottom: 12 }}>
-          <p style={{ color: "#ff3860", fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>
-            🃏 It's tied — waiting on {chaosHolder?.display_name || "the Power of Chaos holder"} to break it from their own screen.
-          </p>
+        <Card style={{ borderColor: exile.tieBreakChoiceId ? "rgba(0,255,157,0.5)" : "rgba(255,56,96,0.5)", marginBottom: 12 }}>
+          {exile.tieBreakChoiceId ? (
+            <p style={{ color: "#00ff9d", fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>
+              ✓ Tie broken — {byId[exile.tieBreakChoiceId] || "?"} chosen. Ready to continue below.
+            </p>
+          ) : (
+            <p style={{ color: "#ff3860", fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>
+              🃏 It's tied — waiting on {chaosHolder?.display_name || "the Power of Chaos holder"} to break it from their own screen.
+            </p>
+          )}
           <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 8px", fontStyle: "italic" }}>Host fallback, if needed:</p>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {tied.map((id) => (
@@ -221,7 +233,7 @@ export default function ExileVoteHost({ gameId, players, round }) {
               <Btn variant="slack" onClick={postSummaryToGroupMe} disabled={busy}>{busy ? "Posting..." : "📱 Just Post to GroupMe"}</Btn>
             </div>
           ) : chaosRevealed && !revealOrder ? (
-            <Btn onClick={finishNow} disabled={busy || needsTieBreak}>{busy ? "Working..." : "Finalize Exile & Continue"}</Btn>
+            <Btn onClick={finishNow} disabled={busy || tieBreakUnresolved}>{busy ? "Working..." : "Finalize Exile & Continue"}</Btn>
           ) : (
             <div>
               <div style={{ display: "grid", gap: 8, marginBottom: 10 }}>
@@ -238,11 +250,11 @@ export default function ExileVoteHost({ gameId, players, round }) {
                   <Btn variant="ghost" small onClick={revealAll}>Reveal All</Btn>
                 </div>
               ) : !chaosRevealed ? (
-                <Btn onClick={() => setChaosRevealed(true)} disabled={needsTieBreak}>
+                <Btn onClick={() => setChaosRevealed(true)} disabled={tieBreakUnresolved}>
                   🃏 Reveal the Power of Chaos — {chaosHolder?.display_name || "?"} chose {nullifiedId ? byId[nullifiedId] || "?" : "no one"}
                 </Btn>
               ) : (
-                <Btn onClick={finishNow} disabled={busy || needsTieBreak}>{busy ? "Working..." : "Finalize Exile & Continue"}</Btn>
+                <Btn onClick={finishNow} disabled={busy || tieBreakUnresolved}>{busy ? "Working..." : "Finalize Exile & Continue"}</Btn>
               )}
             </div>
           )}

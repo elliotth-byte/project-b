@@ -45,6 +45,13 @@ export default function FinaleHost({ gameId, players, round }) {
   const voteRows = Object.entries(votes).map(([voterId, v]) => ({ voterId, targetId: v.targetId, reason: v.reason }));
   const finalistIds = finale.finalists.map((f) => f.playerId);
   const outcome = computeFinaleOutcome(voteRows, nullifiedId, finalistIds);
+  // Same fix as ExileVoteHost.jsx: outcome.needsTieBreak is a pure function
+  // of the vote tally and never flips back to false on its own, so the
+  // action buttons below need to check whether a tie-break choice has
+  // actually been made (matching lib/roundEngine.js's own gate) rather
+  // than gating on needsTieBreak alone — otherwise they stay permanently
+  // disabled even after the host (or Chaos holder) breaks the tie.
+  const tieBreakUnresolved = outcome.needsTieBreak && !finale.tieBreakChoiceId;
 
   const commitVote = async (voterId, targetId) => {
     dirtyRef.current.add(voterId);
@@ -142,10 +149,16 @@ export default function FinaleHost({ gameId, players, round }) {
       </div>
 
       {outcome.needsTieBreak && (
-        <Card style={{ borderColor: "rgba(255,56,96,0.5)", marginBottom: 12 }}>
-          <p style={{ color: "#ff3860", fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>
-            🃏 It's tied — waiting on {chaosHolder?.display_name || "the Power of Chaos holder"} to choose the winner from their own screen.
-          </p>
+        <Card style={{ borderColor: finale.tieBreakChoiceId ? "rgba(0,255,157,0.5)" : "rgba(255,56,96,0.5)", marginBottom: 12 }}>
+          {finale.tieBreakChoiceId ? (
+            <p style={{ color: "#00ff9d", fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>
+              ✓ Tie broken — {byId[finale.tieBreakChoiceId] || "?"} chosen. Ready to continue below.
+            </p>
+          ) : (
+            <p style={{ color: "#ff3860", fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>
+              🃏 It's tied — waiting on {chaosHolder?.display_name || "the Power of Chaos holder"} to choose the winner from their own screen.
+            </p>
+          )}
           <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 8px", fontStyle: "italic" }}>Host fallback, if needed:</p>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {outcome.tied.map((id) => (
@@ -157,8 +170,8 @@ export default function FinaleHost({ gameId, players, round }) {
 
       {!finale.votingOpen && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-          <Btn onClick={finishNow} disabled={busy || outcome.needsTieBreak}>{busy ? "Working..." : "🎭 Reveal Winner In-App"}</Btn>
-          <Btn variant="slack" onClick={postSummaryToGroupMe} disabled={busy || outcome.needsTieBreak || postedToGroupMe}>
+          <Btn onClick={finishNow} disabled={busy || tieBreakUnresolved}>{busy ? "Working..." : "🎭 Reveal Winner In-App"}</Btn>
+          <Btn variant="slack" onClick={postSummaryToGroupMe} disabled={busy || tieBreakUnresolved || postedToGroupMe}>
             {postedToGroupMe ? "✓ Posted to GroupMe" : busy ? "Posting..." : "📱 Just Post to GroupMe"}
           </Btn>
         </div>
