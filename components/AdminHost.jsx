@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Btn, Card } from "./ui";
 import { supabase } from "../lib/supabaseClient";
 import { storageDelete, storageGet } from "../lib/gameStorage";
+import { removePendingPlayer, quitOrRemoveApprovedPlayer } from "../lib/playerRemoval";
 import {
   KEY_ROUND, KEY_CHALLENGE, KEY_FATES, KEY_EXILE, KEY_EXILE_HISTORY, KEY_REENTRY,
   KEY_FINALE, KEY_CHALLENGE_HISTORY, DEFAULT_SETTINGS, getSettings, setSettings, subscribeSettings,
@@ -31,7 +32,17 @@ export default function AdminHost({ gameId, players, round }) {
 
   const rejectPlayer = async (p) => {
     if (!confirm(`Remove ${p.display_name} from this game? They'll need a new join link to try again.`)) return;
-    const { error } = await supabase.from("players").delete().eq("id", p.id);
+    const { error } = await removePendingPlayer(p.id);
+    if (error) alert("Couldn't remove: " + error.message);
+  };
+
+  // For a player who's already approved (and possibly mid-game) — unlike
+  // rejectPlayer above, this doesn't delete their row (see
+  // lib/playerRemoval.js for why): it marks them out with
+  // elimination_type "quit", the same as a self-serve quit.
+  const removeApprovedPlayer = async (p) => {
+    if (!confirm(`Remove ${p.display_name} from this game? They'll be marked out (like an exile, but with no re-entry attempt) rather than deleted, so past rounds still show their name correctly.`)) return;
+    const { error } = await quitOrRemoveApprovedPlayer(p.id);
     if (error) alert("Couldn't remove: " + error.message);
   };
 
@@ -158,7 +169,11 @@ export default function AdminHost({ gameId, players, round }) {
               <Btn small onClick={() => saveName(p)} disabled={saving[p.id] || nameFor(p) === p.display_name}>
                 {saving[p.id] ? "Saving..." : "Save"}
               </Btn>
-              {!p.alive && <span style={{ fontSize: 11, color: "#6b4f99" }}>(exiled)</span>}
+              {p.alive ? (
+                <Btn small variant="ghost" onClick={() => removeApprovedPlayer(p)}>Remove</Btn>
+              ) : (
+                <span style={{ fontSize: 11, color: "#6b4f99" }}>({p.elimination_type === "quit" ? "left" : "exiled"})</span>
+              )}
             </div>
           ))}
           {players.length === 0 && <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No players have joined yet.</p>}

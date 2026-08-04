@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 import { signOut, displayNameFromUser } from "../lib/auth";
+import { removePendingPlayer, quitOrRemoveApprovedPlayer } from "../lib/playerRemoval";
 import ColorPicker from "../components/ColorPicker";
 import ChallengePlayer from "../components/ChallengePlayer";
 import FatesPlayer from "../components/FatesPlayer";
@@ -34,6 +35,7 @@ export default function PlayPage() {
   const [round, setRound] = useState(null);
   const [tab, setTab] = useState("game");
   const [gameInfo, setGameInfo] = useState(null);
+  const [quitBusy, setQuitBusy] = useState(false);
 
   useRoundWatcher(gameId);
 
@@ -182,15 +184,39 @@ export default function PlayPage() {
   const playerName = myPlayer?.name;
   const player = myPlayer ? { id: myPlayer.id, name: myPlayer.name } : null;
   const exiled = joined && myPlayer && myPlayer.alive === false;
+  const quitByChoice = exiled && myPlayer.eliminationType === "quit";
   const approved = joined && !!myPlayer?.approved;
   const gameEnded = round?.phase === PHASES.ENDED;
+
+  const handleQuit = async () => {
+    if (!myPlayer) return;
+    const verb = approved ? "quit this game" : "cancel your join request";
+    if (!confirm(`Are you sure you want to ${verb}? This can't be undone.`)) return;
+    setQuitBusy(true);
+    const { error } = approved
+      ? await quitOrRemoveApprovedPlayer(myPlayer.id)
+      : await removePendingPlayer(myPlayer.id);
+    setQuitBusy(false);
+    if (error) { alert("Couldn't leave: " + error.message); return; }
+    router.replace("/");
+  };
 
   return (
     <div style={{ ...pageStyle, alignItems: "flex-start", flexDirection: "column" }}>
       <div style={{ display: "flex", justifyContent: "space-between", width: "100%", maxWidth: 400, margin: "0 auto 12px" }}>
         <HomeLink />
         <span style={{ color: "#a68fd6", fontSize: 13 }}>Playing as {playerName || "..."}</span>
-        <button onClick={signOut} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 12, cursor: "pointer" }}>Log out</button>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          {joined && myPlayer && myPlayer.alive !== false && !gameEnded && (
+            <button onClick={handleQuit} disabled={quitBusy} style={{
+              background: "none", border: "none", color: "#ff3860", fontSize: 12,
+              cursor: quitBusy ? "not-allowed" : "pointer", opacity: quitBusy ? 0.5 : 1,
+            }}>
+              {quitBusy ? "Leaving..." : approved ? "🚪 Quit" : "✕ Cancel"}
+            </button>
+          )}
+          <button onClick={signOut} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 12, cursor: "pointer" }}>Log out</button>
+        </div>
       </div>
 
       <div style={{ maxWidth: 400, width: "100%", margin: "0 auto" }}>
@@ -237,9 +263,9 @@ export default function PlayPage() {
             background: "linear-gradient(160deg, #200a1a 0%, #120612 100%)",
             border: "2px solid #ff3860", borderRadius: 12, boxShadow: "0 0 24px rgba(255,56,96,0.25)",
           }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>💀</div>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>{quitByChoice ? "🚪" : "💀"}</div>
             <p style={{ color: "#f5f0ff", fontSize: 17, fontWeight: 600, margin: 0, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
-              You have been exiled.
+              {quitByChoice ? "You've left this game." : "You have been exiled."}
             </p>
           </div>
         )}

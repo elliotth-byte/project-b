@@ -6,7 +6,7 @@
 -- ============================================================
 
 alter table players add column if not exists elimination_type text;
--- Expected values in Project B: 'exiled' | null.
+-- Expected values in Project B: 'exiled' | 'quit' | null.
 --   null      = alive and currently in the game, OR returned from exile.
 --   'exiled'  = voted out at an Exile Vote. They still get exactly one
 --               re-entry attempt (see lib/reentryLogic.js) — a player
@@ -15,3 +15,8 @@ alter table players add column if not exists elimination_type text;
 --               they stay alive = false / elimination_type = 'exiled'
 --               forever; lib/gameState.js's pb:reentry list is what
 --               actually tracks whether their one shot is still pending.
+--   'quit'    = added later, in sql/add-player-removal.sql /
+--               lib/playerRemoval.js — a player who left voluntarily, or
+--               was force-removed by the host after being approved. Also
+--               alive = false, but NEVER gets a re-entry attempt, since
+--               nothing ever adds them to pb:reentry.

@@ -154,6 +154,29 @@ actually drives the game from phase to phase.
   Fates nomination detail (`fatesNominatorOrder`/`fatesNominations`) into
   that history record, since it otherwise gets overwritten the moment the
   next round's Fates Ceremony starts.
+- **Fixed:** a tied Exile Vote / Finale vote could get permanently stuck
+  even after the host used the tie-break fallback buttons in
+  `ExileVoteHost.jsx`/`FinaleHost.jsx`. Those buttons were disabled purely
+  based on `outcome.needsTieBreak`, which is a pure function of the vote
+  tally and stays true forever once a tie exists — it never accounted for
+  a tie-break choice having actually been made, unlike
+  `ChaosPowerPlayer.jsx` (the primary tie-break path) and
+  `lib/roundEngine.js` (which both already correctly check
+  `needsTieBreak && !tieBreakChoiceId`). The host-facing tie card now also
+  flips to a green "tie broken" confirmation once a choice is in, instead
+  of staying on the red "it's tied" warning indefinitely.
+- **Fixed + new: player removal.** `sql/schema.sql` never had a DELETE
+  policy on `players` at all, so `AdminHost.jsx`'s existing "Remove"
+  button (for pending join requests) always silently failed — see
+  `sql/add-player-removal.sql`. While fixing that, also added: a host-side
+  "Remove" button for already-approved players (`components/AdminHost.jsx`),
+  and a self-serve "🚪 Quit" / "✕ Cancel" button for players themselves
+  (top bar in `pages/play.jsx`). A pending player quitting/being removed
+  is a genuine delete (nothing references them yet); an approved player
+  quitting/being removed is NOT deleted — `lib/playerRemoval.js` instead
+  marks them `alive: false, elimination_type: "quit"`, the same shape as
+  an exile, so every alive-only filter and every past reference to their
+  name keeps working, they just never get a re-entry attempt.
 
 
 
@@ -162,7 +185,8 @@ actually drives the game from phase to phase.
    `add-join-codes.sql`, `add-season-subtitle.sql`, `add-season-archive.sql`,
    `add-game-hosts.sql`, `add-elimination-type.sql`, `add-confessionals.sql`,
    `add-scheduled-groupme-posts.sql`, `add-player-color.sql`,
-   `add-player-color-policy.sql`, `add-chaos-secrets.sql`.
+   `add-player-color-policy.sql`, `add-chaos-secrets.sql`,
+   `add-player-removal.sql`.
 
    **Already have a project running?** If you ran `add-chaos-secrets.sql`
    before this note was added, also run `sql/fix-chaos-holder-check.sql`
