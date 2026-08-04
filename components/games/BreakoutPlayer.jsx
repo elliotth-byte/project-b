@@ -14,15 +14,23 @@ export default function BreakoutPlayer({ gameId, round, challenge, player }) {
   const stateRef = useRef(null);
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(cfg.lives || 3);
+  const [level, setLevel] = useState(1); // increments each time the board is fully cleared
   const [done, setDone] = useState(false);
   const doneRef = useRef(false);
   const reportedRef = useRef(false);
 
-  useEffect(() => {
+  const freshBricks = () => {
     const bricks = [];
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) bricks.push({ r, c, alive: true });
+    return bricks;
+  };
+
+  const speedForLevel = (lvl) => 1 + (lvl - 1) * 0.22; // each cleared board ramps ball speed up ~22%
+
+  useEffect(() => {
+    const speed = speedForLevel(1);
     stateRef.current = {
-      paddleX: W / 2 - PADDLE_W / 2, ballX: W / 2, ballY: H - 40, vx: 2.4, vy: -3.2, bricks,
+      paddleX: W / 2 - PADDLE_W / 2, ballX: W / 2, ballY: H - 40, vx: 2.4 * speed, vy: -3.2 * speed, bricks: freshBricks(), level: 1,
     };
   }, []);
 
@@ -62,12 +70,23 @@ export default function BreakoutPlayer({ gameId, round, challenge, player }) {
         setLives((l) => {
           const next = l - 1;
           if (next <= 0) { doneRef.current = true; setDone(true); }
-          else { st.ballX = W / 2; st.ballY = H - 40; st.vx = 2.4; st.vy = -3.2; }
+          else { const speed = speedForLevel(st.level); st.ballX = W / 2; st.ballY = H - 40; st.vx = 2.4 * speed; st.vy = -3.2 * speed; }
           return Math.max(0, next);
         });
       }
 
-      if (st.bricks.every((b) => !b.alive)) { doneRef.current = true; setDone(true); }
+      // Board cleared: don't end the game — spawn a fresh, harder board and
+      // keep going. Lives and score carry over; only speed and level reset
+      // the ball's position.
+      if (st.bricks.every((b) => !b.alive)) {
+        st.level += 1;
+        const speed = speedForLevel(st.level);
+        st.bricks = freshBricks();
+        st.ballX = W / 2; st.ballY = H - 40;
+        st.vx = speed * (st.vx >= 0 ? 2.4 : -2.4);
+        st.vy = -Math.abs(3.2 * speed);
+        setLevel(st.level);
+      }
 
       if (ctx) {
         ctx.clearRect(0, 0, W, H);
@@ -112,7 +131,7 @@ export default function BreakoutPlayer({ gameId, round, challenge, player }) {
   return (
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🧱 Breakout</h3>
+        <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🧱 Breakout {level > 1 ? `— Board ${level}` : ""}</h3>
         <Badge>{"❤️".repeat(lives)} · {score} pts</Badge>
       </div>
       <canvas

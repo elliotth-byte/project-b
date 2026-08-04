@@ -25,6 +25,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   const [config, setConfig] = useState(DEFAULT_PARTICIPATION);
   const [gameType, setGameType] = useState("manual");
   const [durationMin, setDurationMin] = useState(Math.round((settings?.challengeDurationSec || 900) / 60));
+  const [mazeSize, setMazeSize] = useState(GAME_REGISTRY.maze2d.config.size);
   const [selectedReentrants, setSelectedReentrants] = useState([]);
   const [busy, setBusy] = useState(false);
 
@@ -67,10 +68,11 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     }
     const now = Date.now();
     const endsAt = settings?.infiniteTime ? null : now + durationMin * 60 * 1000;
+    const configOverrides = gameType === "maze2d" ? { size: mazeSize } : undefined;
     await storageSet(gameId, KEY_CHALLENGE, {
       round: round.round, active: true, startedAt: now, endsAt,
       participantIds, reentryAttemptIds, placements: [], finalized: false,
-      gameType, gameConfig: gameConfigWithDefaults(gameType),
+      gameType, gameConfig: gameConfigWithDefaults(gameType, configOverrides),
     });
     await storageUpdate(gameId, KEY_ROUND, (fresh) => ({ ...(fresh || {}), phaseStartedAt: now, phaseEndsAt: endsAt }));
     setBusy(false);
@@ -138,6 +140,16 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
           ))}
         </div>
         <p style={{ fontSize: 11.5, color: "#6b4f99", margin: "0 0 14px", fontStyle: "italic" }}>{GAME_REGISTRY[gameType].blurb}</p>
+
+        {gameType === "maze2d" && (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+            <label style={{ fontSize: 12, color: "#a68fd6" }}>Maze size:</label>
+            <input type="number" min={5} max={31} step={2} value={mazeSize}
+              onChange={(e) => setMazeSize(Math.max(5, Math.min(31, Number(e.target.value) || 11)))}
+              style={{ width: 70, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 10px", color: "#f5f0ff", fontSize: 13 }} />
+            <span style={{ fontSize: 12, color: "#a68fd6" }}>cells (odd numbers work best)</span>
+          </div>
+        )}
 
         <ParticipantPicker alive={alivePicker} allPlayers={allPicker} value={config} onChange={setConfig} />
 

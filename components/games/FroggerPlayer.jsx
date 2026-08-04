@@ -18,6 +18,9 @@ export default function FroggerPlayer({ gameId, round, challenge, player }) {
   const [done, setDone] = useState(false);
   const doneRef = useRef(false);
   const reportedRef = useRef(false);
+  const scoreRef = useRef(0); // mirrors `score` for the rAF loop below, which closes over stale state otherwise
+
+  useEffect(() => { scoreRef.current = score; }, [score]);
 
   useEffect(() => {
     const cars = LANES.map((row, i) => ({
@@ -59,8 +62,11 @@ export default function FroggerPlayer({ gameId, round, challenge, player }) {
     const loop = () => {
       const st = stateRef.current;
       if (!st || doneRef.current) return;
+      // Every point scored ramps traffic up a little — capped so it never
+      // gets literally unplayable.
+      const difficulty = Math.min(2.5, 1 + scoreRef.current * 0.08);
       st.cars.forEach((car) => {
-        car.x += car.dir * car.speed * 2;
+        car.x += car.dir * car.speed * 2 * difficulty;
         if (car.x > W + 40) car.x = -40;
         if (car.x < -40) car.x = W + 40;
       });

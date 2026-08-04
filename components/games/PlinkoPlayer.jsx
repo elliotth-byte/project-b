@@ -50,6 +50,13 @@ export default function PlinkoPlayer({ gameId, round, challenge, player }) {
     ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
   };
 
+  // The canvas only ever draws ballRef.current — before a drop starts, that
+  // needs to track startCol, or moving the launch position with the arrow
+  // buttons updates state but the chip never visibly moves.
+  useEffect(() => {
+    if (!dropping) ballRef.current = { row: 0, col: startCol };
+  }, [startCol, dropping]);
+
   useEffect(() => { draw(); }); // eslint-disable-line react-hooks/exhaustive-deps
 
   const drop = () => {

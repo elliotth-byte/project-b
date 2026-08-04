@@ -5,7 +5,8 @@ import { useCountdown } from "./useCountdown";
 import { generateScenes, drawScene } from "../../lib/games/spotDiffData";
 import { reportScore } from "../../lib/challengeScores";
 
-const W = 300, H = 200;
+const W = 600, H = 400;
+const WRONG_CLICK_PENALTY_MS = 3000;
 
 export default function SpotDiffPlayer({ gameId, round, challenge, player }) {
   const cfg = challenge?.gameConfig || { differences: 5 };
@@ -14,6 +15,8 @@ export default function SpotDiffPlayer({ gameId, round, challenge, player }) {
   const [scene] = useState(() => generateScenes(seed, cfg.differences || 5, W, H));
   const [differences, setDifferences] = useState(scene.differences);
   const [startTime] = useState(() => Date.now());
+  const [penaltyMs, setPenaltyMs] = useState(0);
+  const [flash, setFlash] = useState(false); // brief red flash on a wrong click
   const [done, setDone] = useState(false);
   const canvasARef = useRef(null);
   const canvasBRef = useRef(null);
@@ -35,13 +38,13 @@ export default function SpotDiffPlayer({ gameId, round, challenge, player }) {
     }
   }, [differences]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const reportComposite = (found, final) => {
-    const elapsed = Date.now() - startTime;
-    const value = found * 1_000_000 - elapsed; // more found always beats fewer; faster breaks ties within equal found-count
+  const reportComposite = (found, final, penalty = penaltyMs) => {
+    const elapsed = Date.now() - startTime + penalty;
+    const value = found * 1_000_000 - elapsed; // more found always beats fewer; faster (incl. wrong-click penalties) breaks ties within equal found-count
     reportScore(gameId, round.round, player.id, player.name, value, { final, foundCount: found });
   };
 
-  useEffect(() => { reportComposite(foundCount, false); }, [foundCount]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { reportComposite(foundCount, false); }, [foundCount, penaltyMs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (timeUp && !reportedRef.current) {
@@ -54,7 +57,8 @@ export default function SpotDiffPlayer({ gameId, round, challenge, player }) {
   const onClickB = (e) => {
     if (done) return;
     const rect = canvasBRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    const scaleX = W / rect.width, scaleY = H / rect.height;
+    const x = (e.clientX - rect.left) * scaleX, y = (e.clientY - rect.top) * scaleY;
     let changed = false;
     const next = differences.map((d) => {
       if (!d.found && Math.hypot(d.x - x, d.y - y) < d.r + 6) { changed = true; return { ...d, found: true }; }
@@ -67,6 +71,11 @@ export default function SpotDiffPlayer({ gameId, round, challenge, player }) {
         setDone(true);
         reportComposite(next.length, true);
       }
+    } else {
+      // Missed — costs time, same as if the clock just ran that much further.
+      setPenaltyMs((p) => p + WRONG_CLICK_PENALTY_MS);
+      setFlash(true);
+      window.setTimeout(() => setFlash(false), 250);
     }
   };
 
@@ -80,9 +89,19 @@ export default function SpotDiffPlayer({ gameId, round, challenge, player }) {
         <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🔍 Spot the Difference</h3>
         <Badge>{foundCount}/{differences.length} found</Badge>
       </div>
-      <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 6px" }}>Top: original. Bottom: tap where it's different.</p>
-      <canvas ref={canvasARef} width={W} height={H} style={{ background: "#0d0618", borderRadius: 8, border: "1px solid #3d1f5c", marginBottom: 6, display: "block", margin: "0 auto 6px" }} />
-      <canvas ref={canvasBRef} width={W} height={H} onClick={onClickB} style={{ background: "#0d0618", borderRadius: 8, border: "1px solid #3d1f5c", cursor: "crosshair", display: "block", margin: "0 auto" }} />
+      <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 6px" }}>
+        Top: original. Bottom: tap where it's different. Wrong clicks cost you {WRONG_CLICK_PENALTY_MS / 1000}s.
+      </p>
+      {penaltyMs > 0 && <p style={{ color: "#ff3860", fontSize: 11, margin: "0 0 6px", fontWeight: 700 }}>-{(penaltyMs / 1000).toFixed(0)}s time penalty so far</p>}
+      <canvas ref={canvasARef} width={W} height={H} style={{ width: "100%", maxWidth: W, height: "auto", background: "#0d0618", borderRadius: 8, border: "1px solid #3d1f5c", marginBottom: 6, display: "block", margin: "0 auto 6px" }} />
+      <canvas
+        ref={canvasBRef} width={W} height={H} onClick={onClickB}
+        style={{
+          width: "100%", maxWidth: W, height: "auto", background: "#0d0618", borderRadius: 8,
+          border: `2px solid ${flash ? "#ff3860" : "#3d1f5c"}`, cursor: "crosshair", display: "block", margin: "0 auto",
+          transition: "border-color 0.15s",
+        }}
+      />
     </Card>
   );
 }

@@ -48,8 +48,15 @@ function resolveGrid(grid, onScore) {
   return { grid: g, cleared: totalCleared };
 }
 
+const MATCH3_DURATION_MS = 3 * 60 * 1000;
+
 export default function Match3Player({ gameId, round, challenge, player }) {
-  const { timeUp } = useCountdown(challenge?.endsAt);
+  // Match 3 always gets a flat 3 minutes from the moment the player hits
+  // Start — not challenge?.endsAt (the host's round length), and not
+  // running from the moment the component mounts either.
+  const [startedAt, setStartedAt] = useState(null);
+  const [localEndsAt, setLocalEndsAt] = useState(null);
+  const { timeUp, remainingSec } = useCountdown(localEndsAt);
   const [grid, setGrid] = useState(() => {
     let g = randomGrid();
     while (findMatches(g).size > 0) g = randomGrid();
@@ -60,9 +67,16 @@ export default function Match3Player({ gameId, round, challenge, player }) {
   const [done, setDone] = useState(false);
   const reportedRef = useRef(false);
 
+  const handleStart = () => {
+    const now = Date.now();
+    setStartedAt(now);
+    setLocalEndsAt(now + MATCH3_DURATION_MS);
+  };
+
   useEffect(() => {
+    if (!startedAt) return;
     reportScore(gameId, round.round, player.id, player.name, score, { final: false });
-  }, [score]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [score, startedAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (timeUp && !reportedRef.current) {
@@ -78,7 +92,7 @@ export default function Match3Player({ gameId, round, challenge, player }) {
   };
 
   const clickTile = (i) => {
-    if (done) return;
+    if (done || !startedAt) return;
     if (selected === null) { setSelected(i); return; }
     if (selected === i) { setSelected(null); return; }
     if (!areAdjacent(selected, i)) { setSelected(i); return; }
@@ -96,11 +110,27 @@ export default function Match3Player({ gameId, round, challenge, player }) {
 
   if (done) return <GameResultCard icon="💎" title="Time's Up" valueLabel={`${score} points`} />;
 
+  if (!startedAt) {
+    return (
+      <Card style={{ marginBottom: 20, textAlign: "center" }}>
+        <h3 style={{ color: "#ff2d95", margin: "0 0 8px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>💎 Match 3</h3>
+        <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 14px" }}>
+          You get 3 minutes on the clock from the moment you hit Start, no matter how long this round is.
+        </p>
+        <button onClick={handleStart} style={{
+          padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 700,
+          background: "linear-gradient(135deg, #ff2d95, #b829ff)", border: "none", color: "#05010f",
+          fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
+        }}>Start</button>
+      </Card>
+    );
+  }
+
   return (
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>💎 Match 3</h3>
-        <Badge>{score} pts</Badge>
+        <Badge color={remainingSec != null && remainingSec <= 15 ? "#ff3860" : "#ff2d95"}>{remainingSec != null ? `${remainingSec}s` : ""} · {score} pts</Badge>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${SIZE}, 42px)`, gap: 3, margin: "0 auto", width: "fit-content" }}>
         {grid.map((v, i) => (

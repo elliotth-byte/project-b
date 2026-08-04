@@ -5,9 +5,14 @@ import { useCountdown } from "./useCountdown";
 import { reportScore } from "../../lib/challengeScores";
 
 const HOLES = 9;
+const DURATION_MS = 90 * 1000;
 
 export default function WhackMolePlayer({ gameId, round, challenge, player }) {
-  const { remainingSec, timeUp } = useCountdown(challenge?.endsAt);
+  // Whack-a-Mole always runs 90 seconds flat, independent of whatever
+  // duration the host set for the round — so it uses its own local clock
+  // rather than challenge?.endsAt.
+  const [localEndsAt] = useState(() => Date.now() + DURATION_MS);
+  const { remainingSec, timeUp } = useCountdown(localEndsAt);
   const [activeHole, setActiveHole] = useState(null);
   const [score, setScore] = useState(0);
   const [done, setDone] = useState(false);
