@@ -96,13 +96,29 @@ export default function PlayPage() {
         return;
       }
 
+      let session = null;
+      for (let attempt = 0; attempt < 15 && !session; attempt++) {
+        const { data } = await supabase.auth.getSession();
+        session = data.session;
+        if (!session) await new Promise((r) => setTimeout(r, 400));
+      }
+      if (!session) {
+        setJoinError(`Couldn't join this game: no session after waiting (user.id=${user.id}). Try refreshing the page.`);
+        return;
+      }
+      if (session.user.id !== user.id) {
+        setJoinError(`Couldn't join this game: session/user mismatch (session=${session.user.id}, state=${user.id}). Try refreshing the page.`);
+        return;
+      }
+
       const { data: created, error } = await supabase
         .from("players")
-        .insert({ game_id: gameId, user_id: user.id, display_name: displayNameFromUser(user), approved: false })
+        .insert({ game_id: gameId, user_id: session.user.id, display_name: displayNameFromUser(user), approved: false })
         .select("id, display_name, alive, elimination_type, approved, color")
         .single();
-      if (error) setJoinError("Couldn't join this game: " + error.message);
-      else {
+      if (error) {
+        setJoinError(`Couldn't join this game: ${error.message}${error.code ? ` [code=${error.code}]` : ""}${error.details ? ` — ${error.details}` : ""} (user_id=${session.user.id})`);
+      } else {
         setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, approved: created.approved, color: created.color });
         setJoined(true);
       }
