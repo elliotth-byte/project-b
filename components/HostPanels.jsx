@@ -26,6 +26,7 @@ export default function HostPanels({ gameId, players }) {
   const [settings, setSettingsState] = useState(null);
   const [unreadConfessionals, setUnreadConfessionals] = useState(0);
   const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState("");
 
   useEffect(() => {
     const unsubscribe = subscribeRound(gameId, setRound);
@@ -59,8 +60,10 @@ export default function HostPanels({ gameId, players }) {
 
   const startSeason = async () => {
     setStarting(true);
-    await initRound(gameId);
+    setStartError("");
+    const ok = await initRound(gameId);
     setStarting(false);
+    if (!ok) setStartError("Couldn't start the round — the write to the database didn't go through. Try again, or check Supabase's logs if it keeps happening.");
   };
 
   return (
@@ -95,6 +98,7 @@ export default function HostPanels({ gameId, players }) {
               </p>
               <Btn onClick={startSeason} disabled={starting || alive.length < 3}>{starting ? "Starting..." : "Start Round 1"}</Btn>
               {alive.length < 3 && <p style={{ color: "#ff3860", fontSize: 11, marginTop: 8 }}>Need at least 3 approved players.</p>}
+              {startError && <p style={{ color: "#ff3860", fontSize: 11, marginTop: 8 }}>{startError}</p>}
             </Card>
           ) : round.phase === PHASES.ENDED ? (
             <Card style={{ textAlign: "center", borderColor: "rgba(255,45,149,0.5)" }}>
