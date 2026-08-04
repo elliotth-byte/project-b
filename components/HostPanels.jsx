@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Btn, Card, Badge } from "./ui";
-import { subscribeRound, subscribeSettings, initRound, PHASES } from "../lib/gameState";
+import { subscribeRound, subscribeSettings, startSeason as startSeasonState, PHASES } from "../lib/gameState";
 import { fetchAllConfessionals, subscribeConfessionalsTable } from "../lib/confessionalsData";
 import ChallengeErrorBoundary from "./ChallengeErrorBoundary";
 import ChallengeHost from "./ChallengeHost";
@@ -61,7 +61,7 @@ export default function HostPanels({ gameId, players }) {
   const startSeason = async () => {
     setStarting(true);
     setStartError("");
-    const ok = await initRound(gameId);
+    const ok = await startSeasonState(gameId);
     setStarting(false);
     if (!ok) setStartError("Couldn't start the round — the write to the database didn't go through. Try again, or check Supabase's logs if it keeps happening.");
   };
