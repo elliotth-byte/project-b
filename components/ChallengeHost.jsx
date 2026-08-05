@@ -100,6 +100,11 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   };
 
   const finishNow = async () => {
+    if (isDigital && (inProgressParticipants.length > 0 || notStartedParticipants.length > 0)) {
+      const stillGoing = [...inProgressParticipants, ...notStartedParticipants].map((p) => p.display_name);
+      const verb = stillGoing.length > 1 ? "haven't" : "hasn't";
+      if (!confirm(`${stillGoing.join(", ")} ${verb} finished yet — ending now ranks them last. Continue?`)) return;
+    }
     setBusy(true);
     await requestAdvance(gameId, true);
     setBusy(false);
@@ -193,9 +198,31 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
 
   const registryEntry = GAME_REGISTRY[challenge.gameType || "manual"];
   const rankDirection = registryEntry?.rank === "time-asc" ? "time-asc" : "score-desc";
-  const liveRanking = isDigital
-    ? scoresToPlacements(scores, participants.map((p) => ({ playerId: p.id, name: p.display_name })), rankDirection)
+
+  // The leaderboard only ever ranks players who have actually FINISHED
+  // (a locked, non-forfeited score) — someone who hasn't played yet, or
+  // is still mid-game, never gets a placement number or a "#1" badge.
+  // Ranking everyone the instant the challenge starts (as if a no-show
+  // were simply "last place") is correct for the FINAL result once the
+  // timer's genuinely up — see scoresToPlacements — but showing that
+  // same logic live, while people (including anyone attempting
+  // re-entry) are still actively playing, makes an in-progress challenge
+  // look like a decided one. That's misleading and risks the host
+  // ending it early on a false impression that it's already over.
+  const finishedParticipants = participants.filter((p) => scores[p.id]?.locked && !scores[p.id]?.forfeited);
+  const forfeitedParticipants = participants.filter((p) => scores[p.id]?.forfeited);
+  const inProgressParticipants = participants.filter((p) => scores[p.id] && !scores[p.id].locked);
+  const notStartedParticipants = participants.filter((p) => !scores[p.id]);
+
+  const finishedRanking = isDigital
+    ? scoresToPlacements(scores, finishedParticipants.map((p) => ({ playerId: p.id, name: p.display_name })), rankDirection)
     : [];
+
+  const scoreLabel = (s) => {
+    if (!s) return null;
+    if (s.foundCount != null) return `${s.foundCount}/${challenge.gameConfig?.differences || 5} found`;
+    return rankDirection === "time-asc" ? `${(s.value / 1000).toFixed(2)}s` : s.value;
+  };
 
   return (
     <Card>
@@ -210,30 +237,71 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
       </p>
 
       {isDigital ? (
-        <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
-          <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Live leaderboard</div>
-          {liveRanking.map((r) => {
-            const s = scores[r.playerId];
-            const isReentrant = challenge.reentryAttemptIds?.includes(r.playerId);
-            return (
-              <div key={r.playerId} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0d0618", borderRadius: 6, padding: "6px 10px" }}>
-                <Badge color={r.place === 1 ? "#ff2d95" : "#a68fd6"}>#{r.place}</Badge>
-                <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff" }}>
-                  {r.name}{isReentrant && <span style={{ color: "#ff3860", fontSize: 11 }}> (re-entry attempt)</span>}
-                </span>
-                <span style={{ fontSize: 12, color: s?.forfeited ? "#ff3860" : "#a68fd6" }}>
-                  {s?.forfeited
-                    ? "🏳️ Forfeited"
-                    : s
-                      ? (s.foundCount != null
-                          ? `${s.foundCount}/${challenge.gameConfig?.differences || 5} found`
-                          : rankDirection === "time-asc" ? `${(s.value / 1000).toFixed(2)}s` : s.value)
-                      : "playing..."}
-                  {s?.locked && !s?.forfeited ? " ✓" : ""}
-                </span>
+        <div style={{ display: "grid", gap: 10, marginBottom: 12 }}>
+          {finishedRanking.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+                Finished ({finishedRanking.length}/{participants.length})
               </div>
-            );
-          })}
+              <div style={{ display: "grid", gap: 6 }}>
+                {finishedRanking.map((r) => {
+                  const isReentrant = challenge.reentryAttemptIds?.includes(r.playerId);
+                  return (
+                    <div key={r.playerId} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0d0618", borderRadius: 6, padding: "6px 10px" }}>
+                      <Badge color={r.place === 1 ? "#ff2d95" : "#a68fd6"}>#{r.place}</Badge>
+                      <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff" }}>
+                        {r.name}{isReentrant && <span style={{ color: "#ff3860", fontSize: 11 }}> (re-entry attempt)</span>}
+                      </span>
+                      <span style={{ fontSize: 12, color: "#a68fd6" }}>{scoreLabel(scores[r.playerId])} ✓</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {(inProgressParticipants.length > 0 || notStartedParticipants.length > 0 || forfeitedParticipants.length > 0) && (
+            <div>
+              <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+                Still playing — not ranked yet
+              </div>
+              <div style={{ display: "grid", gap: 6 }}>
+                {inProgressParticipants.map((p) => {
+                  const isReentrant = challenge.reentryAttemptIds?.includes(p.id);
+                  return (
+                    <div key={p.id} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0d0618", borderRadius: 6, padding: "6px 10px", opacity: 0.85 }}>
+                      <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff" }}>
+                        {p.display_name}{isReentrant && <span style={{ color: "#ff3860", fontSize: 11 }}> (re-entry attempt)</span>}
+                      </span>
+                      <span style={{ fontSize: 12, color: "#a68fd6" }}>{scoreLabel(scores[p.id])} — playing...</span>
+                    </div>
+                  );
+                })}
+                {notStartedParticipants.map((p) => {
+                  const isReentrant = challenge.reentryAttemptIds?.includes(p.id);
+                  return (
+                    <div key={p.id} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0d0618", borderRadius: 6, padding: "6px 10px", opacity: 0.6 }}>
+                      <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff" }}>
+                        {p.display_name}{isReentrant && <span style={{ color: "#ff3860", fontSize: 11 }}> (re-entry attempt)</span>}
+                      </span>
+                      <span style={{ fontSize: 12, color: "#6b4f99", fontStyle: "italic" }}>hasn't started</span>
+                    </div>
+                  );
+                })}
+                {forfeitedParticipants.map((p) => {
+                  const isReentrant = challenge.reentryAttemptIds?.includes(p.id);
+                  return (
+                    <div key={p.id} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0d0618", borderRadius: 6, padding: "6px 10px", opacity: 0.7 }}>
+                      <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff" }}>
+                        {p.display_name}{isReentrant && <span style={{ color: "#ff3860", fontSize: 11 }}> (re-entry attempt)</span>}
+                      </span>
+                      <span style={{ fontSize: 12, color: "#ff3860" }}>🏳️ Forfeited</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
