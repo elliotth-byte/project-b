@@ -13,8 +13,10 @@ import ChaosPowerPlayer from "../components/ChaosPowerPlayer";
 import ConfessionalPlayer from "../components/ConfessionalPlayer";
 import MusicPlayer from "../components/MusicPlayer";
 import HomeLink from "../components/HomeLink";
+import LogoutButton from "../components/LogoutButton";
 import ChallengeErrorBoundary from "../components/ChallengeErrorBoundary";
 import RoundTimerBanner from "../components/RoundTimerBanner";
+import { Card } from "../components/ui";
 import { subscribeRound, PHASES } from "../lib/gameState";
 import { useRoundWatcher } from "../lib/useRoundWatcher";
 
@@ -176,6 +178,7 @@ export default function PlayPage() {
   if (!gameId) {
     return (
       <div style={pageStyle}>
+        <div style={{ position: "absolute", top: 20, right: 24 }}><LogoutButton /></div>
         <p style={{ color: "#a68fd6" }}>Ask the host for your join link — it looks like <code>/play?game=...</code>.</p>
       </div>
     );
@@ -270,7 +273,7 @@ export default function PlayPage() {
           </div>
         )}
 
-        {approved && myPlayer.color && playerName && round && (
+        {approved && myPlayer.color && playerName && (
           <>
             <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #3d1f5c" }}>
               {TABS.map((t) => (
@@ -289,19 +292,26 @@ export default function PlayPage() {
             {tab === "game" && !gameEnded && (
               <>
                 <div style={{ marginBottom: 16 }}><RoundTimerBanner round={round} /></div>
-                {round.phase === PHASES.CHALLENGE && (
+                {(!round || round.phase === PHASES.LOBBY) && (
+                  <Card style={{ marginBottom: 20, textAlign: "center" }}>
+                    <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: 0 }}>
+                      Waiting for the host to start the game. Feel free to check out the Confessional tab in the meantime.
+                    </p>
+                  </Card>
+                )}
+                {round?.phase === PHASES.CHALLENGE && (
                   <ChallengeErrorBoundary label="Challenge"><ChallengePlayer gameId={gameId} player={player} round={round} /></ChallengeErrorBoundary>
                 )}
-                {round.phase === PHASES.FATES && (
+                {round?.phase === PHASES.FATES && (
                   <ChallengeErrorBoundary label="Fates Ceremony"><FatesPlayer gameId={gameId} player={player} players={allPlayers} round={round} /></ChallengeErrorBoundary>
                 )}
-                {round.phase === PHASES.EXILE && !exiled && (
+                {round?.phase === PHASES.EXILE && !exiled && (
                   <ChallengeErrorBoundary label="Exile Vote">
                     <ChaosPowerPlayer gameId={gameId} round={round} player={player} players={allPlayers} />
                     <ExileVotePlayer gameId={gameId} player={player} round={round} players={allPlayers} />
                   </ChallengeErrorBoundary>
                 )}
-                {round.phase === PHASES.FINALE && (
+                {round?.phase === PHASES.FINALE && (
                   <ChallengeErrorBoundary label="Finale">
                     <ChaosPowerPlayer gameId={gameId} round={round} player={player} players={allPlayers} />
                     <FinalePlayer gameId={gameId} player={player} round={round} players={allPlayers} />

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Btn, Card } from "./ui";
 import {
   CONFESSIONAL_TAGS, submitConfessional, fetchOwnConfessionals, subscribeConfessionalPrompt,
+  subscribeConfessionalsTable,
 } from "../lib/confessionalsData";
 
 export default function ConfessionalPlayer({ gameId, player, round }) {
@@ -11,6 +12,7 @@ export default function ConfessionalPlayer({ gameId, player, round }) {
   const [confirmed, setConfirmed] = useState(false);
   const [mine, setMine] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
+  const hasUnseenReply = mine.some((c) => c.host_reply);
   const [prompt, setPrompt] = useState(null);
 
   useEffect(() => {
@@ -22,6 +24,17 @@ export default function ConfessionalPlayer({ gameId, player, round }) {
     if (!player?.id) return;
     fetchOwnConfessionals(player.id).then(setMine);
   }, [player?.id]);
+
+  // Live refresh — RLS already limits what comes back to this player's
+  // own rows, so this is what lets a host's private reply show up here
+  // without needing to leave and come back to the tab.
+  useEffect(() => {
+    if (!player?.id || !gameId) return;
+    const unsubscribe = subscribeConfessionalsTable(gameId, () => {
+      fetchOwnConfessionals(player.id).then(setMine);
+    });
+    return unsubscribe;
+  }, [gameId, player?.id]);
 
   const toggleTag = (t) => setSelectedTags((prev) => prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]);
 
@@ -86,7 +99,7 @@ export default function ConfessionalPlayer({ gameId, player, round }) {
       {mine.length > 0 && (
         <div style={{ marginTop: 14, borderTop: "1px solid #3d1f5c", paddingTop: 10 }}>
           <button onClick={() => setShowHistory(!showHistory)} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 11, cursor: "pointer" }}>
-            {showHistory ? "▲ Hide" : "▼ Show"} your past confessionals ({mine.length})
+            {showHistory ? "▲ Hide" : "▼ Show"} your past confessionals ({mine.length}){hasUnseenReply && !showHistory ? " · 💬 host replied" : ""}
           </button>
           {showHistory && (
             <div style={{ marginTop: 8, display: "grid", gap: 6, maxHeight: 220, overflowY: "auto" }}>
@@ -97,6 +110,12 @@ export default function ConfessionalPlayer({ gameId, player, round }) {
                     {c.tags?.length > 0 && ` · ${c.tags.join(", ")}`}
                   </div>
                   <div style={{ fontSize: 12, color: "#a68fd6" }}>{c.text}</div>
+                  {c.host_reply && (
+                    <div style={{ marginTop: 6, background: "rgba(0,217,255,0.08)", border: "1px solid rgba(0,217,255,0.3)", borderRadius: 6, padding: "6px 8px" }}>
+                      <div style={{ fontSize: 9, color: "#00d9ff", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Host replied</div>
+                      <div style={{ fontSize: 12, color: "#f5f0ff" }}>{c.host_reply}</div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

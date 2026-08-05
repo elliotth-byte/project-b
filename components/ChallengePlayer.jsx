@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { Card, Badge } from "./ui";
-import { subscribeGameState } from "../lib/gameStorage";
+import { Btn, Card, Badge } from "./ui";
+import { subscribeGameState, storageUpdate } from "../lib/gameStorage";
 import { KEY_CHALLENGE } from "../lib/gameState";
 import { subscribeReentry, setWantsToCompete } from "../lib/reentryData";
 import { REENTRY_STATUS } from "../lib/reentryLogic";
-import { subscribeScores } from "../lib/challengeScores";
+import { subscribeScores, forfeitChallenge } from "../lib/challengeScores";
 import { GAME_REGISTRY } from "../lib/challengeGames";
 import Match3Player from "./games/Match3Player";
 import FroggerPlayer from "./games/FroggerPlayer";
@@ -35,6 +35,8 @@ export default function ChallengePlayer({ gameId, player, round }) {
   const [challenge, setChallenge] = useState(null);
   const [reentry, setReentry] = useState([]);
   const [scores, setScores] = useState({});
+  const [readyToPlay, setReadyToPlay] = useState(false);
+  const [forfeiting, setForfeiting] = useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeGameState(gameId, KEY_CHALLENGE, setChallenge);
@@ -51,6 +53,13 @@ export default function ChallengePlayer({ gameId, player, round }) {
     const unsubscribe = subscribeScores(gameId, round.round, setScores);
     return unsubscribe;
   }, [gameId, round?.round]);
+
+  // A brand new challenge (new round, or the host re-starting one) always
+  // needs the rules screen shown again — clicking "Go" on a previous
+  // challenge shouldn't let a player skip straight past the next one.
+  useEffect(() => {
+    setReadyToPlay(false);
+  }, [gameId, round?.round, challenge?.startedAt]);
 
   if (round?.phase !== "challenge") return null;
 
@@ -98,17 +107,77 @@ export default function ChallengePlayer({ gameId, player, round }) {
   const isDigital = challenge.gameType && challenge.gameType !== "manual";
   const myScore = scores?.[player?.id];
   const registryEntry = GAME_REGISTRY[challenge.gameType];
+  const manuallyForfeited = (challenge.forfeitedIds || []).includes(player?.id);
+
+  // Manual / in-person challenges have no digital score to lock in, so a
+  // forfeit there just flags the player's row for the host (who still
+  // enters everyone's finishing order by hand).
+  const forfeitManual = async () => {
+    if (!confirm("Forfeit this challenge? This can't be undone once the challenge is over.")) return;
+    setForfeiting(true);
+    await storageUpdate(gameId, KEY_CHALLENGE, (fresh) => {
+      if (!fresh) return fresh;
+      const ids = fresh.forfeitedIds || [];
+      if (ids.includes(player.id)) return fresh;
+      return { ...fresh, forfeitedIds: [...ids, player.id] };
+    });
+    setForfeiting(false);
+  };
+
+  const forfeitDigital = async () => {
+    if (!confirm("Forfeit this challenge? This can't be undone, and you'll be ranked last.")) return;
+    setForfeiting(true);
+    await forfeitChallenge(gameId, round.round, player.id, player.name);
+    setForfeiting(false);
+  };
 
   if (isDigital && amCompeting) {
     // Already locked in a final score for this round (e.g. after a page
     // refresh) — show the result instead of restarting the mini-game
     // from scratch with fresh local state.
     if (myScore?.locked) {
+      if (myScore.forfeited) {
+        return (
+          <Card style={{ marginBottom: 20, textAlign: "center" }}>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>🏳️</div>
+            <p style={{ color: "#a68fd6", fontSize: 14, margin: 0 }}>You forfeited this challenge.</p>
+          </Card>
+        );
+      }
       return <GameResultCard icon={registryEntry?.icon || "🎮"} title={`${registryEntry?.label || "Challenge"} Complete`} valueLabel={String(myScore.value)} />;
     }
+
     const GameComponent = GAME_COMPONENTS[challenge.gameType];
     if (GameComponent) {
-      return <GameComponent gameId={gameId} round={round} challenge={challenge} player={player} />;
+      // Rules screen: the actual mini-game only mounts once the player
+      // taps "Go" — this both gives them a chance to read how it's
+      // played and keeps a fresh page load from silently dropping them
+      // straight into a moving game.
+      if (!readyToPlay) {
+        return (
+          <Card style={{ marginBottom: 20, textAlign: "center" }}>
+            <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#ff2d95", marginBottom: 6 }}>
+              {registryEntry?.icon || "⚔️"} {registryEntry?.label || "Challenge"}
+            </div>
+            <h3 style={{ color: "#f5f0ff", margin: "0 0 8px", fontSize: 16, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>How to play</h3>
+            <p style={{ color: "#a68fd6", fontSize: 13, margin: "0 0 18px", lineHeight: 1.5 }}>{registryEntry?.blurb}</p>
+            <Btn onClick={() => setReadyToPlay(true)}>Go ➜</Btn>
+            <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 14, fontStyle: "italic" }}>
+              {challenge.endsAt ? "The clock is already running — tap Go whenever you're ready to jump in." : "Tap Go whenever you're ready to jump in."}
+            </p>
+          </Card>
+        );
+      }
+      return (
+        <>
+          <GameComponent gameId={gameId} round={round} challenge={challenge} player={player} />
+          <div style={{ textAlign: "center", marginTop: 10 }}>
+            <Btn small variant="ghost" onClick={forfeitDigital} disabled={forfeiting}>
+              {forfeiting ? "Forfeiting..." : "🏳️ Forfeit Challenge"}
+            </Btn>
+          </div>
+        </>
+      );
     }
   }
 
@@ -118,10 +187,19 @@ export default function ChallengePlayer({ gameId, player, round }) {
         {registryEntry?.icon || "⚔️"} {registryEntry?.label || "Challenge"}
       </div>
       {amCompeting ? (
-        <>
-          <p style={{ color: "#f5f0ff", fontSize: 15, margin: "0 0 6px" }}>You're competing!</p>
-          {challenge.reentryAttemptIds?.includes(player.id) && <Badge color="#ff3860">Your one re-entry attempt</Badge>}
-        </>
+        manuallyForfeited ? (
+          <p style={{ color: "#a68fd6", fontSize: 14, margin: 0 }}>🏳️ You've forfeited this challenge.</p>
+        ) : (
+          <>
+            <p style={{ color: "#f5f0ff", fontSize: 15, margin: "0 0 6px" }}>You're competing!</p>
+            {challenge.reentryAttemptIds?.includes(player.id) && <Badge color="#ff3860">Your one re-entry attempt</Badge>}
+            <div style={{ marginTop: 12 }}>
+              <Btn small variant="ghost" onClick={forfeitManual} disabled={forfeiting}>
+                {forfeiting ? "Forfeiting..." : "🏳️ Forfeit Challenge"}
+              </Btn>
+            </div>
+          </>
+        )
       ) : (
         <p style={{ color: "#a68fd6", fontSize: 14, margin: 0 }}>Sitting this challenge out — cheer everyone on!</p>
       )}

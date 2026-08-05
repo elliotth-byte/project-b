@@ -223,13 +223,15 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
                 <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff" }}>
                   {r.name}{isReentrant && <span style={{ color: "#ff3860", fontSize: 11 }}> (re-entry attempt)</span>}
                 </span>
-                <span style={{ fontSize: 12, color: "#a68fd6" }}>
-                  {s
-                    ? (s.foundCount != null
-                        ? `${s.foundCount}/${challenge.gameConfig?.differences || 5} found`
-                        : rankDirection === "time-asc" ? `${(s.value / 1000).toFixed(2)}s` : s.value)
-                    : "playing..."}
-                  {s?.locked ? " ✓" : ""}
+                <span style={{ fontSize: 12, color: s?.forfeited ? "#ff3860" : "#a68fd6" }}>
+                  {s?.forfeited
+                    ? "🏳️ Forfeited"
+                    : s
+                      ? (s.foundCount != null
+                          ? `${s.foundCount}/${challenge.gameConfig?.differences || 5} found`
+                          : rankDirection === "time-asc" ? `${(s.value / 1000).toFixed(2)}s` : s.value)
+                      : "playing..."}
+                  {s?.locked && !s?.forfeited ? " ✓" : ""}
                 </span>
               </div>
             );
@@ -240,10 +242,12 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
           {participants.map((p) => {
             const current = (challenge.placements || []).find((pl) => pl.playerId === p.id);
             const isReentrant = challenge.reentryAttemptIds?.includes(p.id);
+            const isForfeited = challenge.forfeitedIds?.includes(p.id);
             return (
               <div key={p.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff" }}>
                   {p.display_name}{isReentrant && <span style={{ color: "#ff3860", fontSize: 11 }}> (re-entry attempt)</span>}
+                  {isForfeited && <span style={{ color: "#ff3860", fontSize: 11 }}> (forfeited)</span>}
                 </span>
                 <input type="number" min={1} max={participants.length} value={current?.place || ""}
                   onChange={(e) => setPlace(p.id, e.target.value)}

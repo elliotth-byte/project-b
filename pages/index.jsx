@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
+import LogoutButton from "../components/LogoutButton";
 
 export default function Home() {
   const router = useRouter();
@@ -8,6 +9,7 @@ export default function Home() {
 
   return (
     <div style={pageStyle}>
+      <div style={{ position: "absolute", top: 20, right: 24 }}><LogoutButton /></div>
       <div style={{ textAlign: "center", maxWidth: 420 }}>
         <div style={{ fontSize: 12, letterSpacing: 6, textTransform: "uppercase", color: "#ff2d95", marginBottom: 12 }}>✦</div>
         <h1 style={{ fontFamily: "'Orbitron', 'Segoe UI', sans-serif", fontSize: 26, marginBottom: 6 }}>

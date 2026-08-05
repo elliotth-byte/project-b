@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Btn, Card, Badge } from "./ui";
 import {
   CONFESSIONAL_TAGS, fetchAllConfessionals, updateConfessional, subscribeConfessionalsTable,
-  subscribeConfessionalPrompt, setConfessionalPrompt, clearConfessionalPrompt,
+  subscribeConfessionalPrompt, setConfessionalPrompt, clearConfessionalPrompt, respondToConfessional,
 } from "../lib/confessionalsData";
 import PostToGroupMe from "./PostToGroupMe";
 
@@ -23,6 +23,9 @@ export default function ConfessionalsHost({ gameId, round }) {
   const [recapMode, setRecapMode] = useState(false);
   const [recapSelected, setRecapSelected] = useState([]);
   const [recapOpts, setRecapOpts] = useState({ names: true, anonymous: false, rounds: true, tags: false });
+  const [expandedIds, setExpandedIds] = useState(new Set());
+  const [replyDrafts, setReplyDrafts] = useState({});
+  const [replySaving, setReplySaving] = useState({});
 
   const reload = async () => {
     const data = await fetchAllConfessionals(gameId);
@@ -52,6 +55,23 @@ export default function ConfessionalsHost({ gameId, round }) {
     reload();
   };
   const copyText = (c) => navigator.clipboard.writeText(`${c.player_name}${c.round ? ` (Round ${c.round})` : ""}: ${c.text}`);
+
+  // Compact rows truncate long confessionals to a preview — clicking one
+  // expands just that row to show the full text, without switching the
+  // whole inbox out of Compact View.
+  const toggleExpand = (id) => setExpandedIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
+  const saveReply = async (c) => {
+    const text = replyDrafts[c.id] ?? c.host_reply ?? "";
+    setReplySaving((prev) => ({ ...prev, [c.id]: true }));
+    await respondToConfessional(c.id, text);
+    setReplySaving((prev) => ({ ...prev, [c.id]: false }));
+    reload();
+  };
 
   const players = [...new Set(items.map((c) => c.player_name))].sort();
   const rounds = [...new Set(items.map((c) => c.round).filter(Boolean))].sort((a, b) => a - b);
@@ -220,14 +240,21 @@ export default function ConfessionalsHost({ gameId, round }) {
                 background: !c.read_by_host ? "rgba(255,45,149,0.06)" : "#150a28",
               }}>
                 {compact ? (
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+                  <div
+                    onClick={() => c.text.length > 70 && toggleExpand(c.id)}
+                    style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline", cursor: c.text.length > 70 ? "pointer" : "default" }}
+                  >
                     <span style={{ fontSize: 12, color: "#a68fd6" }}>
                       {!c.read_by_host && <strong style={{ color: "#ff2d95" }}>● </strong>}
                       <strong style={{ color: "#f5f0ff" }}>{c.player_name}</strong>
                       {c.round ? ` · Round ${c.round}` : ""}{c.tags?.length ? ` · ${c.tags.join(", ")}` : ""}
-                      {" · "}"{c.text.length > 70 ? c.text.slice(0, 70) + "..." : c.text}"
+                      {" · "}"{expandedIds.has(c.id) || c.text.length <= 70 ? c.text : c.text.slice(0, 70) + "..."}"
                     </span>
-                    {c.starred && <span>⭐</span>}
+                    <span style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
+                      {c.host_reply && <span title="You replied">💬</span>}
+                      {c.starred && <span>⭐</span>}
+                      {c.text.length > 70 && <span style={{ color: "#6b4f99", fontSize: 10 }}>{expandedIds.has(c.id) ? "▲ collapse" : "▼ expand"}</span>}
+                    </span>
                   </div>
                 ) : (
                   <>
@@ -246,6 +273,29 @@ export default function ConfessionalsHost({ gameId, round }) {
                     <p style={{ fontSize: 14, color: "#f5f0ff", margin: "0 0 8px", lineHeight: 1.5 }}>{c.text}</p>
                   </>
                 )}
+
+                {(!compact || expandedIds.has(c.id)) && (
+                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #3d1f5c" }}>
+                    {c.host_reply && (
+                      <div style={{ background: "rgba(0,217,255,0.08)", border: "1px solid rgba(0,217,255,0.3)", borderRadius: 6, padding: "6px 10px", marginBottom: 6 }}>
+                        <div style={{ fontSize: 10, color: "#00d9ff", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Your private reply</div>
+                        <div style={{ fontSize: 12, color: "#f5f0ff" }}>{c.host_reply}</div>
+                      </div>
+                    )}
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <input
+                        value={replyDrafts[c.id] ?? c.host_reply ?? ""}
+                        onChange={(e) => setReplyDrafts({ ...replyDrafts, [c.id]: e.target.value })}
+                        placeholder={c.host_reply ? "Edit your private reply..." : "Reply privately — only they'll see this..."}
+                        style={{ flex: 1, background: "#1a0a2e", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 10px", color: "#f5f0ff", fontSize: 12 }}
+                      />
+                      <Btn small onClick={() => saveReply(c)} disabled={replySaving[c.id]}>
+                        {replySaving[c.id] ? "Sending..." : c.host_reply ? "Update" : "Send"}
+                      </Btn>
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
                   <Btn small variant="ghost" onClick={() => markRead(c.id, !c.read_by_host)}>{c.read_by_host ? "Mark Unread" : "Mark Read"}</Btn>
                   <Btn small variant={c.starred ? "success" : "ghost"} onClick={() => toggleStar(c)}>{c.starred ? "★ Starred" : "☆ Star"}</Btn>

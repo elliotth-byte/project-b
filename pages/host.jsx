@@ -6,6 +6,7 @@ import HostPanels from "../components/HostPanels";
 import MusicPlayer from "../components/MusicPlayer";
 import HomeLink from "../components/HomeLink";
 import { useRoundWatcher } from "../lib/useRoundWatcher";
+import { initRound } from "../lib/gameState";
 
 export default function HostPage() {
   const router = useRouter();
@@ -242,6 +243,10 @@ export default function HostPage() {
       .select()
       .single();
     if (error) { setError(error.message); return null; }
+    // Put the game straight into the Lobby phase — without this, `round`
+    // stays null until the host later clicks "Start Round 1", and players
+    // can't reach any tab (including Confessionals) until then.
+    await initRound(created.id);
     setGames((prev) => [created, ...(prev || [])]);
     return created;
   }

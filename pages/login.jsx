@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useRouter } from "next/router";
 import { signInPlayer } from "../lib/auth";
 import HomeLink from "../components/HomeLink";
+import LogoutButton from "../components/LogoutButton";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -24,7 +25,10 @@ export default function Login() {
   return (
     <div style={pageStyle}>
       <form onSubmit={submit} style={{ textAlign: "center", maxWidth: 320, width: "100%" }}>
-        <div style={{ marginBottom: 16 }}><HomeLink /></div>
+        <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <HomeLink />
+          <LogoutButton />
+        </div>
         <h2 style={{ fontFamily: "'Orbitron', 'Segoe UI', sans-serif", fontSize: 22, marginBottom: 16 }}>
           Log in
         </h2>

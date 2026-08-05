@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../../lib/supabaseClient";
+import LogoutButton from "../../components/LogoutButton";
 
 // Visiting /join/FX8213 looks up that code and redirects to the real
 // /play?game=<uuid> link — this is just a friendlier front door so you don't
@@ -31,6 +32,7 @@ export default function JoinByCode() {
 
   return (
     <div style={pageStyle}>
+      <div style={{ position: "absolute", top: 20, right: 24 }}><LogoutButton /></div>
       <div style={{ textAlign: "center", maxWidth: 320 }}>
         {preview && !error && (
           <>
