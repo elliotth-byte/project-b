@@ -29,6 +29,28 @@ function VoterStatusList({ alivePlayers, votes, currentPlayerId }) {
   );
 }
 
+// Who nominated whom at this round's Fates Ceremony — this is never
+// secret (nominations were made in the open), so it's shown throughout
+// the Exile Vote too, not just after the vote itself is revealed.
+function NominationsRecap({ nominatorOrder, nominations, byId }) {
+  if (!nominatorOrder?.length) return null;
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+        ⚖️ Fates Ceremony — who nominated whom
+      </div>
+      <div style={{ display: "grid", gap: 4 }}>
+        {nominatorOrder.map((n) => (
+          <p key={n.playerId} style={{ fontSize: 12, color: "#f5f0ff", margin: 0 }}>
+            #{n.place} <strong>{n.name}</strong> nominated{" "}
+            <span style={{ color: "#ff3860" }}>{byId[nominations?.[n.playerId]] || "—"}</span>
+          </p>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 export default function ExileVotePlayer({ gameId, player, round, players }) {
   const [exile, setExile] = useState(null);
   const [choice, setChoice] = useState("");
@@ -39,6 +61,8 @@ export default function ExileVotePlayer({ gameId, player, round, players }) {
 
   const votesKey = `pb:exile-votes:${round?.round}`;
   const alivePlayers = (players || []).filter((p) => p.approved && p.alive);
+  const byId = {};
+  (players || []).forEach((p) => (byId[p.id] = p.display_name));
 
   useEffect(() => {
     const unsubscribe = subscribeGameState(gameId, KEY_EXILE, setExile);
@@ -109,12 +133,17 @@ export default function ExileVotePlayer({ gameId, player, round, players }) {
 
   const changeVote = () => { setSubmitted(false); setExisting(null); setChoice(existing?.targetId || ""); setReason(existing?.reason || ""); };
 
+  const nominationsRecap = (
+    <NominationsRecap nominatorOrder={exile.fatesNominatorOrder} nominations={exile.fatesNominations} byId={byId} />
+  );
+
   if (!votingOpen && !submitted) {
     return (
       <Card style={{ marginBottom: 20, textAlign: "center" }}>
         <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#ff2d95", marginBottom: 6 }}>🃏</div>
         <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: "0 0 10px" }}>The vote is quiet. Await the host's command.</p>
         {chaosBanner}
+        <div style={{ textAlign: "left" }}>{nominationsRecap}</div>
       </Card>
     );
   }
@@ -138,7 +167,8 @@ export default function ExileVotePlayer({ gameId, player, round, players }) {
           }}>Change My Vote</button>
         )}
         <div style={{ marginTop: 14 }}>{chaosBanner}</div>
-        <div style={{ marginTop: 14, textAlign: "left" }}>{voterStatus}</div>
+        <div style={{ marginTop: 14, textAlign: "left" }}>{nominationsRecap}</div>
+        <div style={{ textAlign: "left" }}>{voterStatus}</div>
       </Card>
     );
   }
@@ -151,6 +181,7 @@ export default function ExileVotePlayer({ gameId, player, round, players }) {
         <p style={{ color: "#a68fd6", fontSize: 14, marginBottom: 8 }}>Vote to {verb}:</p>
         {chaosBanner}
       </div>
+      {nominationsRecap}
       {voterStatus}
       <Card style={{ marginBottom: 14 }}>
         <MemoryWall candidates={exile.nominees} players={players} selectedId={choice} onSelect={setChoice} />

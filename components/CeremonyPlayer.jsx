@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, Badge } from "./ui";
 import { subscribeGameState } from "../lib/gameStorage";
-import { KEY_EXILE_HISTORY, KEY_FINALE, KEY_CHALLENGE_HISTORY } from "../lib/gameState";
+import { KEY_EXILE_HISTORY, KEY_FINALE, KEY_CHALLENGE_HISTORY, KEY_EXILE, KEY_FATES } from "../lib/gameState";
 import { GAME_REGISTRY } from "../lib/challengeGames";
 import { formatPlacementValue } from "../lib/challengeScores";
 import { buildVotingRows } from "../lib/votingSpreadsheet";
@@ -23,6 +23,8 @@ export default function CeremonyPlayer({ gameId, players, round }) {
   const [exileHistory, setExileHistory] = useState([]);
   const [challengeHistory, setChallengeHistory] = useState([]);
   const [finale, setFinale] = useState(null);
+  const [liveExile, setLiveExile] = useState(null);
+  const [liveFates, setLiveFates] = useState(null);
 
   useEffect(() => {
     const unsubscribe = subscribeGameState(gameId, KEY_EXILE_HISTORY, (v) => setExileHistory(v || []));
@@ -38,6 +40,24 @@ export default function CeremonyPlayer({ gameId, players, round }) {
     const unsubscribe = subscribeGameState(gameId, KEY_FINALE, setFinale);
     return unsubscribe;
   }, [gameId]);
+
+  // The CURRENT (not-yet-history) exile record — used only to surface this
+  // round's Fates nominations while the Exile Vote is still open (that
+  // detail isn't secret, so it doesn't need to wait for the vote itself
+  // to be revealed the way the vote tally does).
+  useEffect(() => {
+    const unsubscribe = subscribeGameState(gameId, KEY_EXILE, setLiveExile);
+    return unsubscribe;
+  }, [gameId, round?.round]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Same idea, one step earlier — nominations submitted during the Fates
+  // Ceremony itself (before anyone's even reached the vote) are just as
+  // public, so this makes them visible here live too, not only on the
+  // Game tab.
+  useEffect(() => {
+    const unsubscribe = subscribeGameState(gameId, KEY_FATES, setLiveFates);
+    return unsubscribe;
+  }, [gameId, round?.round]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byId = {};
   (players || []).forEach((p) => (byId[p.id] = p.display_name));
@@ -75,6 +95,11 @@ export default function CeremonyPlayer({ gameId, players, round }) {
           <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic", margin: 0 }}>
             Head to the Game tab to take part. The full breakdown shows up here once it's revealed.
           </p>
+          <LiveNominationsRecap
+            nominatorOrder={round.phase === "fates" ? liveFates?.nominatorOrder : liveExile?.fatesNominatorOrder}
+            nominations={round.phase === "fates" ? liveFates?.nominations : liveExile?.fatesNominations}
+            byId={byId}
+          />
         </Card>
       )}
 
@@ -89,6 +114,29 @@ export default function CeremonyPlayer({ gameId, players, round }) {
       {nothingYet && (
         <Card><p style={{ color: "#6b4f99", fontStyle: "italic", margin: 0 }}>No ceremonies yet — they'll show up here once Round 1's Challenge wraps up.</p></Card>
       )}
+    </div>
+  );
+}
+
+function LiveNominationsRecap({ nominatorOrder, nominations, byId }) {
+  if (!nominatorOrder?.length) return null;
+  return (
+    <div style={{ textAlign: "left", marginTop: 12 }}>
+      <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+        ⚖️ Who nominated whom
+      </div>
+      <div style={{ display: "grid", gap: 4 }}>
+        {nominatorOrder.map((n) => (
+          <p key={n.playerId} style={{ fontSize: 12, color: "#f5f0ff", margin: 0 }}>
+            #{n.place} <strong>{n.name}</strong>{" "}
+            {nominations?.[n.playerId] ? (
+              <>nominated <span style={{ color: "#ff3860" }}>{byId[nominations[n.playerId]] || "—"}</span></>
+            ) : (
+              <span style={{ color: "#6b4f99", fontStyle: "italic" }}>still deciding...</span>
+            )}
+          </p>
+        ))}
+      </div>
     </div>
   );
 }
