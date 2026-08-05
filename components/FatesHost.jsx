@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Btn, Card, Badge } from "./ui";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_FATES, KEY_CHALLENGE } from "../lib/gameState";
-import { isValidNomination, nominationsComplete } from "../lib/fatesLogic";
+import { isValidNomination, nominationsComplete, takenNomineeIds } from "../lib/fatesLogic";
 import PostToGroupMe from "./PostToGroupMe";
 import { requestAdvance } from "../lib/advanceNow";
 
@@ -51,12 +51,13 @@ export default function FatesHost({ gameId, players, round }) {
     <Card>
       <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>⚖️ Fates Ceremony — Round {round.round}</h3>
       <p style={{ color: "#6b4f99", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
-        {winnerName ? `${winnerName} won immunity and can't be nominated.` : ""} Nominations happen in finishing order — 1st among the top 3, then 2nd, then 3rd.
+        {winnerName ? `${winnerName} won immunity and can't be nominated.` : ""} Nominations happen in finishing order — 1st among the top 3, then 2nd, then 3rd. Nominees can't be duplicated.
       </p>
 
       <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
         {fates.nominatorOrder.map((nominator) => {
           const currentNominee = fates.nominations?.[nominator.playerId] || "";
+          const taken = takenNomineeIds(fates.nominations, nominator.playerId);
           return (
             <div key={nominator.playerId} style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <Badge>#{nominator.place}</Badge>
@@ -68,10 +69,10 @@ export default function FatesHost({ gameId, players, round }) {
               >
                 <option value="">— choose nominee —</option>
                 {alive.map((p) => {
-                  const check = isValidNomination(nominator.playerId, p.id, winnerId);
+                  const check = isValidNomination(nominator.playerId, p.id, winnerId, taken);
                   return (
-                    <option key={p.id} value={p.id} disabled={!check.ok}>
-                      {p.display_name}{!check.ok ? ` (${check.error})` : ""}
+                    <option key={p.id} value={p.id} disabled={!check.ok && p.id !== currentNominee}>
+                      {p.display_name}{!check.ok && p.id !== currentNominee ? ` (${check.error})` : ""}
                     </option>
                   );
                 })}

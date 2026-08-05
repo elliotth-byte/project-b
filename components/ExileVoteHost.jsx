@@ -20,6 +20,7 @@ export default function ExileVoteHost({ gameId, players, round }) {
   const [busy, setBusy] = useState(false);
   const [drafts, setDrafts] = useState({});
   const dirtyRef = useRef(new Set());
+  const [showComments, setShowComments] = useState(false);
 
   const votesKey = `pb:exile-votes:${round?.round}`;
   const context = exileContext(round?.round);
@@ -202,6 +203,26 @@ export default function ExileVoteHost({ gameId, players, round }) {
           ))}
         </div>
       </div>
+
+      {voteRows.some((r) => r.reason) && (
+        <div style={{ marginBottom: 12 }}>
+          <Btn small variant="ghost" onClick={() => setShowComments(!showComments)}>
+            {showComments ? "▲ Hide Comments" : `▼ Show Comments (${voteRows.filter((r) => r.reason).length})`}
+          </Btn>
+          {showComments && (
+            <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
+              {voteRows.filter((r) => r.reason).map((r) => (
+                <div key={r.voterId} style={{ background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "8px 12px" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#f5f0ff", marginBottom: 2 }}>
+                    {players.find((p) => p.id === r.voterId)?.display_name || "?"}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#a68fd6", fontStyle: "italic" }}>"{r.reason}"</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {needsTieBreak && (
         <Card style={{ borderColor: exile.tieBreakChoiceId ? "rgba(0,255,157,0.5)" : "rgba(255,56,96,0.5)", marginBottom: 12 }}>

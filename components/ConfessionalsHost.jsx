@@ -274,8 +274,7 @@ export default function ConfessionalsHost({ gameId, round }) {
                   </>
                 )}
 
-                {(!compact || expandedIds.has(c.id)) && (
-                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #3d1f5c" }}>
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #3d1f5c" }}>
                     {c.host_reply && (
                       <div style={{ background: "rgba(0,217,255,0.08)", border: "1px solid rgba(0,217,255,0.3)", borderRadius: 6, padding: "6px 10px", marginBottom: 6 }}>
                         <div style={{ fontSize: 10, color: "#00d9ff", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Your private reply</div>
@@ -294,7 +293,6 @@ export default function ConfessionalsHost({ gameId, round }) {
                       </Btn>
                     </div>
                   </div>
-                )}
 
                 <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
                   <Btn small variant="ghost" onClick={() => markRead(c.id, !c.read_by_host)}>{c.read_by_host ? "Mark Unread" : "Mark Read"}</Btn>

@@ -97,6 +97,39 @@ export function Badge({ children, color = "#ff2d95" }) {
   );
 }
 
+// A duration editor that stores/returns whole seconds but lets the host
+// think in days/hours/minutes instead of doing the math themselves —
+// used anywhere a round-length setting is configured (Admin's default
+// phase lengths, a per-challenge override).
+export function DurationInput({ valueSec, onChange, min = 60 }) {
+  const total = Math.max(min, valueSec || 0);
+  const days = Math.floor(total / 86400);
+  const hours = Math.floor((total % 86400) / 3600);
+  const minutes = Math.round((total % 3600) / 60);
+
+  const update = (d, h, m) => {
+    const sec = Math.max(min, d * 86400 + h * 3600 + m * 60);
+    onChange(sec);
+  };
+
+  const boxStyle = {
+    width: 52, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6,
+    padding: "5px 6px", color: "#f5f0ff", fontSize: 13, textAlign: "center",
+  };
+  const labelStyle = { fontSize: 11, color: "#a68fd6" };
+
+  return (
+    <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
+      <input type="number" min={0} value={days} onChange={(e) => update(Number(e.target.value) || 0, hours, minutes)} style={boxStyle} />
+      <span style={labelStyle}>d</span>
+      <input type="number" min={0} max={23} value={hours} onChange={(e) => update(days, Math.max(0, Math.min(23, Number(e.target.value) || 0)), minutes)} style={boxStyle} />
+      <span style={labelStyle}>h</span>
+      <input type="number" min={0} max={59} value={minutes} onChange={(e) => update(days, hours, Math.max(0, Math.min(59, Number(e.target.value) || 0)))} style={boxStyle} />
+      <span style={labelStyle}>m</span>
+    </div>
+  );
+}
+
 // A playing card face — used by the Power of Chaos card-fan flavor moment.
 export function CardFace({ c }) {
   return (

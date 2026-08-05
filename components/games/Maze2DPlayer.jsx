@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Card } from "../ui";
 import GameResultCard from "./GameResultCard";
 import { reportScore } from "../../lib/challengeScores";
+import { usePersistedStart } from "./usePersistedStart";
 
 const DEFAULT_SIZE = 11;
 
@@ -43,7 +44,10 @@ export default function Maze2DPlayer({ gameId, round, challenge, player }) {
   // (plus the goal, always). Everywhere else — wall or open path — is
   // rendered as unexplored fog until they get there.
   const [visited, setVisited] = useState(() => new Set(["1,1"]));
-  const [startTime] = useState(() => Date.now());
+  // Persisted (not just local) so the elapsed-time score this reports
+  // reflects genuine total time since this player's FIRST attempt this
+  // round, not just time since their most recent remount.
+  const startTime = usePersistedStart(gameId, round.round, player.id);
   const [finishMs, setFinishMs] = useState(null);
   const goal = { r: SIZE - 2, c: SIZE - 2 };
   const reported = useRef(false);
@@ -76,16 +80,20 @@ export default function Maze2DPlayer({ gameId, round, challenge, player }) {
   }, [move]);
 
   useEffect(() => {
+    if (!startTime) return;
     if (pos.r === goal.r && pos.c === goal.c && !reported.current) {
       reported.current = true;
       const time = Date.now() - startTime;
       setFinishMs(time);
       reportScore(gameId, round.round, player.id, player.name, time, { final: true });
     }
-  }, [pos]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pos, startTime]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (finishMs) {
     return <GameResultCard icon="🧩" title="Maze Solved" valueLabel={`${(finishMs / 1000).toFixed(2)}s`} />;
+  }
+  if (!startTime) {
+    return <Card style={{ marginBottom: 20, textAlign: "center" }}><p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic" }}>Loading...</p></Card>;
   }
 
   // Bigger mazes get smaller cells so the whole thing still fits comfortably.

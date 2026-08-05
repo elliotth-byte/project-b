@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Btn, Card } from "./ui";
+import { Btn, Card, DurationInput } from "./ui";
 import { supabase } from "../lib/supabaseClient";
 import { storageDelete, storageGet } from "../lib/gameStorage";
 import { removePendingPlayer, quitOrRemoveApprovedPlayer } from "../lib/playerRemoval";
@@ -128,15 +128,9 @@ export default function AdminHost({ gameId, players, round }) {
             { key: "fatesDurationSec", label: "Fates Ceremony" },
             { key: "voteDurationSec", label: "Exile Vote (discussion + voting)" },
           ].map((row) => (
-            <div key={row.key} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div key={row.key} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <span style={{ width: 190, fontSize: 12.5, color: "#f5f0ff", flexShrink: 0 }}>{row.label}</span>
-              <input
-                type="number" min={1}
-                value={Math.round(settings[row.key] / 60)}
-                onChange={(e) => saveSettings({ [row.key]: (Number(e.target.value) || 1) * 60 })}
-                style={{ width: 70, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "5px 8px", color: "#f5f0ff", fontSize: 13 }}
-              />
-              <span style={{ fontSize: 12, color: "#a68fd6" }}>minutes</span>
+              <DurationInput valueSec={settings[row.key]} onChange={(sec) => saveSettings({ [row.key]: sec })} />
             </div>
           ))}
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#a68fd6", cursor: "pointer" }}>

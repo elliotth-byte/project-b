@@ -3,6 +3,7 @@ import { Card, Badge } from "./ui";
 import { subscribeGameState } from "../lib/gameStorage";
 import { KEY_CHALLENGE_HISTORY, KEY_EXILE_HISTORY, KEY_REENTRY, KEY_FINALE } from "../lib/gameState";
 import { GAME_REGISTRY } from "../lib/challengeGames";
+import { formatPlacementValue } from "../lib/challengeScores";
 import VotingHistorySpreadsheet from "./VotingHistorySpreadsheet";
 
 export default function HistoryTab({ gameId, players, gameName }) {
@@ -42,22 +43,49 @@ export default function HistoryTab({ gameId, players, gameName }) {
       {rounds.map((r) => {
         const c = challengeHistory.find((x) => x.round === r);
         const e = exileHistory.find((x) => x.round === r);
+        const registryEntry = c?.gameType && GAME_REGISTRY[c.gameType];
+        const rankDirection = registryEntry?.rank === "time-asc" ? "time-asc" : "score-desc";
+        const hasNominations = e?.fatesNominatorOrder?.length > 0;
         return (
           <Card key={r}>
             <h3 style={{ color: "#ff2d95", margin: "0 0 10px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
               Round {r} {c?.finalFour && <Badge color="#ff3860">Final Four</Badge>}
             </h3>
             {c && (
+              <div style={{ marginBottom: (e || hasNominations) ? 10 : 0 }}>
+                <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+                  Challenge{c.gameType && registryEntry && ` — ${registryEntry.icon} ${registryEntry.label}`}
+                </div>
+                <div style={{ display: "grid", gap: 3 }}>
+                  {[...(c.placements || [])].sort((a, b) => a.place - b.place).map((p) => {
+                    const scoreLabel = formatPlacementValue(p, c.gameType, rankDirection);
+                    return (
+                      <div key={p.playerId} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12 }}>
+                        <span style={{ color: p.place === 1 ? "#ff2d95" : "#a68fd6", fontWeight: p.place === 1 ? 700 : 500 }}>
+                          #{p.place} {p.name}
+                        </span>
+                        {scoreLabel && <span style={{ color: p.forfeited ? "#ff3860" : "#6b4f99" }}>{scoreLabel}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {hasNominations && (
               <div style={{ marginBottom: e ? 10 : 0 }}>
                 <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
-                  Challenge{c.gameType && GAME_REGISTRY[c.gameType] && ` — ${GAME_REGISTRY[c.gameType].icon} ${GAME_REGISTRY[c.gameType].label}`}
+                  Fates Ceremony — Nominations
                 </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {[...(c.placements || [])].sort((a, b) => a.place - b.place).map((p) => (
-                    <span key={p.playerId} style={{ fontSize: 12, color: p.place === 1 ? "#ff2d95" : "#a68fd6", fontWeight: p.place === 1 ? 700 : 500 }}>
-                      #{p.place} {p.name}
-                    </span>
-                  ))}
+                <div style={{ display: "grid", gap: 3 }}>
+                  {e.fatesNominatorOrder.map((n) => {
+                    const nomineeId = e.fatesNominations?.[n.playerId];
+                    return (
+                      <div key={n.playerId} style={{ fontSize: 12, color: "#f5f0ff" }}>
+                        <Badge>#{n.place}</Badge> {n.name} nominated{" "}
+                        <strong style={{ color: "#ff3860" }}>{nomineeId ? byId[nomineeId] || "?" : "no one"}</strong>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

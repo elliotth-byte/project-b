@@ -1,8 +1,33 @@
 import { useState, useEffect } from "react";
-import { Card } from "./ui";
+import { Card, Badge } from "./ui";
 import { storageGet, storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_EXILE } from "../lib/gameState";
 import MemoryWall from "./MemoryWall";
+
+// Who's voted, who hasn't — WITHOUT revealing anyone's actual pick
+// (that stays secret until the host reveals). Shown throughout the vote
+// so waiting players aren't left completely in the dark.
+function VoterStatusList({ alivePlayers, votes, currentPlayerId }) {
+  const votedIds = new Set(Object.keys(votes || {}));
+  return (
+    <div style={{ display: "grid", gap: 4 }}>
+      {alivePlayers.map((p) => (
+        <div key={p.id} style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          background: "#0d0618", borderRadius: 6, padding: "5px 10px",
+          border: p.id === currentPlayerId ? "1px solid rgba(255,45,149,0.4)" : "1px solid transparent",
+        }}>
+          <span style={{ fontSize: 12, color: "#f5f0ff" }}>{p.display_name}</span>
+          {votedIds.has(p.id) ? (
+            <span style={{ fontSize: 11, color: "#00ff9d" }}>✓ voted</span>
+          ) : (
+            <span style={{ fontSize: 11, color: "#6b4f99", fontStyle: "italic" }}>waiting...</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function ExileVotePlayer({ gameId, player, round, players }) {
   const [exile, setExile] = useState(null);
@@ -10,11 +35,22 @@ export default function ExileVotePlayer({ gameId, player, round, players }) {
   const [reason, setReason] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [existing, setExisting] = useState(null);
+  const [votes, setVotes] = useState({});
 
   const votesKey = `pb:exile-votes:${round?.round}`;
+  const alivePlayers = (players || []).filter((p) => p.approved && p.alive);
 
   useEffect(() => {
     const unsubscribe = subscribeGameState(gameId, KEY_EXILE, setExile);
+    return unsubscribe;
+  }, [gameId, round?.round]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Live count of who's voted (not what they voted) — this is what
+  // powers VoterStatusList; who's-in/who's-out is not secret, only the
+  // choices themselves are.
+  useEffect(() => {
+    if (!round?.round) return;
+    const unsubscribe = subscribeGameState(gameId, votesKey, (v) => setVotes(v || {}));
     return unsubscribe;
   }, [gameId, round?.round]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -46,6 +82,15 @@ export default function ExileVotePlayer({ gameId, player, round, players }) {
     <p style={{ textAlign: "center", color: "#a68fd6", fontSize: 12, fontStyle: "italic", margin: "0 0 16px" }}>
       🃏 <strong style={{ color: "#ff3860" }}>{chaosHolderName}</strong> holds the Power of Chaos this round — their pick stays secret until the reveal.
     </p>
+  );
+
+  const voterStatus = alivePlayers.length > 1 && (
+    <Card style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+        Votes: {Object.keys(votes).length}/{alivePlayers.length} in
+      </div>
+      <VoterStatusList alivePlayers={alivePlayers} votes={votes} currentPlayerId={player?.id} />
+    </Card>
   );
 
   const submitVote = async () => {
@@ -93,6 +138,7 @@ export default function ExileVotePlayer({ gameId, player, round, players }) {
           }}>Change My Vote</button>
         )}
         <div style={{ marginTop: 14 }}>{chaosBanner}</div>
+        <div style={{ marginTop: 14, textAlign: "left" }}>{voterStatus}</div>
       </Card>
     );
   }
@@ -105,6 +151,7 @@ export default function ExileVotePlayer({ gameId, player, round, players }) {
         <p style={{ color: "#a68fd6", fontSize: 14, marginBottom: 8 }}>Vote to {verb}:</p>
         {chaosBanner}
       </div>
+      {voterStatus}
       <Card style={{ marginBottom: 14 }}>
         <MemoryWall candidates={exile.nominees} players={players} selectedId={choice} onSelect={setChoice} />
       </Card>

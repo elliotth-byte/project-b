@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card, Badge } from "../ui";
 import GameResultCard from "./GameResultCard";
 import { useCountdown } from "./useCountdown";
-import { reportScore } from "../../lib/challengeScores";
+import { reportScore, peekSession, getOrStartSession } from "../../lib/challengeScores";
 
 const SIZE = 6;
 const GEMS = ["💎", "🔷", "🔶", "🟣", "🟢"];
@@ -53,8 +53,12 @@ const MATCH3_DURATION_MS = 3 * 60 * 1000;
 export default function Match3Player({ gameId, round, challenge, player }) {
   // Match 3 always gets a flat 3 minutes from the moment the player hits
   // Start — not challenge?.endsAt (the host's round length), and not
-  // running from the moment the component mounts either.
+  // running from the moment the component mounts either. That start
+  // moment is persisted (see lib/challengeScores.js) so navigating away
+  // mid-game and coming back resumes the SAME clock instead of showing
+  // the Start button again and handing them a fresh 3 minutes.
   const [startedAt, setStartedAt] = useState(null);
+  const [checkedExisting, setCheckedExisting] = useState(false);
   const [localEndsAt, setLocalEndsAt] = useState(null);
   const { timeUp, remainingSec } = useCountdown(localEndsAt);
   const [grid, setGrid] = useState(() => {
@@ -67,8 +71,21 @@ export default function Match3Player({ gameId, round, challenge, player }) {
   const [done, setDone] = useState(false);
   const reportedRef = useRef(false);
 
-  const handleStart = () => {
-    const now = Date.now();
+  useEffect(() => {
+    let cancelled = false;
+    peekSession(gameId, round.round, player.id).then((existingStart) => {
+      if (cancelled) return;
+      if (existingStart) {
+        setStartedAt(existingStart);
+        setLocalEndsAt(existingStart + MATCH3_DURATION_MS);
+      }
+      setCheckedExisting(true);
+    });
+    return () => { cancelled = true; };
+  }, [gameId, round.round, player.id]);
+
+  const handleStart = async () => {
+    const now = await getOrStartSession(gameId, round.round, player.id);
     setStartedAt(now);
     setLocalEndsAt(now + MATCH3_DURATION_MS);
   };
@@ -111,6 +128,9 @@ export default function Match3Player({ gameId, round, challenge, player }) {
   if (done) return <GameResultCard icon="💎" title="Time's Up" valueLabel={`${score} points`} />;
 
   if (!startedAt) {
+    if (!checkedExisting) {
+      return <Card style={{ marginBottom: 20, textAlign: "center" }}><p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic" }}>Loading...</p></Card>;
+    }
     return (
       <Card style={{ marginBottom: 20, textAlign: "center" }}>
         <h3 style={{ color: "#ff2d95", margin: "0 0 8px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>💎 Match 3</h3>

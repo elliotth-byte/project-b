@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Btn, Card, Badge } from "./ui";
+import { Btn, Card, Badge, DurationInput } from "./ui";
 import { storageSet, storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_CHALLENGE, KEY_ROUND } from "../lib/gameState";
 import { placementsComplete } from "../lib/challengeLogic";
@@ -24,7 +24,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   const [reentry, setReentry] = useState([]);
   const [config, setConfig] = useState(DEFAULT_PARTICIPATION);
   const [gameType, setGameType] = useState("manual");
-  const [durationMin, setDurationMin] = useState(Math.round((settings?.challengeDurationSec || 900) / 60));
+  const [durationSec, setDurationSec] = useState(settings?.challengeDurationSec || 900);
   const [mazeSize, setMazeSize] = useState(GAME_REGISTRY.maze2d.config.size);
   const [selectedReentrants, setSelectedReentrants] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -54,7 +54,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
 
   const pickGameType = (type) => {
     setGameType(type);
-    setDurationMin(Math.round(GAME_REGISTRY[type].defaultDurationSec / 60));
+    setDurationSec(GAME_REGISTRY[type].defaultDurationSec);
   };
 
   const startChallenge = async () => {
@@ -67,7 +67,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
       if (!participantIds.includes(id)) participantIds = [...participantIds, id];
     }
     const now = Date.now();
-    const endsAt = settings?.infiniteTime ? null : now + durationMin * 60 * 1000;
+    const endsAt = settings?.infiniteTime ? null : now + durationSec * 1000;
     const configOverrides = gameType === "maze2d" ? { size: mazeSize } : undefined;
     await storageSet(gameId, KEY_CHALLENGE, {
       round: round.round, active: true, startedAt: now, endsAt,
@@ -180,11 +180,9 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
         {settings?.infiniteTime ? (
           <p style={{ color: "#ff2d95", fontSize: 12, margin: "0 0 12px" }}>∞ Infinite time is on — this challenge runs until you end it. (Change this in Admin → Round Lengths.)</p>
         ) : (
-          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
             <label style={{ fontSize: 12, color: "#a68fd6" }}>Duration:</label>
-            <input type="number" min={1} value={durationMin} onChange={(e) => setDurationMin(Number(e.target.value) || 1)}
-              style={{ width: 70, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 10px", color: "#f5f0ff", fontSize: 13 }} />
-            <span style={{ fontSize: 12, color: "#a68fd6" }}>minutes</span>
+            <DurationInput valueSec={durationSec} onChange={setDurationSec} />
           </div>
         )}
 

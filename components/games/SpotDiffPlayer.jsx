@@ -4,6 +4,7 @@ import GameResultCard from "./GameResultCard";
 import { useCountdown } from "./useCountdown";
 import { generateScenes, drawScene } from "../../lib/games/spotDiffData";
 import { reportScore } from "../../lib/challengeScores";
+import { usePersistedStart } from "./usePersistedStart";
 
 const W = 600, H = 400;
 const WRONG_CLICK_PENALTY_MS = 3000;
@@ -14,7 +15,10 @@ export default function SpotDiffPlayer({ gameId, round, challenge, player }) {
   const seed = (challenge?.startedAt || 1) + (player?.id ? player.id.length : 0);
   const [scene] = useState(() => generateScenes(seed, cfg.differences || 5, W, H));
   const [differences, setDifferences] = useState(scene.differences);
-  const [startTime] = useState(() => Date.now());
+  // Persisted (not just local) so a wrong-click penalty / found-count score
+  // stays comparable across a remount — otherwise navigating away and back
+  // would quietly reset the elapsed-time component of the score.
+  const startTime = usePersistedStart(gameId, round.round, player.id);
   const [penaltyMs, setPenaltyMs] = useState(0);
   const [flash, setFlash] = useState(false); // brief red flash on a wrong click
   const [done, setDone] = useState(false);
@@ -39,12 +43,13 @@ export default function SpotDiffPlayer({ gameId, round, challenge, player }) {
   }, [differences]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const reportComposite = (found, final, penalty = penaltyMs) => {
+    if (!startTime) return;
     const elapsed = Date.now() - startTime + penalty;
     const value = found * 1_000_000 - elapsed; // more found always beats fewer; faster (incl. wrong-click penalties) breaks ties within equal found-count
     reportScore(gameId, round.round, player.id, player.name, value, { final, foundCount: found });
   };
 
-  useEffect(() => { reportComposite(foundCount, false); }, [foundCount, penaltyMs]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { reportComposite(foundCount, false); }, [foundCount, penaltyMs, startTime]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (timeUp && !reportedRef.current) {
@@ -81,6 +86,9 @@ export default function SpotDiffPlayer({ gameId, round, challenge, player }) {
 
   if (done) {
     return <GameResultCard icon="🔍" title="Round Complete" valueLabel={`${foundCount}/${differences.length} found`} />;
+  }
+  if (!startTime) {
+    return <Card style={{ marginBottom: 20, textAlign: "center" }}><p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic" }}>Loading...</p></Card>;
   }
 
   return (

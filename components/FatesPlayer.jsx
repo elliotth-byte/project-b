@@ -1,9 +1,37 @@
 import { useState, useEffect } from "react";
-import { Card } from "./ui";
+import { Card, Badge } from "./ui";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_FATES, KEY_CHALLENGE } from "../lib/gameState";
-import { isValidNomination } from "../lib/fatesLogic";
+import { isValidNomination, takenNomineeIds } from "../lib/fatesLogic";
 import MemoryWall from "./MemoryWall";
+
+// Shared live-status list — who's nominating, who's already submitted
+// (and to whom), who's still deciding. Shown to waiting players AND to
+// the nominators themselves, so everyone can see the same picture and
+// nominators can avoid duplicating each other's choice.
+function NominatorStatusList({ nominatorOrder, nominations, byId, highlightId }) {
+  return (
+    <div style={{ display: "grid", gap: 6 }}>
+      {nominatorOrder.map((n) => {
+        const nomineeId = nominations?.[n.playerId];
+        return (
+          <div key={n.playerId} style={{
+            display: "flex", gap: 8, alignItems: "center", background: "#0d0618", borderRadius: 8, padding: "8px 10px",
+            border: n.playerId === highlightId ? "1px solid rgba(255,45,149,0.4)" : "1px solid transparent",
+          }}>
+            <Badge>#{n.place}</Badge>
+            <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff", fontWeight: 700 }}>{n.name}</span>
+            {nomineeId ? (
+              <span style={{ fontSize: 12, color: "#00ff9d" }}>✓ nominated <strong style={{ color: "#ff3860" }}>{byId[nomineeId] || "?"}</strong></span>
+            ) : (
+              <span style={{ fontSize: 12, color: "#6b4f99", fontStyle: "italic" }}>still deciding...</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function FatesPlayer({ gameId, player, players, round }) {
   const [fates, setFates] = useState(null);
@@ -22,36 +50,49 @@ export default function FatesPlayer({ gameId, player, players, round }) {
 
   if (round?.phase !== "fates" || !fates) return null;
 
+  const others = (players || []).filter((p) => p.approved && p.alive);
+  const byId = {};
+  others.forEach((p) => (byId[p.id] = p.display_name));
+
   const myEntry = fates.nominatorOrder.find((n) => n.playerId === player?.id);
   if (!myEntry) {
     return (
-      <Card style={{ marginBottom: 20, textAlign: "center" }}>
-        <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#ff2d95", marginBottom: 6 }}>⚖️ Fates Ceremony</div>
-        <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: 0 }}>
-          The top 3 finishers are making their nominations. Await the reveal.
-        </p>
+      <Card style={{ marginBottom: 20 }}>
+        <div style={{ textAlign: "center", marginBottom: 10 }}>
+          <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#ff2d95", marginBottom: 6 }}>⚖️ Fates Ceremony</div>
+          <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: 0 }}>
+            The top 3 finishers are making their nominations.
+          </p>
+        </div>
+        <NominatorStatusList nominatorOrder={fates.nominatorOrder} nominations={fates.nominations} byId={byId} />
       </Card>
     );
   }
 
   const winnerId = (challenge?.placements || []).find((p) => p.place === 1)?.playerId || null;
   const alreadySubmitted = fates.nominations?.[player.id];
-  const others = (players || []).filter((p) => p.approved && p.alive);
 
   if (alreadySubmitted) {
-    const name = others.find((p) => p.id === alreadySubmitted)?.display_name;
+    const name = byId[alreadySubmitted];
     return (
-      <Card style={{ marginBottom: 20, textAlign: "center" }}>
-        <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#00ff9d", marginBottom: 6 }}>Nomination Submitted</div>
-        <p style={{ color: "#f5f0ff", fontSize: 15, margin: 0 }}>You nominated <strong style={{ color: "#ff3860" }}>{name}</strong></p>
+      <Card style={{ marginBottom: 20 }}>
+        <div style={{ textAlign: "center", marginBottom: 12 }}>
+          <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#00ff9d", marginBottom: 6 }}>Nomination Submitted</div>
+          <p style={{ color: "#f5f0ff", fontSize: 15, margin: 0 }}>You nominated <strong style={{ color: "#ff3860" }}>{name}</strong></p>
+        </div>
+        <NominatorStatusList nominatorOrder={fates.nominatorOrder} nominations={fates.nominations} byId={byId} highlightId={player.id} />
       </Card>
     );
   }
+
+  const taken = takenNomineeIds(fates.nominations, player.id);
 
   const submit = async () => {
     if (!choice) return;
     await storageUpdate(gameId, KEY_FATES, (fresh) => {
       if (!fresh) return null;
+      const stillTaken = takenNomineeIds(fresh.nominations, player.id);
+      if (stillTaken.has(choice)) return fresh; // someone else grabbed it first — abort, let the UI re-render disabled
       fresh.nominations = { ...(fresh.nominations || {}), [player.id]: choice };
       return fresh;
     });
@@ -64,13 +105,22 @@ export default function FatesPlayer({ gameId, player, players, round }) {
         <h2 style={{ color: "#f5f0ff", fontFamily: "'Orbitron', 'Segoe UI', sans-serif", marginBottom: 4 }}>Make Your Nomination</h2>
         <p style={{ color: "#a68fd6", fontSize: 13 }}>You finished #{myEntry.place} — nominate someone for exile.</p>
       </div>
+      {(fates.nominatorOrder.length > 1) && (
+        <Card style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>Live status</div>
+          <NominatorStatusList nominatorOrder={fates.nominatorOrder} nominations={fates.nominations} byId={byId} highlightId={player.id} />
+          <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 8, marginBottom: 0, fontStyle: "italic" }}>
+            Nominees can't be duplicated — whoever's already been picked is grayed out below.
+          </p>
+        </Card>
+      )}
       <Card style={{ marginBottom: 16 }}>
         <MemoryWall
           candidates={others.map((p) => ({ playerId: p.id, name: p.display_name }))}
           players={players}
           selectedId={choice}
           onSelect={setChoice}
-          disabledIds={others.filter((p) => !isValidNomination(player.id, p.id, winnerId).ok).map((p) => p.id)}
+          disabledIds={others.filter((p) => !isValidNomination(player.id, p.id, winnerId, taken).ok).map((p) => p.id)}
         />
       </Card>
       <button onClick={submit} disabled={!choice} style={{

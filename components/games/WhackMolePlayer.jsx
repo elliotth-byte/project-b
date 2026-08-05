@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card, Badge } from "../ui";
 import GameResultCard from "./GameResultCard";
 import { useCountdown } from "./useCountdown";
+import { usePersistedStart } from "./usePersistedStart";
 import { reportScore } from "../../lib/challengeScores";
 
 const HOLES = 9;
@@ -9,9 +10,12 @@ const DURATION_MS = 90 * 1000;
 
 export default function WhackMolePlayer({ gameId, round, challenge, player }) {
   // Whack-a-Mole always runs 90 seconds flat, independent of whatever
-  // duration the host set for the round — so it uses its own local clock
-  // rather than challenge?.endsAt.
-  const [localEndsAt] = useState(() => Date.now() + DURATION_MS);
+  // duration the host set for the round — so it uses its own clock
+  // rather than challenge?.endsAt. That clock's start time is persisted
+  // (see usePersistedStart) so navigating away mid-game and coming back
+  // doesn't hand the player a fresh 90 seconds.
+  const startedAt = usePersistedStart(gameId, round.round, player.id);
+  const localEndsAt = startedAt ? startedAt + DURATION_MS : null;
   const { remainingSec, timeUp } = useCountdown(localEndsAt);
   const [activeHole, setActiveHole] = useState(null);
   const [score, setScore] = useState(0);
@@ -51,6 +55,7 @@ export default function WhackMolePlayer({ gameId, round, challenge, player }) {
   };
 
   if (done) return <GameResultCard icon="🔨" title="Time's Up" valueLabel={`${score} whacks`} />;
+  if (!startedAt) return <Card style={{ marginBottom: 20, textAlign: "center" }}><p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic" }}>Loading...</p></Card>;
 
   return (
     <Card style={{ marginBottom: 20, textAlign: "center" }}>

@@ -13,8 +13,12 @@ const PHASE_LABEL = {
 function formatRemaining(ms) {
   if (ms <= 0) return "0:00";
   const totalSec = Math.ceil(ms / 1000);
-  const m = Math.floor(totalSec / 60);
+  const days = Math.floor(totalSec / 86400);
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
+  if (days > 0) return `${days}d ${hours}h ${m}m`;
+  if (hours > 0) return `${hours}h ${m}m`;
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 

@@ -3,11 +3,14 @@ import { Card } from "../ui";
 import GameResultCard from "./GameResultCard";
 import { WORDS_PER_SET, WORD_COLORS, WORD_FONTS, getPlayerWordSet, initFloatingLetters } from "../../lib/games/wordData";
 import { reportScore } from "../../lib/challengeScores";
+import { usePersistedStart } from "./usePersistedStart";
 
 export default function WordScramblePlayer({ gameId, round, challenge, player }) {
   const [answers, setAnswers] = useState(Array(WORDS_PER_SET).fill(""));
   const [solved, setSolved] = useState(new Set());
-  const [startTime] = useState(() => Date.now());
+  // Persisted (not just local) so a navigate-away-and-back doesn't reset
+  // the elapsed-time clock this game's score is based on.
+  const startTime = usePersistedStart(gameId, round.round, player.id);
   const [finishMs, setFinishMs] = useState(null);
   const [, setTick] = useState(0);
   const lettersRef = useRef([]);
@@ -38,12 +41,12 @@ export default function WordScramblePlayer({ gameId, round, challenge, player })
   }, [finishMs]);
 
   useEffect(() => {
-    if (solved.size === words.length && !finishMs) {
+    if (solved.size === words.length && !finishMs && startTime) {
       const time = Date.now() - startTime;
       setFinishMs(time);
       reportScore(gameId, round.round, player.id, player.name, time, { final: true });
     }
-  }, [solved.size]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [solved.size, startTime]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleInput = (idx, val) => {
     const upper = val.toUpperCase();
@@ -55,6 +58,9 @@ export default function WordScramblePlayer({ gameId, round, challenge, player })
 
   if (finishMs) {
     return <GameResultCard icon="🔤" title="All Words Found" valueLabel={`${(finishMs / 1000).toFixed(2)}s`} />;
+  }
+  if (!startTime) {
+    return <Card style={{ marginBottom: 20, textAlign: "center" }}><p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic" }}>Loading...</p></Card>;
   }
 
   const visibleLetters = lettersRef.current.filter((l) => !solved.has(l.wi));
