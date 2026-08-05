@@ -36,6 +36,17 @@ export default function ExileVotePlayer({ gameId, player, round, players }) {
 
   const votingOpen = exile.votingOpen;
   const verb = exile.mode === "save" ? "SAVE" : "eliminate";
+  const chaosHolderName = players?.find((p) => p.id === exile.chaosHolderId)?.display_name;
+
+  // Public knowledge from the moment the round starts — only their actual
+  // pick stays secret until the reveal. Skipped for the holder themselves
+  // since ChaosPowerPlayer.jsx already shows them a much bigger card
+  // saying exactly this.
+  const chaosBanner = chaosHolderName && exile.chaosHolderId !== player?.id && (
+    <p style={{ textAlign: "center", color: "#a68fd6", fontSize: 12, fontStyle: "italic", margin: "0 0 16px" }}>
+      🃏 <strong style={{ color: "#ff3860" }}>{chaosHolderName}</strong> holds the Power of Chaos this round — their pick stays secret until the reveal.
+    </p>
+  );
 
   const submitVote = async () => {
     if (!choice) return;
@@ -57,7 +68,8 @@ export default function ExileVotePlayer({ gameId, player, round, players }) {
     return (
       <Card style={{ marginBottom: 20, textAlign: "center" }}>
         <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#ff2d95", marginBottom: 6 }}>🃏</div>
-        <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: 0 }}>The vote is quiet. Await the host's command.</p>
+        <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: "0 0 10px" }}>The vote is quiet. Await the host's command.</p>
+        {chaosBanner}
       </Card>
     );
   }
@@ -80,6 +92,7 @@ export default function ExileVotePlayer({ gameId, player, round, players }) {
             color: "#a68fd6", fontSize: 14, cursor: "pointer", fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
           }}>Change My Vote</button>
         )}
+        <div style={{ marginTop: 14 }}>{chaosBanner}</div>
       </Card>
     );
   }
@@ -89,7 +102,8 @@ export default function ExileVotePlayer({ gameId, player, round, players }) {
       <div style={{ textAlign: "center", marginBottom: 20 }}>
         <div style={{ fontSize: 12, letterSpacing: 6, textTransform: "uppercase", color: "#ff2d95", marginBottom: 8 }}>🃏</div>
         <h2 style={{ color: "#f5f0ff", fontFamily: "'Orbitron', 'Segoe UI', sans-serif", marginBottom: 4 }}>Exile Vote — Round {round.round}</h2>
-        <p style={{ color: "#a68fd6", fontSize: 14 }}>Vote to {verb}:</p>
+        <p style={{ color: "#a68fd6", fontSize: 14, marginBottom: 8 }}>Vote to {verb}:</p>
+        {chaosBanner}
       </div>
       <Card style={{ marginBottom: 14 }}>
         <MemoryWall candidates={exile.nominees} players={players} selectedId={choice} onSelect={setChoice} />

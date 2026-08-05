@@ -28,6 +28,21 @@ export default function FinalePlayer({ gameId, player, round, players }) {
 
   if (round?.phase !== "finale" || !finale) return null;
 
+  const chaosHolderName = players?.find((p) => p.id === finale.chaosHolderId)?.display_name;
+
+  // Public knowledge from the moment the Finale starts — only their pick
+  // stays secret until the reveal. Worth showing to finalists too: the
+  // Power of Chaos is drawn from the exiled, never a finalist, so a
+  // finalist can't hold it themselves — but knowing who can nullify them
+  // is exactly the kind of thing they'd want to know. Skipped for the
+  // holder themselves since ChaosPowerPlayer.jsx already shows them a
+  // much bigger card saying exactly this.
+  const chaosBanner = chaosHolderName && finale.chaosHolderId !== player?.id && (
+    <p style={{ textAlign: "center", color: "#a68fd6", fontSize: 12, fontStyle: "italic", margin: "10px 0 0" }}>
+      🃏 <strong style={{ color: "#ff3860" }}>{chaosHolderName}</strong> holds the Power of Chaos this round — their pick stays secret until the reveal.
+    </p>
+  );
+
   const isFinalist = finale.finalists.some((f) => f.playerId === player?.id);
   if (isFinalist) {
     return (
@@ -35,6 +50,7 @@ export default function FinalePlayer({ gameId, player, round, players }) {
         <div style={{ fontSize: 32, marginBottom: 8 }}>🔥</div>
         <p style={{ color: "#f5f0ff", fontSize: 16, fontWeight: 700, margin: "0 0 6px", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>You made the Finale!</p>
         <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>Every exiled player is voting right now for who should win. Good luck.</p>
+        {chaosBanner}
       </Card>
     );
   }
@@ -45,6 +61,7 @@ export default function FinalePlayer({ gameId, player, round, players }) {
     return (
       <Card style={{ marginBottom: 20, textAlign: "center" }}>
         <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: 0 }}>The finale vote hasn't opened yet.</p>
+        {chaosBanner}
       </Card>
     );
   }
@@ -59,6 +76,7 @@ export default function FinalePlayer({ gameId, player, round, players }) {
             "{existing.reason}"
           </p>
         )}
+        {chaosBanner}
       </Card>
     );
   }
@@ -79,6 +97,7 @@ export default function FinalePlayer({ gameId, player, round, players }) {
       <div style={{ textAlign: "center", marginBottom: 16 }}>
         <div style={{ fontSize: 12, letterSpacing: 6, textTransform: "uppercase", color: "#ff2d95", marginBottom: 8 }}>🔥</div>
         <h2 style={{ color: "#f5f0ff", fontFamily: "'Orbitron', 'Segoe UI', sans-serif", marginBottom: 4 }}>Vote for the Winner</h2>
+        {chaosBanner}
       </div>
       <Card style={{ marginBottom: 14 }}>
         <MemoryWall candidates={finale.finalists} players={players} selectedId={choice} onSelect={setChoice} />

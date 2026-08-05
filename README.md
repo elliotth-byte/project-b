@@ -177,6 +177,16 @@ actually drives the game from phase to phase.
   marks them `alive: false, elimination_type: "quit"`, the same shape as
   an exile, so every alive-only filter and every past reference to their
   name keeps working, they just never get a re-entry attempt.
+- **Changed: the Power of Chaos holder's identity is now shown to every
+  player**, not just the host and the holder. `ExileVotePlayer.jsx` and
+  `FinalePlayer.jsx` now show a small "🃏 X holds the Power of Chaos this
+  round" line (skipped for the holder themselves, who already gets a much
+  bigger card via `ChaosPowerPlayer.jsx`). This isn't a new data exposure
+  — `chaosHolderId` was always fully readable by every player via
+  `game_state` RLS, and the host UI and GroupMe announcements already
+  disclosed it; it just wasn't ever surfaced in the player-facing vote
+  screens. Only the holder's actual pick (who they nullify) stays secret
+  until the reveal, same as before.
 
 
 
