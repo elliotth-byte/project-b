@@ -5,7 +5,7 @@ import { KEY_CHALLENGE, KEY_ROUND } from "../lib/gameState";
 import { placementsComplete } from "../lib/challengeLogic";
 import { GAME_REGISTRY, gameConfigWithDefaults } from "../lib/challengeGames";
 import { subscribeScores, scoresToPlacements } from "../lib/challengeScores";
-import { subscribeReentry } from "../lib/reentryData";
+import { subscribeReentry, getReentry } from "../lib/reentryData";
 import { REENTRY_STATUS } from "../lib/reentryLogic";
 import { DEFAULT_PARTICIPATION, computeParticipants } from "../lib/challengeParticipants";
 import ParticipantPicker from "./ParticipantPicker";
@@ -65,10 +65,15 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     setBusy(true);
     const { participants } = computeParticipants(config, { alive: alivePicker, allPlayers: allPicker });
     const participantIds = participants.map((p) => p.id);
-    // Snapshotted now, not recomputed later — so someone exiled mid-
-    // challenge doesn't suddenly become eligible to opt into a challenge
-    // that's already running.
-    const reentryEligibleIds = pendingReentrants.map((r) => r.playerId);
+    // Read fresh rather than trusting the subscribed `reentry` state above —
+    // right after an Exile Vote resolves, a host clicking Start Challenge
+    // quickly could otherwise snapshot a beat-behind list and permanently
+    // lock a just-exiled player out of opting into this specific
+    // challenge. Snapshotted (not recomputed later) so someone exiled
+    // mid-challenge doesn't suddenly become eligible to opt into a
+    // challenge that's already running.
+    const freshReentry = await getReentry(gameId);
+    const reentryEligibleIds = freshReentry.filter((r) => r.status === REENTRY_STATUS.PENDING).map((r) => r.playerId);
     const now = Date.now();
     const endsAt = settings?.infiniteTime ? null : now + durationSec * 1000;
     const configOverrides = gameType === "maze2d" ? { size: mazeSize } : undefined;
