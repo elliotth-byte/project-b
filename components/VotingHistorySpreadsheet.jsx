@@ -1,14 +1,36 @@
 import { Card, Btn, Badge } from "./ui";
 import { buildVotingGrid, votingGridToCSV } from "../lib/votingSpreadsheet";
 
+const headerRowStyle = { borderBottom: "1px solid #3d1f5c" };
+const headerLabelStyle = {
+  textAlign: "left", padding: "4px 10px", color: "#6b4f99", fontWeight: 500, fontStyle: "italic",
+  whiteSpace: "nowrap", position: "sticky", left: 0, background: "#1a0a2e",
+};
+
+function HeaderRow({ label, byColumn, columns, color = "#a68fd6" }) {
+  return (
+    <tr style={headerRowStyle}>
+      <th style={headerLabelStyle}>{label}</th>
+      {columns.map((c) => (
+        <th key={c.key} style={{ textAlign: "left", padding: "4px 10px", color, fontWeight: 500, fontStyle: "italic", whiteSpace: "nowrap" }}>
+          {(byColumn[c.key] || []).join(", ") || "—"}
+        </th>
+      ))}
+    </tr>
+  );
+}
+
 // ─── Voting History ───
 // A Survivor/Big Brother wiki-style grid: one column per round (plus the
 // Finale), one row per player, each cell showing who they voted for that
 // round. No Mode or Reason columns — those are still available in the
-// round-by-round recap on the History/Ceremony tabs; this table is
-// purely "who voted for whom, at a glance."
-export default function VotingHistorySpreadsheet({ exileHistory, finaleState, players, gameName }) {
-  const grid = buildVotingGrid(exileHistory, finaleState, players);
+// round-by-round recap on the History/Ceremony tabs. Above the grid,
+// stacked header rows (matching how Big Brother's own voting-history
+// sheet stacks HOH/Nominations/Veto above its player grid) show that
+// round's Challenge Winner, Fates Winners (the top 3 who earned a
+// nomination), Nominees, and Power of Chaos holder, then who was Exiled.
+export default function VotingHistorySpreadsheet({ exileHistory, finaleState, players, gameName, challengeHistory }) {
+  const grid = buildVotingGrid(exileHistory, finaleState, players, challengeHistory);
   if (grid.columns.length === 0) return null;
 
   const download = () => {
@@ -33,7 +55,7 @@ export default function VotingHistorySpreadsheet({ exileHistory, finaleState, pl
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <thead>
-            <tr style={{ borderBottom: "1px solid #3d1f5c" }}>
+            <tr style={headerRowStyle}>
               <th style={{ textAlign: "left", padding: "6px 10px", color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, whiteSpace: "nowrap", position: "sticky", left: 0, background: "#1a0a2e" }}>
                 Player
               </th>
@@ -43,16 +65,11 @@ export default function VotingHistorySpreadsheet({ exileHistory, finaleState, pl
                 </th>
               ))}
             </tr>
-            <tr style={{ borderBottom: "1px solid #3d1f5c" }}>
-              <th style={{ textAlign: "left", padding: "4px 10px", color: "#6b4f99", fontWeight: 500, fontStyle: "italic", whiteSpace: "nowrap", position: "sticky", left: 0, background: "#1a0a2e" }}>
-                Exiled
-              </th>
-              {grid.columns.map((c) => (
-                <th key={c.key} style={{ textAlign: "left", padding: "4px 10px", color: "#ff3860", fontWeight: 500, fontStyle: "italic", whiteSpace: "nowrap" }}>
-                  {(grid.exiledByColumn[c.key] || []).join(", ") || "—"}
-                </th>
-              ))}
-            </tr>
+            <HeaderRow label="Challenge Winner" byColumn={grid.winnerByColumn} columns={grid.columns} color="#00ff9d" />
+            <HeaderRow label="Fates Winners" byColumn={grid.fatesWinnersByColumn} columns={grid.columns} />
+            <HeaderRow label="Nominees" byColumn={grid.nomineesByColumn} columns={grid.columns} />
+            <HeaderRow label="🃏 Power of Chaos" byColumn={grid.chaosByColumn} columns={grid.columns} />
+            <HeaderRow label="Exiled" byColumn={grid.exiledByColumn} columns={grid.columns} color="#ff3860" />
           </thead>
           <tbody>
             {grid.playerRows.map((r) => (

@@ -184,7 +184,7 @@ export default function HistoryTab({ gameId, players, gameName, round }) {
         </Card>
       )}
 
-      <VotingHistorySpreadsheet exileHistory={exileHistory} finaleState={finaleState} players={players} gameName={gameName} />
+      <VotingHistorySpreadsheet exileHistory={exileHistory} finaleState={finaleState} players={players} gameName={gameName} challengeHistory={challengeHistory} />
     </div>
   );
 }

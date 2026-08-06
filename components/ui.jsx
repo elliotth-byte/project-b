@@ -97,6 +97,33 @@ export function Badge({ children, color = "#ff2d95" }) {
   );
 }
 
+// A per-player Power of Chaos draw-status indicator for the host's voter
+// list rows (see ExileVoteHost.jsx / FinaleHost.jsx). Deliberately NOT
+// just a colored emoji — most browsers render emoji with their own
+// built-in color and ignore any CSS `color` set on them, so a colored 🃏
+// alone renders identically regardless of status. The color instead
+// lives on a background/border pill around the icon, which does respond
+// to CSS, with the icon just sitting inside as a static glyph.
+export function ChaosStatusBadge({ holderId, playerId, drawPicks }) {
+  const isHolder = holderId === playerId;
+  const hasPicked = drawPicks?.[playerId] !== undefined;
+  const color = isHolder ? "#ff2d95" : hasPicked ? "#00ff9d" : "#3d1f5c";
+  const title = isHolder ? "Holds the Power of Chaos" : hasPicked ? "Made their Power of Chaos pick" : "Hasn't made their Power of Chaos pick yet";
+  return (
+    <span
+      title={title}
+      style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
+        background: `${color}2e`, border: `2px solid ${color}`,
+        fontSize: 13, lineHeight: 1,
+      }}
+    >
+      🃏
+    </span>
+  );
+}
+
 // A duration editor that stores/returns whole seconds but lets the host
 // think in days/hours/minutes instead of doing the math themselves —
 // used anywhere a round-length setting is configured (Admin's default

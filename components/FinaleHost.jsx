@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Btn, Card, Badge } from "./ui";
+import { Btn, Card, Badge, ChaosStatusBadge } from "./ui";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_FINALE } from "../lib/gameState";
 import { computeFinaleOutcome } from "../lib/exileLogic";
@@ -153,12 +153,7 @@ export default function FinaleHost({ gameId, players, round }) {
                 {finale.finalists.map((f) => <option key={f.playerId} value={f.playerId}>{f.name}</option>)}
               </select>
               {votes[voter.id]?.reason && <span style={{ fontSize: 10, color: "#6b4f99" }} title={votes[voter.id].reason}>💬</span>}
-              <span
-                style={{ fontSize: 10, color: finale.chaosHolderId === voter.id ? "#ff2d95" : drawPicks[voter.id] !== undefined ? "#00ff9d" : "#3d1f5c", flexShrink: 0 }}
-                title={finale.chaosHolderId === voter.id ? "Holds the Power of Chaos" : drawPicks[voter.id] !== undefined ? "Made their Power of Chaos pick" : "Hasn't made their Power of Chaos pick yet"}
-              >
-                🃏
-              </span>
+              <ChaosStatusBadge holderId={finale.chaosHolderId} playerId={voter.id} drawPicks={drawPicks} />
             </div>
           ))}
           {exiledPlayers.length === 0 && <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No exiled players yet to vote — this can happen in a short game.</p>}
