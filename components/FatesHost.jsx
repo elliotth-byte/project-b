@@ -3,7 +3,7 @@ import { Btn, Card, Badge } from "./ui";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_FATES, KEY_CHALLENGE } from "../lib/gameState";
 import { isValidNomination, nominationsComplete, takenNomineeIds } from "../lib/fatesLogic";
-import PostToGroupMe from "./PostToGroupMe";
+import CopyMessage from "./CopyMessage";
 import { requestAdvance } from "../lib/advanceNow";
 
 export default function FatesHost({ gameId, players, round }) {
@@ -88,7 +88,7 @@ export default function FatesHost({ gameId, players, round }) {
       </div>
       {!complete && <p style={{ color: "#6b4f99", fontSize: 11, fontStyle: "italic", margin: "0 0 12px" }}>Every one of the top 3 needs to submit a nomination first.</p>}
 
-      <PostToGroupMe gameId={gameId} icon="⚖️" label="Fates Ceremony Announcement"
+      <CopyMessage icon="⚖️" label="Fates Ceremony Announcement"
         text={`⚖️ The Fates Ceremony has begun. ${fates.nominatorOrder.map((n) => n.name).join(", ")} will each nominate one player for exile.`} />
     </Card>
   );

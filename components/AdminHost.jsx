@@ -184,8 +184,8 @@ export default function AdminHost({ gameId, players, round }) {
         <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>⏱ Round Lengths</h3>
         <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
           Default timer for each phase. The Challenge phase's duration can still be overridden per-round when the host starts that
-          round's challenge. When a phase's timer runs out, the game automatically moves to the next phase and posts an update to
-          GroupMe — as long as the host has finished entering whatever that phase needed (results, nominations, etc.).
+          round's challenge. When a phase's timer runs out, the game automatically moves to the next phase and posts an update
+          in-app — as long as the host has finished entering whatever that phase needed (results, nominations, etc.).
         </p>
         <div style={{ display: "grid", gap: 10 }}>
           {[

@@ -181,7 +181,6 @@ export default function HostPanels({ gameId, players, gameName }) {
 
       {tab === "admin" && (
         <div style={{ display: "grid", gap: 16 }}>
-          <ChallengeErrorBoundary label="Scheduled GroupMe Posts"><ScheduledPostsList gameId={gameId} /></ChallengeErrorBoundary>
           <ChallengeErrorBoundary label="Admin"><AdminHost gameId={gameId} players={players} round={round} /></ChallengeErrorBoundary>
         </div>
       )}

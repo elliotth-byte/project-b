@@ -1,11 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 import { makeDb } from "../../../lib/dbAdapter";
 import { advancePhase } from "../../../lib/roundEngine";
+import { makeInAppPostMessage } from "../../../lib/announcements";
 import { KEY_ROUND } from "../../../lib/gameState";
 
 // ============================================================
-// Runs on Vercel's cron schedule (see vercel.json). Same CRON_SECRET
-// pattern as pages/api/cron/post-scheduled.js.
+// Runs on Vercel's cron schedule (see vercel.json).
 //
 // IMPORTANT — Vercel plan limits: Hobby accounts can only run a cron job
 // once per DAY, so on Hobby this route is really just a safety net that
@@ -38,23 +38,10 @@ export default async function handler(req, res) {
     return v.phaseEndsAt && v.phaseEndsAt <= now && v.phase !== "lobby" && v.phase !== "ended";
   });
 
-  const botId = process.env.GROUPME_BOT_ID;
-  const postMessage = async (text) => {
-    if (!botId) return;
-    try {
-      await fetch("https://api.groupme.com/v3/bots/post", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bot_id: botId, text }),
-      });
-    } catch {
-      // Best-effort, same as advance-phase.js.
-    }
-  };
-
   const results = [];
   for (const row of due) {
     try {
+      const postMessage = makeInAppPostMessage(db, row.game_id);
       const result = await advancePhase(row.game_id, { db, client: supabaseAdmin, postMessage });
       results.push({ gameId: row.game_id, ...result });
     } catch (err) {

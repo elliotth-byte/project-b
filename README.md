@@ -1,9 +1,10 @@
 # Project B (Supabase + Vercel)
 
 A deployable, real-time host/player web app for running **Project B** — a
-Challenge / Fates Ceremony / Exile Vote social deduction game — with a
-Slack-free stack: GroupMe for group updates, Supabase for the database +
-auth + realtime, Vercel for hosting.
+Challenge / Fates Ceremony / Exile Vote social deduction game — built on
+Supabase for the database + auth + realtime, and Vercel for hosting. All
+game announcements are in-app (see "Announcements" below) — no
+third-party chat integration required.
 
 This is a from-scratch adaptation of an earlier "Traitors" project of the
 same shape. It keeps that project's admin tools, confessionals, voting
@@ -50,10 +51,12 @@ actually drives the game from phase to phase.
   rules requires supporting more than one at a time, and allowing several
   at once raises ambiguous cases the rules don't address (what if two
   exiled players tie for 1st?).
-- **The "Fan of Cards" moment is flavor, not mechanics.** The rules
-  describe it but never say it changes an outcome, so the host has a
-  "Draw" button that pulls a flavor card to read aloud / post to GroupMe;
-  it doesn't feed into any calculation.
+- **The Power of Chaos is won, not assigned.** The written rules just say
+  one player is "randomly given" it each round; this implementation makes
+  that a real moment instead of a silent draw — every eligible player
+  sees a row of mystery cards (see `components/ChaosPowerPlayer.jsx`) and
+  gets one shot at picking the right one. The odds are identical to a
+  flat random assignment; this only changes how it's revealed.
 - **The finale's "final 2" language** is read as: all 3 finalists get
   votes, the Chaos holder nullifies one finalist's votes entirely
   (removing them from contention), and the winner is decided between
@@ -124,9 +127,10 @@ actually drives the game from phase to phase.
   `ExileVoteHost.jsx`/`FinaleHost.jsx` are kept as a manual fallback, not
   the primary path.
 - **Reveal toggle**: at the end of a vote, the host now picks "🎭 Reveal
-  In-App" (the existing step-by-step dramatic reveal) or "📱 Just Post to
-  GroupMe" (composes and posts a full text summary — votes, reasons, the
-  Chaos pick — in one message, then lets the host finalize immediately).
+  In-App" (the existing step-by-step dramatic reveal) or "📋 Copy Results
+  Summary" (composes a full text summary — votes, reasons, the Chaos
+  pick — that the host can paste wherever they want, then finalizes
+  immediately).
 - **Voting history spreadsheet** — `components/VotingHistorySpreadsheet.jsx`,
   shown at the bottom of the History tab, flattens every past exile vote
   and the finale into one table (voter, target, reason, Chaos holder,
@@ -183,7 +187,7 @@ actually drives the game from phase to phase.
   round" line (skipped for the holder themselves, who already gets a much
   bigger card via `ChaosPowerPlayer.jsx`). This isn't a new data exposure
   — `chaosHolderId` was always fully readable by every player via
-  `game_state` RLS, and the host UI and GroupMe announcements already
+  `game_state` RLS, and the host UI and in-app announcements already
   disclosed it; it just wasn't ever surfaced in the player-facing vote
   screens. Only the holder's actual pick (who they nullify) stays secret
   until the reveal, same as before.
@@ -194,21 +198,25 @@ actually drives the game from phase to phase.
    `sql/` **in this order**: `schema.sql`, `add-player-approval.sql`,
    `add-join-codes.sql`, `add-season-subtitle.sql`, `add-season-archive.sql`,
    `add-game-hosts.sql`, `add-elimination-type.sql`, `add-confessionals.sql`,
-   `add-scheduled-groupme-posts.sql`, `add-player-color.sql`,
+   `add-confessional-replies.sql`, `add-player-color.sql`,
    `add-player-color-policy.sql`, `add-chaos-secrets.sql`,
-   `add-player-removal.sql`.
+   `add-chaos-draw-index.sql`, `add-player-removal.sql`.
 
-   **Already have a project running?** If you ran `add-chaos-secrets.sql`
-   before this note was added, also run `sql/fix-chaos-holder-check.sql`
-   once — it patches a bug where the player actually holding the Power of
-   Chaos could never read their own secret pick (the RLS check compared a
-   `players.id` straight against `auth.uid()`, which are different UUIDs
-   for the same person). Fresh installs following the order above already
-   get the fixed version and can skip this file.
+   **Already have a project running?** A few migrations only matter if
+   you set this project up before they existed:
+   - If you ran `add-chaos-secrets.sql` before this note was added, also
+     run `sql/fix-chaos-holder-check.sql` once — it patches a bug where
+     the player actually holding the Power of Chaos could never read
+     their own secret pick (the RLS check compared a `players.id`
+     straight against `auth.uid()`, which are different UUIDs for the
+     same person). Fresh installs following the order above already get
+     the fixed version and can skip this file.
+   - If you ever ran the old `add-scheduled-groupme-posts.sql` (from
+     before announcements moved in-app — see "Announcements" below), run
+     `sql/remove-groupme-integration.sql` once to drop that now-unused
+     table. Fresh installs never need to run either of these two files.
 2. **Copy `.env.local.example` to `.env.local`** and fill in your Supabase
-   URL/keys, your GroupMe bot ID (create one at
-   [dev.groupme.com/bots](https://dev.groupme.com/bots) for the group you
-   want updates posted into), and a random `CRON_SECRET`.
+   URL/keys and a random `CRON_SECRET`.
 3. Create a host account: in Supabase → Authentication → Users → Add
    user, or call `signUpHost()` from `lib/auth.js` once, then set that
    user's `raw_user_meta_data` to include `"role": "host"`.
@@ -272,6 +280,25 @@ supports (once/day) as a safety net for a game left running unattended.
 `* * * * *` (every minute) and it becomes a fully reliable path that
 doesn't need anyone's browser tab open at all.
 
+## Announcements
+
+Every automated narration the round engine generates ("Challenge
+complete! 🏆 X finishes 1st...", "Round begins...", eliminations, etc.)
+is written straight into the game — `lib/roundEngine.js` calls a
+`postMessage(text)` callback (`lib/announcements.js`'s
+`makeInAppPostMessage`, wired up in `pages/api/advance-phase.js` and
+`pages/api/cron/advance-rounds.js`) that appends it to a rolling
+in-app feed (`components/AnnouncementsFeed.jsx`, shown on both the
+host's History tab and the player's Ceremony tab, keeping the most
+recent 30 entries). No external chat integration, bot, or API key
+required.
+
+For the host's own manual announcements — a vote reveal summary, a
+confessional recap, anything they want to share outside the app entirely
+(a group text, Slack, wherever) — `components/CopyMessage.jsx` composes
+the text and copies it to the clipboard for the host to paste anywhere
+they like, rather than posting it anywhere automatically.
+
 ## What's the same as the original Traitors project
 
 - Supabase auth (players use a plain username, hosts a real email),
@@ -286,9 +313,14 @@ doesn't need anyone's browser tab open at all.
 
 ## What's different
 
-- **GroupMe instead of Slack** everywhere: `lib/groupmeClient.js`,
-  `lib/groupmeScheduling.js`, `pages/api/post-to-groupme.js`,
-  `pages/api/cron/post-scheduled.js`, `sql/add-scheduled-groupme-posts.sql`.
+- **In-app announcements instead of a third-party chat.** The automated
+  "Challenge complete!" / "Round begins" / etc. narration
+  `lib/roundEngine.js` generates gets written straight into the game
+  (`lib/announcements.js`, `components/AnnouncementsFeed.jsx` — shown on
+  both the host's History tab and the player's Ceremony tab), and the
+  host can copy any vote/reveal summary out to paste wherever they
+  actually want it (`components/CopyMessage.jsx`) — Slack, a group text,
+  anything. No bot, no webhook, no third-party API key required.
 - All of the Traitors-specific mini-games, traitor roles, and murder
   vote were removed — Project B's Challenge/Fates/Exile loop replaces
   Roundtable entirely, and there's no host-only secret state anymore

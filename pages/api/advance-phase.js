@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { makeDb } from "../../lib/dbAdapter";
 import { advancePhase } from "../../lib/roundEngine";
+import { makeInAppPostMessage } from "../../lib/announcements";
 
 // ============================================================
 // Why this endpoint exists (and why it's safe):
@@ -59,23 +60,9 @@ export default async function handler(req, res) {
     if (!isHostOrCoHost) return res.status(403).json({ error: "Only the host can force-advance the game." });
   }
 
-  const botId = process.env.GROUPME_BOT_ID;
-  const postMessage = async (text) => {
-    if (!botId) return;
-    try {
-      await fetch("https://api.groupme.com/v3/bots/post", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bot_id: botId, text }),
-      });
-    } catch {
-      // Best-effort — a failed GroupMe post should never block the game
-      // itself from advancing.
-    }
-  };
-
   const adminClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
   const db = makeDb(adminClient);
+  const postMessage = makeInAppPostMessage(db, gameId);
 
   try {
     const result = await advancePhase(gameId, { db, client: adminClient, postMessage, force: !!force });

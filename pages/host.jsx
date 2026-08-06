@@ -477,7 +477,7 @@ export default function HostPage() {
                     <p style={{ fontSize: 11.5, color: inviteStatus.startsWith("✅") ? "#00ff9d" : "#ff3860", marginTop: 6 }}>{inviteStatus}</p>
                   )}
                   <p style={{ fontSize: 11, color: "#6b4f99", marginTop: 8, fontStyle: "italic" }}>
-                    Co-hosts need an existing host account (see README.md) and get full access to run this season — roster, challenges, GroupMe posting. Only the primary host can add/remove co-hosts or archive/delete the season.
+                    Co-hosts need an existing host account (see README.md) and get full access to run this season — roster, challenges, announcements. Only the primary host can add/remove co-hosts or archive/delete the season.
                   </p>
                 </div>
               )}

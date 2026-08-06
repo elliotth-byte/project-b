@@ -5,8 +5,7 @@ import { KEY_FINALE } from "../lib/gameState";
 import { computeFinaleOutcome } from "../lib/exileLogic";
 import { FINALE_CONTEXT, subscribeChaosSecret } from "../lib/chaosSecrets";
 import { FINALE_DRAW_CONTEXT, chaosPicksKey } from "../lib/chaosDraw";
-import PostToGroupMe from "./PostToGroupMe";
-import { postToGroupMe } from "../lib/groupmeClient";
+import CopyMessage from "./CopyMessage";
 import { requestAdvance } from "../lib/advanceNow";
 
 const VOTES_KEY = "pb:finale-votes";
@@ -17,7 +16,6 @@ export default function FinaleHost({ gameId, players, round }) {
   const [nullifiedId, setNullifiedId] = useState(null);
   const [drawPicks, setDrawPicks] = useState({});
   const [busy, setBusy] = useState(false);
-  const [postedToGroupMe, setPostedToGroupMe] = useState(false);
   const dirtyRef = useRef(new Set());
 
   useEffect(() => {
@@ -98,15 +96,10 @@ export default function FinaleHost({ gameId, players, round }) {
     if (result.error) alert("Couldn't move on: " + result.error);
   };
 
-  const postSummaryToGroupMe = async () => {
-    setBusy(true);
+  const buildFinaleSummary = () => {
     const lines = voteRows.map((r) => `${players.find((p) => p.id === r.voterId)?.display_name || "?"} → ${byId[r.targetId] || "?"}${r.reason ? ` ("${r.reason}")` : ""}`);
     const chaosLine = nullifiedId ? `🃏 ${chaosHolder?.display_name || "The Power of Chaos"} nullified ${byId[nullifiedId] || "?"} — they can't win.` : "";
-    const text = `🔥 Finale votes — ${finale.finalists.map((f) => f.name).join(", ")}\n\n${lines.join("\n")}\n\n${chaosLine}`.trim();
-    const res = await postToGroupMe(gameId, text);
-    setBusy(false);
-    if (!res.ok) { alert("Couldn't post to GroupMe: " + res.error); return; }
-    setPostedToGroupMe(true);
+    return `🔥 Finale votes — ${finale.finalists.map((f) => f.name).join(", ")}\n\n${lines.join("\n")}\n\n${chaosLine}`.trim();
   };
 
   return (
@@ -185,16 +178,14 @@ export default function FinaleHost({ gameId, players, round }) {
       )}
 
       {!finale.votingOpen && (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-          <Btn onClick={finishNow} disabled={busy || tieBreakUnresolved}>{busy ? "Working..." : "🎭 Reveal Winner In-App"}</Btn>
-          <Btn variant="slack" onClick={postSummaryToGroupMe} disabled={busy || tieBreakUnresolved || postedToGroupMe}>
-            {postedToGroupMe ? "✓ Posted to GroupMe" : busy ? "Posting..." : "📱 Just Post to GroupMe"}
-          </Btn>
+        <div style={{ marginBottom: 12 }}>
+          <Btn onClick={finishNow} disabled={busy || tieBreakUnresolved} style={{ marginBottom: 8 }}>{busy ? "Working..." : "🎭 Reveal Winner In-App"}</Btn>
+          <CopyMessage icon="🔥" label="Copy Finale Vote Summary" text={buildFinaleSummary()} />
         </div>
       )}
 
       <div style={{ marginTop: 12 }}>
-        <PostToGroupMe gameId={gameId} icon="🔥" label="Finale Announcement"
+        <CopyMessage icon="🔥" label="Finale Announcement"
           text={`🔥 The Finale is here! ${finale.finalists.map((f) => f.name).join(", ")} — every exiled player now votes for a winner.`} />
       </div>
     </Card>

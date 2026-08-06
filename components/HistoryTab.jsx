@@ -5,6 +5,7 @@ import { KEY_CHALLENGE_HISTORY, KEY_EXILE_HISTORY, KEY_REENTRY, KEY_FINALE, KEY_
 import { GAME_REGISTRY } from "../lib/challengeGames";
 import { formatPlacementValue } from "../lib/challengeScores";
 import VotingHistorySpreadsheet from "./VotingHistorySpreadsheet";
+import AnnouncementsFeed from "./AnnouncementsFeed";
 
 function LiveNominationsCard({ round, nominatorOrder, nominations, byId }) {
   if (!nominatorOrder?.length) return null;
@@ -78,13 +79,20 @@ export default function HistoryTab({ gameId, players, gameName, round }) {
   const showLiveNominations = !currentRoundHasHistory && liveNominatorOrder?.length > 0;
 
   if (challengeHistory.length === 0 && exileHistory.length === 0 && !showLiveNominations) {
-    return <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>No completed rounds yet.</p></Card>;
+    return (
+      <div style={{ display: "grid", gap: 16 }}>
+        <AnnouncementsFeed gameId={gameId} />
+        <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>No completed rounds yet.</p></Card>
+      </div>
+    );
   }
 
   const rounds = [...new Set([...challengeHistory.map((c) => c.round), ...exileHistory.map((e) => e.round)])].sort((a, b) => a - b);
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
+      <AnnouncementsFeed gameId={gameId} />
+
       {showLiveNominations && (
         <LiveNominationsCard round={round.round} nominatorOrder={liveNominatorOrder} nominations={liveNominations} byId={byId} />
       )}

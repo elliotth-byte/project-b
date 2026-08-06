@@ -5,6 +5,7 @@ import { KEY_EXILE_HISTORY, KEY_FINALE, KEY_CHALLENGE_HISTORY, KEY_EXILE, KEY_FA
 import { GAME_REGISTRY } from "../lib/challengeGames";
 import { formatPlacementValue } from "../lib/challengeScores";
 import { buildVotingRows } from "../lib/votingSpreadsheet";
+import AnnouncementsFeed from "./AnnouncementsFeed";
 
 // ─── Player-facing Ceremony tab ───
 // Unlike FatesPlayer/ExileVotePlayer/FinalePlayer (which only render while
@@ -82,6 +83,8 @@ export default function CeremonyPlayer({ gameId, players, round }) {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
+      <AnnouncementsFeed gameId={gameId} />
+
       {finale && (
         <FinaleCard finale={finale} rows={finaleRows} byId={byId} />
       )}

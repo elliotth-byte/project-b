@@ -4,7 +4,7 @@ import {
   CONFESSIONAL_TAGS, fetchAllConfessionals, updateConfessional, subscribeConfessionalsTable,
   subscribeConfessionalPrompt, setConfessionalPrompt, clearConfessionalPrompt, respondToConfessional,
 } from "../lib/confessionalsData";
-import PostToGroupMe from "./PostToGroupMe";
+import CopyMessage from "./CopyMessage";
 
 export default function ConfessionalsHost({ gameId, round }) {
   const [items, setItems] = useState([]);
@@ -220,10 +220,7 @@ export default function ConfessionalsHost({ gameId, round }) {
             ))}
           </div>
           {recapSelected.length > 0 && (
-            <>
-              <Btn small variant="ghost" onClick={() => navigator.clipboard.writeText(buildRecapText())} style={{ marginBottom: 8 }}>Copy Recap Text</Btn>
-              <PostToGroupMe gameId={gameId} icon="🎥" label="Post Recap to GroupMe" text={buildRecapText()} />
-            </>
+            <CopyMessage icon="🎥" label="Copy Confessional Recap" text={buildRecapText()} />
           )}
         </Card>
       )}

@@ -5,8 +5,7 @@ import { KEY_EXILE } from "../lib/gameState";
 import { computeEliminateOutcome, computeSaveOutcome, buildRevealOrder } from "../lib/exileLogic";
 import { exileContext, subscribeChaosSecret } from "../lib/chaosSecrets";
 import { exileDrawContext, chaosPicksKey } from "../lib/chaosDraw";
-import PostToGroupMe from "./PostToGroupMe";
-import { postToGroupMe } from "../lib/groupmeClient";
+import CopyMessage from "./CopyMessage";
 import { requestAdvance } from "../lib/advanceNow";
 
 export default function ExileVoteHost({ gameId, players, round }) {
@@ -124,16 +123,13 @@ export default function ExileVoteHost({ gameId, players, round }) {
     if (result.error) alert("Couldn't move on: " + result.error);
   };
 
-  const postSummaryToGroupMe = async () => {
-    setBusy(true);
+  const buildResultsSummary = () => {
     const lines = voteRows.map((r) => `${players.find((p) => p.id === r.voterId)?.display_name || "?"} → ${byId[r.targetId] || "?"}${r.reason ? ` ("${r.reason}")` : ""}`);
     const chaosLine = nullifiedId ? `🃏 ${chaosHolder?.display_name || "The Power of Chaos"} nullified ${byId[nullifiedId] || "?"}.` : "";
-    const text = `🃏 Exile Vote results — Round ${round.round}\n\n${lines.join("\n")}\n\n${chaosLine}`.trim();
-    const res = await postToGroupMe(gameId, text);
-    setBusy(false);
-    if (!res.ok) { alert("Couldn't post to GroupMe: " + res.error); return; }
-    setChaosRevealed(true);
+    return `🃏 Exile Vote results — Round ${round.round}\n\n${lines.join("\n")}\n\n${chaosLine}`.trim();
   };
+
+  const skipReveal = () => setChaosRevealed(true);
 
   const tied = outcome.tied || [];
   const needsTieBreak = outcome.needsTieBreak;
@@ -251,9 +247,12 @@ export default function ExileVoteHost({ gameId, players, round }) {
       {!exile.votingOpen && voteRows.length > 0 && (
         <div style={{ borderTop: "1px solid #3d1f5c", paddingTop: 12, marginBottom: 12 }}>
           {!revealOrder && !chaosRevealed ? (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <Btn onClick={startReveal}>🎭 Reveal In-App</Btn>
-              <Btn variant="slack" onClick={postSummaryToGroupMe} disabled={busy}>{busy ? "Posting..." : "📱 Just Post to GroupMe"}</Btn>
+            <div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                <Btn onClick={startReveal}>🎭 Reveal In-App</Btn>
+                <Btn variant="ghost" onClick={skipReveal} disabled={busy}>⏭ Skip Reveal — Just Finalize</Btn>
+              </div>
+              <CopyMessage icon="🃏" label="Copy Results Summary" text={buildResultsSummary()} />
             </div>
           ) : chaosRevealed && !revealOrder ? (
             <Btn onClick={finishNow} disabled={busy || tieBreakUnresolved}>{busy ? "Working..." : "Finalize Exile & Continue"}</Btn>
@@ -284,7 +283,7 @@ export default function ExileVoteHost({ gameId, players, round }) {
         </div>
       )}
 
-      <PostToGroupMe gameId={gameId} icon="🃏" label="Exile Vote Announcement"
+      <CopyMessage icon="🃏" label="Exile Vote Announcement"
         text={`🃏 The Exile Vote is underway. Nominees: ${exile.nominees.map((n) => n.name).join(", ")}. Power of Chaos: ${chaosHolder?.display_name || "?"}.`} />
     </Card>
   );

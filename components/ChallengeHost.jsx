@@ -9,7 +9,7 @@ import { subscribeReentry, getReentry } from "../lib/reentryData";
 import { REENTRY_STATUS } from "../lib/reentryLogic";
 import { DEFAULT_PARTICIPATION, computeParticipants } from "../lib/challengeParticipants";
 import ParticipantPicker from "./ParticipantPicker";
-import PostToGroupMe from "./PostToGroupMe";
+import CopyMessage from "./CopyMessage";
 import { requestAdvance } from "../lib/advanceNow";
 
 // ─── Challenge: Host Control ───
@@ -358,7 +358,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
       </div>
       {!isDigital && !complete && <p style={{ color: "#6b4f99", fontSize: 11, fontStyle: "italic", margin: "0 0 12px" }}>Every competitor needs a distinct place (1, 2, 3, ...) before this can finish.</p>}
 
-      <PostToGroupMe gameId={gameId} icon={registryEntry?.icon || "⚔️"} label="Challenge Announcement"
+      <CopyMessage icon={registryEntry?.icon || "⚔️"} label="Challenge Announcement"
         text={`${registryEntry?.icon || "⚔️"} ${registryEntry?.label} underway! ${participants.length} competing. 1st place wins immunity${round.finalFour ? " — this is the FINAL FOUR, everyone else is automatically nominated." : "."}`} />
     </Card>
   );
