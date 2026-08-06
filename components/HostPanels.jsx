@@ -22,7 +22,7 @@ const BASE_TABS = [
   { key: "admin", label: "🛠 Admin" },
 ];
 
-export default function HostPanels({ gameId, players, gameName }) {
+export default function HostPanels({ gameId, players, gameName, adminExtra }) {
   const [tab, setTab] = useState("round");
   const [round, setRound] = useState(null);
   const [settings, setSettingsState] = useState(null);
@@ -181,6 +181,7 @@ export default function HostPanels({ gameId, players, gameName }) {
 
       {tab === "admin" && (
         <div style={{ display: "grid", gap: 16 }}>
+          {adminExtra}
           <ChallengeErrorBoundary label="Admin"><AdminHost gameId={gameId} players={players} round={round} /></ChallengeErrorBoundary>
         </div>
       )}

@@ -1,15 +1,18 @@
-import { Card, Btn } from "./ui";
-import { buildVotingRows, rowsToCSV } from "../lib/votingSpreadsheet";
+import { Card, Btn, Badge } from "./ui";
+import { buildVotingGrid, votingGridToCSV } from "../lib/votingSpreadsheet";
 
+// ─── Voting History ───
+// A Survivor/Big Brother wiki-style grid: one column per round (plus the
+// Finale), one row per player, each cell showing who they voted for that
+// round. No Mode or Reason columns — those are still available in the
+// round-by-round recap on the History/Ceremony tabs; this table is
+// purely "who voted for whom, at a glance."
 export default function VotingHistorySpreadsheet({ exileHistory, finaleState, players, gameName }) {
-  const byId = {};
-  players.forEach((p) => (byId[p.id] = p.display_name));
-
-  const rows = buildVotingRows(exileHistory, finaleState, byId);
-  if (rows.length === 0) return null;
+  const grid = buildVotingGrid(exileHistory, finaleState, players);
+  if (grid.columns.length === 0) return null;
 
   const download = () => {
-    const csv = rowsToCSV(rows);
+    const csv = votingGridToCSV(grid);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -31,23 +34,38 @@ export default function VotingHistorySpreadsheet({ exileHistory, finaleState, pl
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <thead>
             <tr style={{ borderBottom: "1px solid #3d1f5c" }}>
-              {["Round", "Mode", "Voter", "Voted For", "Reason", "Chaos", "Nullified?", "Tie Broken For", "Result"].map((h) => (
-                <th key={h} style={{ textAlign: "left", padding: "6px 8px", color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, whiteSpace: "nowrap" }}>{h}</th>
+              <th style={{ textAlign: "left", padding: "6px 10px", color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, whiteSpace: "nowrap", position: "sticky", left: 0, background: "#1a0a2e" }}>
+                Player
+              </th>
+              {grid.columns.map((c) => (
+                <th key={c.key} style={{ textAlign: "left", padding: "6px 10px", color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, whiteSpace: "nowrap" }}>
+                  {c.label}
+                </th>
+              ))}
+            </tr>
+            <tr style={{ borderBottom: "1px solid #3d1f5c" }}>
+              <th style={{ textAlign: "left", padding: "4px 10px", color: "#6b4f99", fontWeight: 500, fontStyle: "italic", whiteSpace: "nowrap", position: "sticky", left: 0, background: "#1a0a2e" }}>
+                Exiled
+              </th>
+              {grid.columns.map((c) => (
+                <th key={c.key} style={{ textAlign: "left", padding: "4px 10px", color: "#ff3860", fontWeight: 500, fontStyle: "italic", whiteSpace: "nowrap" }}>
+                  {(grid.exiledByColumn[c.key] || []).join(", ") || "—"}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => (
-              <tr key={i} style={{ borderBottom: "1px solid #150a28" }}>
-                <td style={{ padding: "6px 8px", color: "#f5f0ff", whiteSpace: "nowrap" }}>{r.context}</td>
-                <td style={{ padding: "6px 8px", color: "#a68fd6", whiteSpace: "nowrap" }}>{r.mode}</td>
-                <td style={{ padding: "6px 8px", color: "#f5f0ff", whiteSpace: "nowrap" }}>{r.voter}</td>
-                <td style={{ padding: "6px 8px", color: "#f5f0ff", whiteSpace: "nowrap" }}>{r.target}</td>
-                <td style={{ padding: "6px 8px", color: "#a68fd6", fontStyle: "italic", maxWidth: 220 }}>{r.reason}</td>
-                <td style={{ padding: "6px 8px", color: "#a68fd6", whiteSpace: "nowrap" }}>{r.chaosHolder}</td>
-                <td style={{ padding: "6px 8px", color: r.nullified ? "#ff3860" : "#6b4f99", whiteSpace: "nowrap" }}>{r.nullified}</td>
-                <td style={{ padding: "6px 8px", color: "#a68fd6", whiteSpace: "nowrap" }}>{r.tieBreak}</td>
-                <td style={{ padding: "6px 8px", color: r.exiled ? "#ff3860" : "#6b4f99", whiteSpace: "nowrap" }}>{r.exiled}</td>
+            {grid.playerRows.map((r) => (
+              <tr key={r.playerId} style={{ borderBottom: "1px solid #150a28" }}>
+                <td style={{ padding: "6px 10px", whiteSpace: "nowrap", position: "sticky", left: 0, background: "#1a0a2e" }}>
+                  <span style={{ color: "#f5f0ff", fontWeight: 700 }}>{r.name}</span>
+                  {r.isWinner && <span style={{ marginLeft: 6 }}><Badge color="#00ff9d">Winner</Badge></span>}
+                </td>
+                {r.cells.map((cell, i) => (
+                  <td key={i} style={{ padding: "6px 10px", color: cell ? "#f5f0ff" : "#6b4f99", whiteSpace: "nowrap" }}>
+                    {cell || "—"}
+                  </td>
+                ))}
               </tr>
             ))}
           </tbody>

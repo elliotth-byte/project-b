@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 import { signInHost, signOut, isHost } from "../lib/auth";
 import HostPanels from "../components/HostPanels";
+import GameAccessPanel from "../components/GameAccessPanel";
 import MusicPlayer from "../components/MusicPlayer";
 import HomeLink from "../components/HomeLink";
 import { useRoundWatcher } from "../lib/useRoundWatcher";
@@ -28,11 +29,9 @@ export default function HostPage() {
   const [editName, setEditName] = useState("");
   const [editSubtitle, setEditSubtitle] = useState("");
 
-  const [copied, setCopied] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
 
   const [coHosts, setCoHosts] = useState([]);
-  const [showCoHosts, setShowCoHosts] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteStatus, setInviteStatus] = useState(null); // null | "sending" | message string
 
@@ -281,15 +280,6 @@ export default function HostPage() {
     setEditing(false);
   };
 
-  const joinUrl = game?.join_code ? `${origin}/join/${game.join_code}` : "";
-  const copyLink = () => {
-    if (!joinUrl) return;
-    navigator.clipboard.writeText(joinUrl).then(() => {
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    });
-  };
-
   if (user === undefined) return <div style={pageStyle}><p>Loading...</p></div>;
 
   if (!user) {
@@ -442,86 +432,10 @@ export default function HostPage() {
               </div>
             )}
 
-            {/* ---------------- Co-hosts ---------------- */}
-            <div style={{ marginBottom: 14 }}>
-              <button onClick={() => setShowCoHosts((v) => !v)} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 12, cursor: "pointer", padding: 0 }}>
-                {showCoHosts ? "▾" : "▸"} 👥 Co-hosts ({coHosts.length}){!isPrimaryHost && " — you're a co-host"}
-              </button>
-              {showCoHosts && (
-                <div style={{ marginTop: 8 }}>
-                  {coHosts.length === 0 ? (
-                    <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic", margin: 0 }}>No co-hosts yet — just you.</p>
-                  ) : (
-                    <div style={{ display: "grid", gap: 6, marginBottom: isPrimaryHost ? 10 : 0 }}>
-                      {coHosts.map((c) => (
-                        <div key={c.user_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "6px 10px" }}>
-                          <span style={{ fontSize: 12, color: "#a68fd6" }}>{c.email}</span>
-                          {isPrimaryHost && (
-                            <button onClick={() => removeCoHost(c.user_id)} style={{ background: "none", border: "1px solid #ff386055", borderRadius: 6, color: "#ff3860", fontSize: 11, cursor: "pointer", padding: "3px 8px" }}>Remove</button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {isPrimaryHost && (
-                    <form onSubmit={inviteCoHost} style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                      <input
-                        type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)}
-                        placeholder="Co-host's host account email"
-                        style={{ ...inputStyle, marginBottom: 0, flex: 1 }}
-                      />
-                      <button type="submit" style={{ ...btnStyle, width: "auto", whiteSpace: "nowrap", padding: "10px 16px" }}>Add</button>
-                    </form>
-                  )}
-                  {inviteStatus && inviteStatus !== "sending" && (
-                    <p style={{ fontSize: 11.5, color: inviteStatus.startsWith("✅") ? "#00ff9d" : "#ff3860", marginTop: 6 }}>{inviteStatus}</p>
-                  )}
-                  <p style={{ fontSize: 11, color: "#6b4f99", marginTop: 8, fontStyle: "italic" }}>
-                    Co-hosts need an existing host account (see README.md) and get full access to run this season — roster, challenges, announcements. Only the primary host can add/remove co-hosts or archive/delete the season.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* ---------------- Shareable link ---------------- */}
-            <div style={{ fontSize: 13 }}>
-              <div style={{ color: "#a68fd6", marginBottom: 6 }}>Share this with players so they can join:</div>
-              {game.join_code ? (
-                <>
-                  <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: 2, color: "#ff2d95", marginBottom: 8 }}>
-                    {game.join_code}
-                  </div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
-                    <code style={{
-                      flex: 1, color: "#f5f0ff", fontSize: 13, wordBreak: "break-all",
-                      background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8,
-                      padding: "10px 12px", display: "flex", alignItems: "center",
-                    }}>
-                      {joinUrl}
-                    </code>
-                    <button onClick={copyLink} style={{ ...btnStyle, width: "auto", whiteSpace: "nowrap", padding: "10px 16px" }}>
-                      {copied ? "Copied ✓" : "Copy link"}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>
-                  Generating a join code... (refresh if this doesn't update in a few seconds)
-                </p>
-              )}
-              <details style={{ marginTop: 10 }}>
-                <summary style={{ color: "#6b4f99", fontSize: 11, cursor: "pointer" }}>Advanced: direct link</summary>
-                <code style={{ color: "#6b4f99", fontSize: 11, wordBreak: "break-all", display: "block", marginTop: 4 }}>
-                  {origin}/play?game={game.id}
-                </code>
-              </details>
-            </div>
-
-            <div style={{ marginTop: 12, color: "#a68fd6", fontSize: 13 }}>
-              Players in game: {players.length === 0 ? "none yet" : players.map((p) =>
-                !p.approved ? `${p.display_name} (pending)` : p.alive ? p.display_name : `${p.display_name} (exiled)`
-              ).join(", ")}
-            </div>
+            {/* Co-hosts, the shareable join link, and the roster summary
+                have moved to the Admin tab (see GameAccessPanel) — none
+                of that is useful to have staring at you once the season's
+                actually underway. */}
           </div>
         )}
 
@@ -530,7 +444,28 @@ export default function HostPage() {
         {/* key={game.id} forces a clean remount of all host panels/polling
             when switching seasons, instead of every tab's internal state
             (and in-flight polls) carrying over from the previous season. */}
-        {game && <HostPanels key={game.id} gameId={game.id} players={players} gameName={game.name} />}
+        {game && (
+          <HostPanels
+            key={game.id}
+            gameId={game.id}
+            players={players}
+            gameName={game.name}
+            adminExtra={
+              <GameAccessPanel
+                game={game}
+                players={players}
+                isPrimaryHost={isPrimaryHost}
+                origin={origin}
+                coHosts={coHosts}
+                inviteEmail={inviteEmail}
+                setInviteEmail={setInviteEmail}
+                inviteStatus={inviteStatus}
+                inviteCoHost={inviteCoHost}
+                removeCoHost={removeCoHost}
+              />
+            }
+          />
+        )}
       </div>
       {game && <MusicPlayer key={`music-${game.id}`} gameId={game.id} isHost={true} />}
     </div>

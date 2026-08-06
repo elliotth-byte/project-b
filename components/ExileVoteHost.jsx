@@ -180,9 +180,10 @@ export default function ExileVoteHost({ gameId, players, round }) {
       )}
 
       <div style={{ marginTop: 12, marginBottom: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>
           Votes: {voteRows.length}/{alive.length} in
         </div>
+        <div style={{ fontSize: 10, color: "#6b4f99", marginBottom: 8 }}>🃏 next to a name shows their Power of Chaos draw status — pink = holder, green = picked, gray = hasn't picked yet.</div>
         <div style={{ display: "grid", gap: 6 }}>
           {alive.map((voter) => (
             <div key={voter.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -198,6 +199,12 @@ export default function ExileVoteHost({ gameId, players, round }) {
                 {exile.nominees.map((n) => <option key={n.playerId} value={n.playerId}>{n.name}</option>)}
               </select>
               {votes[voter.id]?.reason && <span style={{ fontSize: 10, color: "#6b4f99" }} title={votes[voter.id].reason}>💬</span>}
+              <span
+                style={{ fontSize: 10, color: exile.chaosHolderId === voter.id ? "#ff2d95" : drawPicks[voter.id] !== undefined ? "#00ff9d" : "#3d1f5c", flexShrink: 0 }}
+                title={exile.chaosHolderId === voter.id ? "Holds the Power of Chaos" : drawPicks[voter.id] !== undefined ? "Made their Power of Chaos pick" : "Hasn't made their Power of Chaos pick yet"}
+              >
+                🃏
+              </span>
             </div>
           ))}
         </div>
