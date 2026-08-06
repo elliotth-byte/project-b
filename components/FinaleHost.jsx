@@ -4,6 +4,7 @@ import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_FINALE } from "../lib/gameState";
 import { computeFinaleOutcome } from "../lib/exileLogic";
 import { FINALE_CONTEXT, subscribeChaosSecret } from "../lib/chaosSecrets";
+import { FINALE_DRAW_CONTEXT, chaosPicksKey } from "../lib/chaosDraw";
 import PostToGroupMe from "./PostToGroupMe";
 import { postToGroupMe } from "../lib/groupmeClient";
 import { requestAdvance } from "../lib/advanceNow";
@@ -14,6 +15,7 @@ export default function FinaleHost({ gameId, players, round }) {
   const [finale, setFinale] = useState(null);
   const [votes, setVotes] = useState({});
   const [nullifiedId, setNullifiedId] = useState(null);
+  const [drawPicks, setDrawPicks] = useState({});
   const [busy, setBusy] = useState(false);
   const [postedToGroupMe, setPostedToGroupMe] = useState(false);
   const dirtyRef = useRef(new Set());
@@ -30,6 +32,11 @@ export default function FinaleHost({ gameId, players, round }) {
 
   useEffect(() => {
     const unsubscribe = subscribeChaosSecret(gameId, FINALE_CONTEXT, setNullifiedId);
+    return unsubscribe;
+  }, [gameId]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeGameState(gameId, chaosPicksKey(FINALE_DRAW_CONTEXT), (v) => setDrawPicks(v || {}));
     return unsubscribe;
   }, [gameId]);
 
@@ -111,11 +118,19 @@ export default function FinaleHost({ gameId, players, round }) {
 
       <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
         <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
-          🃏 Power of Chaos (drawn from the exiled): <span style={{ color: "#ff3860" }}>{chaosHolder?.display_name || "—"}</span>
+          🃏 Power of Chaos (drawn from the exiled)
         </div>
-        <p style={{ fontSize: 12, color: nullifiedId ? "#00ff9d" : "#a68fd6", margin: 0 }}>
-          {nullifiedId ? "✓ Their pick is locked in — secret until the reveal." : `Waiting on ${chaosHolder?.display_name || "them"} to choose, from their own screen.`}
-        </p>
+        {chaosHolder ? (
+          <p style={{ fontSize: 12, color: nullifiedId ? "#00ff9d" : "#a68fd6", margin: 0 }}>
+            <strong style={{ color: "#ff3860" }}>{chaosHolder.display_name}</strong> claimed it.{" "}
+            {nullifiedId ? "✓ Their pick is locked in — secret until the reveal." : "Waiting on them to choose, from their own screen."}
+          </p>
+        ) : (
+          <p style={{ fontSize: 12, color: "#a68fd6", margin: 0 }}>
+            Every exiled player got one shot at a mystery-card draw on their own screen ({exiledPlayers.length} cards, one Power of Chaos) — {Object.keys(drawPicks).length}/{exiledPlayers.length} have picked so far.
+            {finale.votingOpen ? " Still up for grabs." : " Voting's closed with nobody claiming it — no one holds it this round."}
+          </p>
+        )}
       </div>
 
       {finale.votingOpen ? (

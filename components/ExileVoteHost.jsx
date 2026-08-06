@@ -4,16 +4,16 @@ import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_EXILE } from "../lib/gameState";
 import { computeEliminateOutcome, computeSaveOutcome, buildRevealOrder } from "../lib/exileLogic";
 import { exileContext, subscribeChaosSecret } from "../lib/chaosSecrets";
+import { exileDrawContext, chaosPicksKey } from "../lib/chaosDraw";
 import PostToGroupMe from "./PostToGroupMe";
 import { postToGroupMe } from "../lib/groupmeClient";
 import { requestAdvance } from "../lib/advanceNow";
-
-const CARD_DECK = ["🂡 Ace", "🂮 King", "🂭 Queen", "🂫 Jack", "🃏 Joker — The Power of Chaos smiles on no one tonight", "10", "7", "3"];
 
 export default function ExileVoteHost({ gameId, players, round }) {
   const [exile, setExile] = useState(null);
   const [votes, setVotes] = useState({});
   const [nullifiedId, setNullifiedId] = useState(null); // host CAN read this (see sql/add-chaos-secrets.sql) — just doesn't show it until reveal
+  const [drawPicks, setDrawPicks] = useState({});
   const [revealOrder, setRevealOrder] = useState(null);
   const [revealIndex, setRevealIndex] = useState(-1);
   const [chaosRevealed, setChaosRevealed] = useState(false);
@@ -24,6 +24,7 @@ export default function ExileVoteHost({ gameId, players, round }) {
 
   const votesKey = `pb:exile-votes:${round?.round}`;
   const context = exileContext(round?.round);
+  const drawContext = exileDrawContext(round?.round);
 
   useEffect(() => {
     const unsubscribe = subscribeGameState(gameId, KEY_EXILE, setExile);
@@ -41,6 +42,12 @@ export default function ExileVoteHost({ gameId, players, round }) {
     const unsubscribe = subscribeChaosSecret(gameId, context, setNullifiedId);
     return unsubscribe;
   }, [gameId, context]);
+
+  useEffect(() => {
+    if (!round?.round) return;
+    const unsubscribe = subscribeGameState(gameId, chaosPicksKey(drawContext), (v) => setDrawPicks(v || {}));
+    return unsubscribe;
+  }, [gameId, drawContext]);
 
   const alive = players.filter((p) => p.approved && p.alive);
 
@@ -69,16 +76,6 @@ export default function ExileVoteHost({ gameId, players, round }) {
   const outcome = exile.mode === "save"
     ? computeSaveOutcome(voteRows, nullifiedId, nomineeIds)
     : computeEliminateOutcome(voteRows, nullifiedId, nomineeIds);
-
-  const drawCard = async () => {
-    const card = CARD_DECK[Math.floor(Math.random() * CARD_DECK.length)];
-    await storageUpdate(gameId, KEY_EXILE, (fresh) => {
-      if (!fresh) return null;
-      fresh.cardsFanned = true;
-      fresh.cardDrawnText = card;
-      return fresh;
-    });
-  };
 
   const commitVote = async (voterId, targetId) => {
     dirtyRef.current.add(voterId);
@@ -164,15 +161,19 @@ export default function ExileVoteHost({ gameId, players, round }) {
 
       <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
         <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
-          🃏 Power of Chaos: <span style={{ color: "#ff3860" }}>{chaosHolder?.display_name || "—"}</span>
+          🃏 Power of Chaos
         </div>
-        <p style={{ fontSize: 12, color: nullifiedId ? "#00ff9d" : "#a68fd6", margin: "0 0 8px" }}>
-          {nullifiedId ? "✓ Their pick is locked in — secret until you reveal it below." : `Waiting on ${chaosHolder?.display_name || "them"} to choose, from their own screen.`}
-        </p>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <Btn small variant="ghost" onClick={drawCard}>🃏 Fan of Cards — Draw</Btn>
-          {exile.cardDrawnText && <span style={{ fontSize: 12, color: "#ff2d95" }}>{exile.cardDrawnText}</span>}
-        </div>
+        {chaosHolder ? (
+          <p style={{ fontSize: 12, color: nullifiedId ? "#00ff9d" : "#a68fd6", margin: 0 }}>
+            <strong style={{ color: "#ff3860" }}>{chaosHolder.display_name}</strong> claimed it.{" "}
+            {nullifiedId ? "✓ Their pick is locked in — secret until you reveal it below." : "Waiting on them to choose, from their own screen."}
+          </p>
+        ) : (
+          <p style={{ fontSize: 12, color: "#a68fd6", margin: 0 }}>
+            Every voter got one shot at a mystery-card draw on their own screen ({alive.length} cards, one Power of Chaos) — {Object.keys(drawPicks).length}/{alive.length} have picked so far.
+            {exile.votingOpen ? " Still up for grabs." : " Voting's closed with nobody claiming it — no one holds it this round."}
+          </p>
+        )}
       </div>
 
       {exile.votingOpen ? (

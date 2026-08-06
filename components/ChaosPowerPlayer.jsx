@@ -1,24 +1,36 @@
 import { useState, useEffect } from "react";
-import { Card, Badge } from "./ui";
+import { Card, Badge, Btn } from "./ui";
 import { subscribeGameState, storageUpdate } from "../lib/gameStorage";
 import { KEY_EXILE, KEY_FINALE } from "../lib/gameState";
 import { computeEliminateOutcome, computeSaveOutcome, computeFinaleOutcome } from "../lib/exileLogic";
 import { exileContext, FINALE_CONTEXT, setChaosNullify, subscribeChaosSecret } from "../lib/chaosSecrets";
+import { exileDrawContext, FINALE_DRAW_CONTEXT, submitChaosDrawPick, chaosPicksKey } from "../lib/chaosDraw";
 import MemoryWall from "./MemoryWall";
 
-// Renders nothing at all unless the current player genuinely holds the
-// Power of Chaos for whatever's active right now. `players` is the full
-// roster (for MemoryWall's color lookup).
+// ─── The Power of Chaos ───
+// Two stages. First, every eligible player (alive players during the
+// Exile Vote; exiled players during the Finale) sees a row of N mystery
+// buttons — N being however many players are actually in the draw that
+// round — with exactly one secretly correct (see pages/api/chaos-draw.js;
+// nobody's browser, winner included, ever receives that secret directly,
+// only the outcome of their own pick). Each player gets ONE shot at ONE
+// button. Whoever hits the right one becomes this round's holder —
+// publicly, same as before. Second, once someone's won it, THEY get the
+// familiar nullify-picker below (unchanged from before this rework).
 export default function ChaosPowerPlayer({ gameId, round, player, players, readOnly = false }) {
   const isExile = round?.phase === "exile";
   const isFinale = round?.phase === "finale";
   const key = isExile ? KEY_EXILE : isFinale ? KEY_FINALE : null;
   const votesKey = isExile ? `pb:exile-votes:${round.round}` : isFinale ? "pb:finale-votes" : null;
   const context = isExile ? exileContext(round?.round) : isFinale ? FINALE_CONTEXT : null;
+  const drawContext = isExile ? exileDrawContext(round?.round) : isFinale ? FINALE_DRAW_CONTEXT : null;
 
   const [state, setState] = useState(null);
   const [votes, setVotes] = useState({});
   const [myPick, setMyPick] = useState(null);
+  const [drawPicks, setDrawPicks] = useState({});
+  const [drawSubmitting, setDrawSubmitting] = useState(null); // index currently being submitted
+  const [justWon, setJustWon] = useState(false);
 
   useEffect(() => {
     if (!key) return;
@@ -38,14 +50,107 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
     return unsubscribe;
   }, [gameId, context]);
 
-  if (!state || state.chaosHolderId !== player?.id) return null;
+  useEffect(() => {
+    if (!drawContext) return;
+    const unsubscribe = subscribeGameState(gameId, chaosPicksKey(drawContext), (v) => setDrawPicks(v || {}));
+    return unsubscribe;
+  }, [gameId, drawContext]);
 
-  // A read-only viewer (the host "viewing as" this player) can't actually
-  // read this player's secret pick anyway — chaos_secrets' RLS is keyed
-  // to the real authenticated session, which is the host's, not this
-  // player's — and must never be able to lock one in on their behalf, so
-  // this skips straight to a plain "holds it, pick stays secret" card
-  // instead of the interactive picker.
+  if (!key || !state) return null;
+
+  const me = (players || []).find((p) => p.id === player?.id);
+  const eligible = isExile ? me?.alive !== false : isFinale ? me?.alive === false : false;
+  if (!eligible) return null;
+
+  const iAmHolder = state.chaosHolderId === player?.id;
+  // 0 is a valid button index, so this has to check for "picked at all",
+  // not truthiness.
+  const myDrawPick = drawPicks[player?.id];
+  const hasPicked = myDrawPick !== undefined;
+  const drawOpen = !state.chaosHolderId && state.votingOpen;
+  const holderName = state.chaosHolderId ? (players || []).find((p) => p.id === state.chaosHolderId)?.display_name : null;
+  const poolSize = isExile
+    ? (players || []).filter((p) => p.approved && p.alive).length
+    : (players || []).filter((p) => p.approved && !p.alive).length;
+  // Any button someone's already tried is guaranteed wrong — if it were
+  // right, chaosHolderId would already be set and we wouldn't be in this
+  // branch at all — so these are safe to mark (and skip) for everyone.
+  const triedIndices = new Set(Object.values(drawPicks));
+
+  // ─── Stage 1: the draw ───
+  if (!iAmHolder) {
+    if (readOnly) {
+      if (!drawOpen && !hasPicked && !holderName) return null;
+      return (
+        <Card style={{ marginBottom: 20, textAlign: "center" }}>
+          <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#ff2d95", marginBottom: 6 }}>🃏 Power of Chaos</div>
+          <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>
+            {holderName ? `${holderName} claimed it this round.` : hasPicked ? "Already made their pick." : drawOpen ? "Hasn't picked yet." : "The draw has closed."}
+          </p>
+        </Card>
+      );
+    }
+
+    if (!drawOpen) {
+      if (!holderName) return null; // draw closed, nobody claimed it — nothing worth showing
+      return (
+        <Card style={{ marginBottom: 20, textAlign: "center" }}>
+          <div style={{ fontSize: 22, marginBottom: 4 }}>🃏</div>
+          <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>
+            <strong style={{ color: "#ff3860" }}>{holderName}</strong> claimed the Power of Chaos this round.
+          </p>
+        </Card>
+      );
+    }
+
+    if (hasPicked) {
+      return (
+        <Card style={{ marginBottom: 20, textAlign: "center" }}>
+          <div style={{ fontSize: 28, marginBottom: 6 }}>🃏</div>
+          <p style={{ color: "#f5f0ff", fontSize: 14, margin: 0 }}>You picked #{myDrawPick + 1} — {justWon ? "🎉 you claimed it!" : "hang tight."}</p>
+        </Card>
+      );
+    }
+
+    const pickDraw = async (index) => {
+      setDrawSubmitting(index);
+      const result = await submitChaosDrawPick(gameId, drawContext, index);
+      setDrawSubmitting(null);
+      if (result.error) { alert("Couldn't submit your pick: " + result.error); return; }
+      setJustWon(!!result.won);
+    };
+
+    return (
+      <Card style={{ marginBottom: 20, textAlign: "center" }}>
+        <div style={{ fontSize: 28, marginBottom: 6 }}>🃏</div>
+        <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 16, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>The Power of Chaos</h3>
+        <p style={{ color: "#a68fd6", fontSize: 13, margin: "0 0 18px" }}>
+          {poolSize} cards, one Power of Chaos. Pick one — you get one shot.
+          {triedIndices.size > 0 && ` Already tried (and wrong): ${[...triedIndices].sort((a, b) => a - b).map((i) => i + 1).join(", ")}.`}
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(64px, 1fr))", gap: 10 }}>
+          {Array.from({ length: poolSize }, (_, i) => i).map((i) => {
+            const tried = triedIndices.has(i);
+            return (
+              <Btn
+                key={i}
+                variant={tried ? "ghost" : "primary"}
+                disabled={tried || drawSubmitting !== null}
+                onClick={() => pickDraw(i)}
+                style={{ padding: "16px 8px", fontSize: 16, borderRadius: 12, opacity: tried ? 0.35 : 1 }}
+              >
+                {tried ? "✕" : "🃏"}
+                <br />
+                {i + 1}
+              </Btn>
+            );
+          })}
+        </div>
+      </Card>
+    );
+  }
+
+  // ─── Stage 2: you won — choose who to nullify (unchanged) ───
   if (readOnly) {
     return (
       <Card style={{ marginBottom: 20, borderColor: "#ff2d95", boxShadow: "0 0 24px rgba(255,45,149,0.25)" }}>

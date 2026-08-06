@@ -8,6 +8,7 @@ import {
   KEY_FINALE, KEY_CHALLENGE_HISTORY, DEFAULT_SETTINGS, getSettings, setSettings, subscribeSettings,
   initRound, PHASES,
 } from "../lib/gameState";
+import { REENTRY_STATUS } from "../lib/reentryLogic";
 
 export default function AdminHost({ gameId, players, round }) {
   const [names, setNames] = useState({});
@@ -106,6 +107,16 @@ export default function AdminHost({ gameId, players, round }) {
       storageDelete(gameId, `pb:exile-votes:${roundNum}`),
       storageUpdate(gameId, KEY_CHALLENGE_HISTORY, (fresh) => (fresh || []).filter((c) => c.round !== roundNum)),
       storageUpdate(gameId, KEY_EXILE_HISTORY, (fresh) => (fresh || []).filter((e) => e.round !== roundNum)),
+      // Anyone attempting re-entry got their status flipped from PENDING
+      // to COMPETING the moment the host started the (now-reset)
+      // challenge — without this, they'd be stuck in COMPETING forever
+      // with no challenge left to resolve it, unable to opt back in
+      // (the offer only shows for PENDING). Since nobody actually
+      // competed, they get their one shot back.
+      storageUpdate(gameId, KEY_REENTRY, (fresh) => {
+        const list = fresh || [];
+        return list.map((r) => (r.wantsToCompete === roundNum && r.status === REENTRY_STATUS.COMPETING) ? { ...r, status: REENTRY_STATUS.PENDING } : r);
+      }),
     ]);
 
     await storageUpdate(gameId, KEY_ROUND, (fresh) => ({
@@ -190,7 +201,10 @@ export default function AdminHost({ gameId, players, round }) {
           ))}
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#a68fd6", cursor: "pointer" }}>
             <input type="checkbox" checked={settings.autoAdvance} onChange={(e) => saveSettings({ autoAdvance: e.target.checked })} />
-            Automatically advance phases when the timer runs out (uncheck to require a manual "Advance Now" click every time)
+            Automatically move on once a phase's timer runs out, OR the moment everyone's actually finished (every competitor done with
+            the challenge, all 3 Fates nominations in, every eligible vote cast) — whichever comes first. Uncheck to require a manual
+            "Finish Now" click every time, which is worth doing if you like to run a live reveal ceremony for the Exile Vote or Finale,
+            since otherwise the last vote landing can advance the round out from under you.
           </label>
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#ff2d95", cursor: "pointer", fontWeight: 700 }}>
             <input type="checkbox" checked={settings.infiniteTime} onChange={(e) => saveSettings({ infiniteTime: e.target.checked })} />
