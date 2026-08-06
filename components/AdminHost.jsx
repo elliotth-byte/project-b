@@ -107,15 +107,14 @@ export default function AdminHost({ gameId, players, round }) {
       storageDelete(gameId, `pb:exile-votes:${roundNum}`),
       storageUpdate(gameId, KEY_CHALLENGE_HISTORY, (fresh) => (fresh || []).filter((c) => c.round !== roundNum)),
       storageUpdate(gameId, KEY_EXILE_HISTORY, (fresh) => (fresh || []).filter((e) => e.round !== roundNum)),
-      // Anyone attempting re-entry got their status flipped from PENDING
-      // to COMPETING the moment the host started the (now-reset)
-      // challenge — without this, they'd be stuck in COMPETING forever
-      // with no challenge left to resolve it, unable to opt back in
-      // (the offer only shows for PENDING). Since nobody actually
-      // competed, they get their one shot back.
+      // Every still-exiled player competes in every challenge automatically
+      // now, so anyone flipped from PENDING to COMPETING when the host
+      // started the (now-reset) challenge needs to go back to PENDING —
+      // otherwise they'd be stuck in COMPETING forever with no challenge
+      // left to resolve it, unable to compete again until that clears.
       storageUpdate(gameId, KEY_REENTRY, (fresh) => {
         const list = fresh || [];
-        return list.map((r) => (r.wantsToCompete === roundNum && r.status === REENTRY_STATUS.COMPETING) ? { ...r, status: REENTRY_STATUS.PENDING } : r);
+        return list.map((r) => (r.status === REENTRY_STATUS.COMPETING) ? { ...r, status: REENTRY_STATUS.PENDING } : r);
       }),
     ]);
 

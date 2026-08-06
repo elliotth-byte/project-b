@@ -5,7 +5,7 @@ import { KEY_CHALLENGE, KEY_ROUND } from "../lib/gameState";
 import { placementsComplete } from "../lib/challengeLogic";
 import { GAME_REGISTRY, gameConfigWithDefaults } from "../lib/challengeGames";
 import { subscribeScores, scoresToPlacements } from "../lib/challengeScores";
-import { subscribeReentry, markCompeting } from "../lib/reentryData";
+import { subscribeReentry } from "../lib/reentryData";
 import { REENTRY_STATUS } from "../lib/reentryLogic";
 import { DEFAULT_PARTICIPATION, computeParticipants } from "../lib/challengeParticipants";
 import ParticipantPicker from "./ParticipantPicker";
@@ -26,7 +26,6 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   const [gameType, setGameType] = useState("manual");
   const [durationSec, setDurationSec] = useState(settings?.challengeDurationSec || 900);
   const [mazeSize, setMazeSize] = useState(GAME_REGISTRY.maze2d.config.size);
-  const [selectedReentrants, setSelectedReentrants] = useState([]);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -50,7 +49,12 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   const alivePicker = approvedAlive.map((p) => ({ id: p.id, name: p.display_name }));
   const allPicker = allApproved.map((p) => ({ id: p.id, name: p.display_name }));
 
-  const requesters = reentry.filter((r) => r.status === REENTRY_STATUS.PENDING && r.wantsToCompete === round?.round);
+  // Every exiled player still eligible (hasn't used their one shot yet)
+  // gets to opt in or out of THIS specific challenge, deliberately, from
+  // their own screen — see components/ChallengePlayer.jsx and
+  // lib/reentryData.js's setReentryDecision. Nothing for the host to pick
+  // here; this is just who's currently eligible to decide.
+  const pendingReentrants = reentry.filter((r) => r.status === REENTRY_STATUS.PENDING);
 
   const pickGameType = (type) => {
     setGameType(type);
@@ -60,18 +64,17 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   const startChallenge = async () => {
     setBusy(true);
     const { participants } = computeParticipants(config, { alive: alivePicker, allPlayers: allPicker });
-    let participantIds = participants.map((p) => p.id);
-    const reentryAttemptIds = [...selectedReentrants];
-    for (const id of reentryAttemptIds) {
-      await markCompeting(gameId, id);
-      if (!participantIds.includes(id)) participantIds = [...participantIds, id];
-    }
+    const participantIds = participants.map((p) => p.id);
+    // Snapshotted now, not recomputed later — so someone exiled mid-
+    // challenge doesn't suddenly become eligible to opt into a challenge
+    // that's already running.
+    const reentryEligibleIds = pendingReentrants.map((r) => r.playerId);
     const now = Date.now();
     const endsAt = settings?.infiniteTime ? null : now + durationSec * 1000;
     const configOverrides = gameType === "maze2d" ? { size: mazeSize } : undefined;
     await storageSet(gameId, KEY_CHALLENGE, {
       round: round.round, active: true, startedAt: now, endsAt,
-      participantIds, reentryAttemptIds, placements: [], finalized: false,
+      participantIds, reentryEligibleIds, reentryDecisions: {}, reentryAttemptIds: [], placements: [], finalized: false,
       gameType, gameConfig: gameConfigWithDefaults(gameType, configOverrides),
     });
     await storageUpdate(gameId, KEY_ROUND, (fresh) => ({ ...(fresh || {}), phaseStartedAt: now, phaseEndsAt: endsAt }));
@@ -159,26 +162,23 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
 
         <ParticipantPicker alive={alivePicker} allPlayers={allPicker} value={config} onChange={setConfig} />
 
-        {requesters.length > 0 && (
+        {pendingReentrants.length > 0 && (
           <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
-              Exiled players requesting re-entry this round
+              Exiled players eligible to opt in
             </div>
             <p style={{ fontSize: 11, color: "#6b4f99", margin: "0 0 8px", fontStyle: "italic" }}>
-              Each exiled player gets exactly one re-entry attempt, ever. Any number of them can try in the SAME challenge — but only whoever actually finishes 1st overall returns (and makes this round a double elimination); everyone else who tried and didn't get 1st uses up their one shot for good.
+              Each gets exactly one re-entry attempt, ever. Once this challenge starts, they'll each choose — deliberately, from
+              their own screen — whether to compete in THIS one. Not deciding by the time everyone else finishes counts as sitting
+              it out (costs them nothing); opting in and not finishing 1st uses up their one shot for good.
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {requesters.map((r) => {
-                const selected = selectedReentrants.includes(r.playerId);
-                return (
-                  <button key={r.playerId} onClick={() => setSelectedReentrants((prev) => selected ? prev.filter((id) => id !== r.playerId) : [...prev, r.playerId])} style={{
-                    fontSize: 11, padding: "4px 10px", borderRadius: 12, cursor: "pointer",
-                    background: selected ? "rgba(255,56,96,0.15)" : "transparent",
-                    border: `1px solid ${selected ? "#ff3860" : "#3d1f5c"}`,
-                    color: selected ? "#ff3860" : "#a68fd6",
-                  }}>{selected ? "✓ " : ""}{r.name}</button>
-                );
-              })}
+              {pendingReentrants.map((r) => (
+                <span key={r.playerId} style={{
+                  fontSize: 11, padding: "4px 10px", borderRadius: 12,
+                  background: "rgba(255,56,96,0.12)", border: "1px solid #ff3860", color: "#ff3860",
+                }}>{r.name}</span>
+              ))}
             </div>
           </div>
         )}
@@ -236,6 +236,27 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
       <p style={{ color: "#6b4f99", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
         1st place wins immunity{round.finalFour ? " — everyone else is automatically nominated (Final Four)." : "; the top 3 each get to make a nomination at the Fates Ceremony."}
       </p>
+
+      {challenge.reentryEligibleIds?.length > 0 && (
+        <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+            🔥 Re-entry — deciding whether to compete
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {challenge.reentryEligibleIds.map((id) => {
+              const name = players.find((p) => p.id === id)?.display_name || "?";
+              const decision = challenge.reentryDecisions?.[id];
+              const color = decision === "in" ? "#ff3860" : decision === "out" ? "#6b4f99" : "#a68fd6";
+              const label = decision === "in" ? `${name} — opted in` : decision === "out" ? `${name} — sitting out` : `${name} — deciding...`;
+              return (
+                <span key={id} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 12, border: `1px solid ${color}`, color, opacity: decision === "out" ? 0.7 : 1 }}>
+                  {label}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {isDigital ? (
         <div style={{ display: "grid", gap: 10, marginBottom: 12 }}>

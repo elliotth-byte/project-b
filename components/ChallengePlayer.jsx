@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { Btn, Card, Badge } from "./ui";
 import { subscribeGameState, storageUpdate } from "../lib/gameStorage";
 import { KEY_CHALLENGE } from "../lib/gameState";
-import { subscribeReentry, setWantsToCompete } from "../lib/reentryData";
-import { REENTRY_STATUS } from "../lib/reentryLogic";
+import { setReentryDecision } from "../lib/reentryData";
 import { subscribeScores, forfeitChallenge } from "../lib/challengeScores";
 import { GAME_REGISTRY } from "../lib/challengeGames";
 import Match3Player from "./games/Match3Player";
@@ -33,20 +32,15 @@ const GAME_COMPONENTS = {
 
 export default function ChallengePlayer({ gameId, player, round, readOnly = false }) {
   const [challenge, setChallenge] = useState(null);
-  const [reentry, setReentry] = useState([]);
   const [scores, setScores] = useState({});
   const [readyToPlay, setReadyToPlay] = useState(false);
   const [forfeiting, setForfeiting] = useState(false);
+  const [deciding, setDeciding] = useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeGameState(gameId, KEY_CHALLENGE, setChallenge);
     return unsubscribe;
   }, [gameId, round?.round]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    const unsubscribe = subscribeReentry(gameId, setReentry);
-    return unsubscribe;
-  }, [gameId]);
 
   useEffect(() => {
     if (!round?.round) return;
@@ -63,50 +57,65 @@ export default function ChallengePlayer({ gameId, player, round, readOnly = fals
 
   if (round?.phase !== "challenge") return null;
 
-  const myReentry = reentry.find((r) => r.playerId === player?.id);
-  const canOfferReentry = myReentry?.status === REENTRY_STATUS.PENDING && !challenge?.active;
-
-  if (canOfferReentry) {
-    const wants = myReentry.wantsToCompete === round.round;
-    return (
-      <Card style={{ marginBottom: 20, borderColor: "rgba(255,56,96,0.4)", textAlign: "center" }}>
-        <div style={{ fontSize: 28, marginBottom: 6 }}>🔥</div>
-        <p style={{ color: "#f5f0ff", fontSize: 15, fontWeight: 600, margin: "0 0 6px", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
-          Has one shot at re-entry
-        </p>
-        {readOnly ? (
-          <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>
-            {wants ? "✓ Has requested to compete this round." : "Hasn't requested to compete this round yet."}
-          </p>
-        ) : (
-          <>
-            <p style={{ color: "#a68fd6", fontSize: 13, margin: "0 0 14px" }}>
-              If you believe you could finish 1st in this round's challenge, you can elect to compete. Come in 1st and you're back in the game — anything else, and you're out for good.
-            </p>
-            <button
-              onClick={() => setWantsToCompete(gameId, player.id, round.round, !wants)}
-              style={{
-                background: wants ? "linear-gradient(135deg, #ff3860, #c9184a)" : "transparent",
-                color: wants ? "#f5f0ff" : "#ff3860", border: "1px solid #ff3860",
-                borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 700, cursor: "pointer",
-                fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
-              }}
-            >
-              {wants ? "✓ Requested — tap to withdraw" : "Request to compete this round"}
-            </button>
-            <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 10, fontStyle: "italic" }}>The host will confirm before the challenge starts.</p>
-          </>
-        )}
-      </Card>
-    );
-  }
-
   if (!challenge?.active) {
     return (
       <Card style={{ marginBottom: 20, textAlign: "center" }}>
         <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: 0 }}>
           Waiting for the host to start this round's challenge.
         </p>
+      </Card>
+    );
+  }
+
+  // Exiled players get exactly one re-entry attempt, ever — and they
+  // decide, deliberately, per challenge, whether to use it here. Not
+  // deciding by the time everyone else finishes just counts as sitting
+  // this one out (see lib/roundEngine.js) — it costs nothing. Once they
+  // opt in, they're folded into the normal competing flow below, same as
+  // anyone else (see lib/reentryData.js's setReentryDecision).
+  const isReentryEligible = (challenge.reentryEligibleIds || []).includes(player?.id);
+  const reentryDecision = challenge.reentryDecisions?.[player?.id];
+
+  if (isReentryEligible && reentryDecision !== "in") {
+    if (readOnly) {
+      return (
+        <Card style={{ marginBottom: 20, borderColor: "rgba(255,56,96,0.4)", textAlign: "center" }}>
+          <div style={{ fontSize: 28, marginBottom: 6 }}>🔥</div>
+          <p style={{ color: "#f5f0ff", fontSize: 15, fontWeight: 600, margin: "0 0 6px", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
+            One shot at re-entry
+          </p>
+          <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>
+            {reentryDecision === "out" ? "Opted to sit this challenge out." : "Hasn't decided whether to compete yet."}
+          </p>
+        </Card>
+      );
+    }
+
+    const decide = async (decision) => {
+      setDeciding(true);
+      const ok = await setReentryDecision(gameId, player.id, decision);
+      setDeciding(false);
+      if (!ok) alert("Couldn't save your decision — try again.");
+    };
+
+    return (
+      <Card style={{ marginBottom: 20, borderColor: "rgba(255,56,96,0.4)", textAlign: "center" }}>
+        <div style={{ fontSize: 28, marginBottom: 6 }}>🔥</div>
+        <p style={{ color: "#f5f0ff", fontSize: 15, fontWeight: 600, margin: "0 0 6px", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
+          One shot at re-entry
+        </p>
+        <p style={{ color: "#a68fd6", fontSize: 13, margin: "0 0 14px" }}>
+          Compete in THIS challenge for a chance to return? Finish 1st and you're back in the game. Anything else, and this was
+          your one shot. Not deciding by the time everyone else finishes counts as sitting this one out — that costs you nothing,
+          and you'll get to decide again next challenge.
+        </p>
+        {reentryDecision === "out" && (
+          <p style={{ color: "#6b4f99", fontSize: 12, margin: "0 0 10px", fontStyle: "italic" }}>You've opted out of this one — you can still change your mind below.</p>
+        )}
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+          <Btn onClick={() => decide("in")} disabled={deciding}>{deciding ? "..." : "Compete this round"}</Btn>
+          <Btn variant="ghost" onClick={() => decide("out")} disabled={deciding}>Sit this one out</Btn>
+        </div>
       </Card>
     );
   }
@@ -217,7 +226,7 @@ export default function ChallengePlayer({ gameId, player, round, readOnly = fals
         ) : (
           <>
             <p style={{ color: "#f5f0ff", fontSize: 15, margin: "0 0 6px" }}>You're competing!</p>
-            {challenge.reentryAttemptIds?.includes(player.id) && <Badge color="#ff3860">Your one re-entry attempt</Badge>}
+            {challenge.reentryAttemptIds?.includes(player.id) && <Badge color="#ff3860">Re-entry attempt — finish 1st to return</Badge>}
             {!readOnly && (
               <div style={{ marginTop: 12 }}>
                 <Btn small variant="ghost" onClick={forfeitManual} disabled={forfeiting}>
