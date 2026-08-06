@@ -12,11 +12,13 @@ import ScheduledPostsList from "./ScheduledPostsList";
 import AdminHost from "./AdminHost";
 import HistoryTab from "./HistoryTab";
 import RoundTimerBanner from "./RoundTimerBanner";
+import PlayerViewer from "./PlayerViewer";
 
 const BASE_TABS = [
   { key: "round", label: "🎲 Current Round" },
   { key: "confessionals", label: "🎥 Confessionals" },
   { key: "history", label: "📜 History" },
+  { key: "viewas", label: "👁️ View as Player" },
   { key: "admin", label: "🛠 Admin" },
 ];
 
@@ -26,6 +28,7 @@ export default function HostPanels({ gameId, players, gameName }) {
   const [settings, setSettingsState] = useState(null);
   const [unreadConfessionals, setUnreadConfessionals] = useState(0);
   const [starting, setStarting] = useState(false);
+  const [viewAsPlayerId, setViewAsPlayerId] = useState("");
 
   useEffect(() => {
     const unsubscribe = subscribeRound(gameId, setRound);
@@ -137,6 +140,42 @@ export default function HostPanels({ gameId, players, gameName }) {
       {tab === "history" && (
         <ChallengeErrorBoundary label="History">
           <HistoryTab gameId={gameId} players={approvedPlayers} gameName={gameName} round={round} />
+        </ChallengeErrorBoundary>
+      )}
+
+      {tab === "viewas" && (
+        <ChallengeErrorBoundary label="View as Player">
+          <div style={{ display: "grid", gap: 16 }}>
+            <Card>
+              <label style={{ display: "block", fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+                Choose a player
+              </label>
+              <select
+                value={viewAsPlayerId}
+                onChange={(e) => setViewAsPlayerId(e.target.value)}
+                style={{ width: "100%", background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "8px 10px", color: "#f5f0ff", fontSize: 13 }}
+              >
+                <option value="">— select a player —</option>
+                {players.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.display_name}{!p.approved ? " (pending)" : p.alive === false ? " (exiled)" : ""}
+                  </option>
+                ))}
+              </select>
+              <p style={{ color: "#6b4f99", fontSize: 11, margin: "8px 0 0", fontStyle: "italic" }}>
+                Shows exactly what this player sees right now — read-only, so nothing you do here affects the game.
+              </p>
+            </Card>
+            {viewAsPlayerId && (
+              <PlayerViewer
+                gameId={gameId}
+                targetPlayer={players.find((p) => p.id === viewAsPlayerId) || null}
+                allPlayers={players}
+                round={round}
+                onExit={() => setViewAsPlayerId("")}
+              />
+            )}
+          </div>
         </ChallengeErrorBoundary>
       )}
 

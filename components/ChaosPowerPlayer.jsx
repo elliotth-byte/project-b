@@ -9,7 +9,7 @@ import MemoryWall from "./MemoryWall";
 // Renders nothing at all unless the current player genuinely holds the
 // Power of Chaos for whatever's active right now. `players` is the full
 // roster (for MemoryWall's color lookup).
-export default function ChaosPowerPlayer({ gameId, round, player, players }) {
+export default function ChaosPowerPlayer({ gameId, round, player, players, readOnly = false }) {
   const isExile = round?.phase === "exile";
   const isFinale = round?.phase === "finale";
   const key = isExile ? KEY_EXILE : isFinale ? KEY_FINALE : null;
@@ -39,6 +39,26 @@ export default function ChaosPowerPlayer({ gameId, round, player, players }) {
   }, [gameId, context]);
 
   if (!state || state.chaosHolderId !== player?.id) return null;
+
+  // A read-only viewer (the host "viewing as" this player) can't actually
+  // read this player's secret pick anyway — chaos_secrets' RLS is keyed
+  // to the real authenticated session, which is the host's, not this
+  // player's — and must never be able to lock one in on their behalf, so
+  // this skips straight to a plain "holds it, pick stays secret" card
+  // instead of the interactive picker.
+  if (readOnly) {
+    return (
+      <Card style={{ marginBottom: 20, borderColor: "#ff2d95", boxShadow: "0 0 24px rgba(255,45,149,0.25)" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 32, marginBottom: 4 }}>🃏</div>
+          <h3 style={{ color: "#ff2d95", margin: "0 0 4px", fontSize: 16, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
+            Holds the Power of Chaos
+          </h3>
+          <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>Their pick is kept secret until the reveal — even from this viewer.</p>
+        </div>
+      </Card>
+    );
+  }
 
   const candidates = isExile ? state.nominees : state.finalists;
   const nomineeIds = candidates.map((c) => c.playerId);

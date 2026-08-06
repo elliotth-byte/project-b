@@ -5,7 +5,7 @@ import {
   subscribeConfessionalsTable,
 } from "../lib/confessionalsData";
 
-export default function ConfessionalPlayer({ gameId, player, round }) {
+export default function ConfessionalPlayer({ gameId, player, round, readOnly = false }) {
   const [text, setText] = useState("");
   const [selectedTags, setSelectedTags] = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -61,8 +61,10 @@ export default function ConfessionalPlayer({ gameId, player, round }) {
     <Card style={{ marginBottom: 20, borderColor: "rgba(124,58,237,0.35)", background: "linear-gradient(160deg, #150a28 0%, #150a28 100%)" }}>
       <h3 style={{ color: "#ff2d95", margin: "0 0 4px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🎥 Confessional</h3>
       <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
-        This is your private room. Tell the host what you're thinking, plotting, noticing, or feeling.
-        Confessionals are visible only to you and the host — no other player can ever see them.
+        {readOnly
+          ? "Viewing this player's confessional room — read-only."
+          : <>This is your private room. Tell the host what you're thinking, plotting, noticing, or feeling.
+              Confessionals are visible only to you and the host — no other player can ever see them.</>}
       </p>
 
       {prompt && (
@@ -72,29 +74,37 @@ export default function ConfessionalPlayer({ gameId, player, round }) {
         </div>
       )}
 
-      <textarea
-        value={text} onChange={(e) => setText(e.target.value)} rows={4}
-        placeholder="Step into the confessional. What are you thinking? Who do you trust? Who are you lying to? What just happened?"
-        style={{
-          width: "100%", background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "10px 12px",
-          color: "#f5f0ff", fontSize: 14, resize: "vertical", boxSizing: "border-box", marginBottom: 8,
-          fontFamily: "'Orbitron', 'Segoe UI', sans-serif", lineHeight: 1.5,
-        }}
-      />
+      {/* A read-only viewer (the host "viewing as" this player) never
+          gets the submission form — an insert here would fail RLS anyway
+          (it requires the real authenticated session to own this player
+          row), but hiding it avoids a confusing failed-submit for the host. */}
+      {!readOnly && (
+        <>
+          <textarea
+            value={text} onChange={(e) => setText(e.target.value)} rows={4}
+            placeholder="Step into the confessional. What are you thinking? Who do you trust? Who are you lying to? What just happened?"
+            style={{
+              width: "100%", background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "10px 12px",
+              color: "#f5f0ff", fontSize: 14, resize: "vertical", boxSizing: "border-box", marginBottom: 8,
+              fontFamily: "'Orbitron', 'Segoe UI', sans-serif", lineHeight: 1.5,
+            }}
+          />
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 10 }}>
-        {CONFESSIONAL_TAGS.map((t) => (
-          <button key={t} onClick={() => toggleTag(t)} style={{
-            fontSize: 11, padding: "4px 10px", borderRadius: 12, cursor: "pointer",
-            background: selectedTags.includes(t) ? "rgba(255,45,149,0.15)" : "#0d0618",
-            border: `1px solid ${selectedTags.includes(t) ? "#ff2d95" : "#3d1f5c"}`,
-            color: selectedTags.includes(t) ? "#ff2d95" : "#a68fd6",
-          }}>{t}</button>
-        ))}
-      </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 10 }}>
+            {CONFESSIONAL_TAGS.map((t) => (
+              <button key={t} onClick={() => toggleTag(t)} style={{
+                fontSize: 11, padding: "4px 10px", borderRadius: 12, cursor: "pointer",
+                background: selectedTags.includes(t) ? "rgba(255,45,149,0.15)" : "#0d0618",
+                border: `1px solid ${selectedTags.includes(t) ? "#ff2d95" : "#3d1f5c"}`,
+                color: selectedTags.includes(t) ? "#ff2d95" : "#a68fd6",
+              }}>{t}</button>
+            ))}
+          </div>
 
-      <Btn onClick={submit} disabled={!text.trim() || submitting}>{submitting ? "Submitting..." : "Submit Confessional"}</Btn>
-      {confirmed && <p style={{ color: "#00ff9d", fontSize: 12, marginTop: 8 }}>✓ Sent to the host. Thank you for sharing.</p>}
+          <Btn onClick={submit} disabled={!text.trim() || submitting}>{submitting ? "Submitting..." : "Submit Confessional"}</Btn>
+          {confirmed && <p style={{ color: "#00ff9d", fontSize: 12, marginTop: 8 }}>✓ Sent to the host. Thank you for sharing.</p>}
+        </>
+      )}
 
       {mine.length > 0 && (
         <div style={{ marginTop: 14, borderTop: "1px solid #3d1f5c", paddingTop: 10 }}>

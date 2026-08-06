@@ -6,7 +6,7 @@ import MemoryWall from "./MemoryWall";
 
 const VOTES_KEY = "pb:finale-votes";
 
-export default function FinalePlayer({ gameId, player, round, players }) {
+export default function FinalePlayer({ gameId, player, round, players, readOnly = false }) {
   const [finale, setFinale] = useState(null);
   const [choice, setChoice] = useState("");
   const [reason, setReason] = useState("");
@@ -76,6 +76,18 @@ export default function FinalePlayer({ gameId, player, round, players }) {
             "{existing.reason}"
           </p>
         )}
+        {chaosBanner}
+      </Card>
+    );
+  }
+
+  // A read-only viewer (the host "viewing as" this player) can watch
+  // status but must never be able to cast a real vote on this player's
+  // behalf — same reasoning as ExileVotePlayer/FatesPlayer.
+  if (readOnly) {
+    return (
+      <Card style={{ marginBottom: 20, textAlign: "center" }}>
+        <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: 0 }}>Hasn't voted yet.</p>
         {chaosBanner}
       </Card>
     );

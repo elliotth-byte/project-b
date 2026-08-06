@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { Btn, Card, DurationInput } from "./ui";
 import { supabase } from "../lib/supabaseClient";
-import { storageDelete, storageGet } from "../lib/gameStorage";
+import { storageDelete, storageGet, storageSet, storageUpdate } from "../lib/gameStorage";
 import { removePendingPlayer, quitOrRemoveApprovedPlayer } from "../lib/playerRemoval";
 import {
   KEY_ROUND, KEY_CHALLENGE, KEY_FATES, KEY_EXILE, KEY_EXILE_HISTORY, KEY_REENTRY,
   KEY_FINALE, KEY_CHALLENGE_HISTORY, DEFAULT_SETTINGS, getSettings, setSettings, subscribeSettings,
-  initRound,
+  initRound, PHASES,
 } from "../lib/gameState";
 
 export default function AdminHost({ gameId, players, round }) {
@@ -61,6 +61,61 @@ export default function AdminHost({ gameId, players, round }) {
     setSavingSettings(true);
     await setSettings(gameId, patch);
     setSavingSettings(false);
+  };
+
+  const [confirmRoundReset, setConfirmRoundReset] = useState(false);
+  const [roundResetBusy, setRoundResetBusy] = useState(false);
+  const [roundResetStatus, setRoundResetStatus] = useState("");
+
+  const roundResetBlockedReason =
+    !round || round.phase === PHASES.LOBBY || round.phase === PHASES.ENDED
+      ? "There's no active round to reset."
+      : round.phase === PHASES.FINALE
+        ? "Can't reset during the Finale — use Reset Season instead if you need to undo this far."
+        : null;
+
+  // Puts THIS round's Challenge, Fates Ceremony, and Exile Vote back to
+  // "hasn't happened yet" — for when something went wrong before anyone
+  // meaningfully competed (nobody actually got to play, a mini-game broke,
+  // etc). Unlike Reset Season, this leaves every EARLIER round's results,
+  // and everyone's alive/exiled status, untouched. As a safety rail, it
+  // refuses once this round's Exile Vote has actually been revealed —
+  // undoing a real elimination needs Reset Season (or manual correction),
+  // not this.
+  const resetCurrentRound = async () => {
+    setRoundResetBusy(true);
+    setRoundResetStatus("");
+    const roundNum = round.round;
+
+    const exile = await storageGet(gameId, KEY_EXILE);
+    if (exile && exile.round === roundNum && exile.revealed) {
+      setRoundResetBusy(false);
+      setRoundResetStatus("Can't reset — this round's Exile Vote has already been revealed and someone's been eliminated. Use Reset Season if you need to undo that.");
+      return;
+    }
+
+    await Promise.all([
+      storageSet(gameId, KEY_CHALLENGE, {
+        round: roundNum, active: false, startedAt: null, endsAt: null,
+        participantIds: [], reentryAttemptIds: [], placements: [], finalized: false, forfeitedIds: [],
+      }),
+      storageDelete(gameId, `pb:challenge-scores:${roundNum}`),
+      storageDelete(gameId, `pb:challenge-session:${roundNum}`),
+      storageDelete(gameId, KEY_FATES),
+      storageDelete(gameId, KEY_EXILE),
+      storageDelete(gameId, `pb:exile-votes:${roundNum}`),
+      storageUpdate(gameId, KEY_CHALLENGE_HISTORY, (fresh) => (fresh || []).filter((c) => c.round !== roundNum)),
+      storageUpdate(gameId, KEY_EXILE_HISTORY, (fresh) => (fresh || []).filter((e) => e.round !== roundNum)),
+    ]);
+
+    await storageUpdate(gameId, KEY_ROUND, (fresh) => ({
+      ...(fresh || {}), round: roundNum, phase: PHASES.CHALLENGE, phaseStartedAt: null, phaseEndsAt: null,
+      finalFour: false, doubleElimination: false,
+    }));
+
+    setRoundResetBusy(false);
+    setConfirmRoundReset(false);
+    setRoundResetStatus(`Round ${roundNum} reset. Start the challenge again whenever you're ready.`);
   };
 
   // Full restart: every challenge/fates/exile/finale/reentry state, every
@@ -172,6 +227,33 @@ export default function AdminHost({ gameId, players, round }) {
           ))}
           {players.length === 0 && <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No players have joined yet.</p>}
         </div>
+      </Card>
+
+      <Card style={{ borderColor: "rgba(255,45,149,0.3)" }}>
+        <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
+          ♻️ Reset Round {round?.round || ""}
+        </h3>
+        {roundResetStatus && (
+          <p style={{ fontSize: 12, color: roundResetStatus.startsWith("Can't") ? "#ff3860" : "#00ff9d", margin: "0 0 10px" }}>{roundResetStatus}</p>
+        )}
+        <p style={{ fontSize: 12, color: "#a68fd6", margin: "0 0 8px" }}>
+          Puts this round's Challenge, Fates Ceremony, and Exile Vote back to "hasn't happened yet" — for when nobody actually
+          got to compete. Earlier rounds and everyone's current alive/exiled status are untouched. Only available before this
+          round's Exile Vote has been revealed.
+        </p>
+        {roundResetBlockedReason ? (
+          <p style={{ fontSize: 12, color: "#6b4f99", fontStyle: "italic", margin: 0 }}>{roundResetBlockedReason}</p>
+        ) : confirmRoundReset ? (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ color: "#ff3860", fontSize: 12, fontWeight: 700 }}>Really reset Round {round.round}?</span>
+            <Btn small variant="danger" onClick={resetCurrentRound} disabled={roundResetBusy}>
+              {roundResetBusy ? "Resetting..." : "Yes, reset this round"}
+            </Btn>
+            <Btn small variant="ghost" onClick={() => setConfirmRoundReset(false)}>Cancel</Btn>
+          </div>
+        ) : (
+          <Btn small variant="danger" onClick={() => setConfirmRoundReset(true)}>Reset This Round</Btn>
+        )}
       </Card>
 
       <Card style={{ borderColor: "rgba(255,56,96,0.3)" }}>

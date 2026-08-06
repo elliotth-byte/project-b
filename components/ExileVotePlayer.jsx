@@ -51,7 +51,7 @@ function NominationsRecap({ nominatorOrder, nominations, byId }) {
   );
 }
 
-export default function ExileVotePlayer({ gameId, player, round, players }) {
+export default function ExileVotePlayer({ gameId, player, round, players, readOnly = false }) {
   const [exile, setExile] = useState(null);
   const [choice, setChoice] = useState("");
   const [reason, setReason] = useState("");
@@ -160,7 +160,7 @@ export default function ExileVotePlayer({ gameId, player, round, players }) {
             "{existing.reason}"
           </p>
         )}
-        {votingOpen && (
+        {votingOpen && !readOnly && (
           <button onClick={changeVote} style={{
             background: "transparent", border: "1px solid #3d1f5c", borderRadius: 10, padding: "10px 24px",
             color: "#a68fd6", fontSize: 14, cursor: "pointer", fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
@@ -168,6 +168,23 @@ export default function ExileVotePlayer({ gameId, player, round, players }) {
         )}
         <div style={{ marginTop: 14 }}>{chaosBanner}</div>
         <div style={{ marginTop: 14, textAlign: "left" }}>{nominationsRecap}</div>
+        <div style={{ textAlign: "left" }}>{voterStatus}</div>
+      </Card>
+    );
+  }
+
+  // A read-only viewer (the host "viewing as" this player) can watch
+  // live status but must never be able to cast a real vote on this
+  // player's behalf — game_state writes here aren't checked against who's
+  // actually authenticated, only against whatever player id gets passed
+  // in, so this guard is the only thing stopping that.
+  if (readOnly) {
+    return (
+      <Card style={{ marginBottom: 20, textAlign: "center" }}>
+        <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#ff2d95", marginBottom: 6 }}>🃏</div>
+        <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: "0 0 10px" }}>Hasn't voted yet.</p>
+        {chaosBanner}
+        <div style={{ textAlign: "left" }}>{nominationsRecap}</div>
         <div style={{ textAlign: "left" }}>{voterStatus}</div>
       </Card>
     );

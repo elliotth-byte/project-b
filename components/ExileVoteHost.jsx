@@ -122,8 +122,9 @@ export default function ExileVoteHost({ gameId, players, round }) {
 
   const finishNow = async () => {
     setBusy(true);
-    await requestAdvance(gameId, true);
+    const result = await requestAdvance(gameId, true);
     setBusy(false);
+    if (result.error) alert("Couldn't move on: " + result.error);
   };
 
   const postSummaryToGroupMe = async () => {

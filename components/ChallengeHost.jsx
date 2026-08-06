@@ -106,8 +106,9 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
       if (!confirm(`${stillGoing.join(", ")} ${verb} finished yet — ending now ranks them last. Continue?`)) return;
     }
     setBusy(true);
-    await requestAdvance(gameId, true);
+    const result = await requestAdvance(gameId, true);
     setBusy(false);
+    if (result.error) alert("Couldn't finish the challenge: " + result.error);
   };
 
   if (round?.phase !== "challenge") {

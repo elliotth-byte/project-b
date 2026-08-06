@@ -33,7 +33,7 @@ function NominatorStatusList({ nominatorOrder, nominations, byId, highlightId })
   );
 }
 
-export default function FatesPlayer({ gameId, player, players, round }) {
+export default function FatesPlayer({ gameId, player, players, round, readOnly = false }) {
   const [fates, setFates] = useState(null);
   const [challenge, setChallenge] = useState(null);
   const [choice, setChoice] = useState("");
@@ -86,6 +86,25 @@ export default function FatesPlayer({ gameId, player, players, round }) {
   }
 
   const taken = takenNomineeIds(fates.nominations, player.id);
+
+  // A read-only viewer (the host "viewing as" this player) can watch the
+  // live status but must never be able to submit a real nomination on
+  // this player's behalf — game_state writes here aren't checked against
+  // who's actually authenticated, only against whatever player id gets
+  // passed in, so this guard is the only thing stopping that.
+  if (readOnly) {
+    return (
+      <Card style={{ marginBottom: 20 }}>
+        <div style={{ textAlign: "center", marginBottom: 12 }}>
+          <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#ff2d95", marginBottom: 6 }}>⚖️ Fates Ceremony</div>
+          <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: 0 }}>
+            Finished #{myEntry.place} — hasn't nominated yet.
+          </p>
+        </div>
+        <NominatorStatusList nominatorOrder={fates.nominatorOrder} nominations={fates.nominations} byId={byId} highlightId={player.id} />
+      </Card>
+    );
+  }
 
   const submit = async () => {
     if (!choice) return;
