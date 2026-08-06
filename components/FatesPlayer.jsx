@@ -9,22 +9,28 @@ import MemoryWall from "./MemoryWall";
 // (and to whom), who's still deciding. Shown to waiting players AND to
 // the nominators themselves, so everyone can see the same picture and
 // nominators can avoid duplicating each other's choice.
-function NominatorStatusList({ nominatorOrder, nominations, byId, highlightId }) {
+function NominatorStatusList({ nominatorOrder, nominations, nominationReasons, byId, highlightId }) {
   return (
     <div style={{ display: "grid", gap: 6 }}>
       {nominatorOrder.map((n) => {
         const nomineeId = nominations?.[n.playerId];
+        const reason = nominationReasons?.[n.playerId];
         return (
           <div key={n.playerId} style={{
-            display: "flex", gap: 8, alignItems: "center", background: "#0d0618", borderRadius: 8, padding: "8px 10px",
+            display: "flex", flexDirection: "column", gap: 2, background: "#0d0618", borderRadius: 8, padding: "8px 10px",
             border: n.playerId === highlightId ? "1px solid rgba(255,45,149,0.4)" : "1px solid transparent",
           }}>
-            <Badge>#{n.place}</Badge>
-            <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff", fontWeight: 700 }}>{n.name}</span>
-            {nomineeId ? (
-              <span style={{ fontSize: 12, color: "#00ff9d" }}>✓ nominated <strong style={{ color: "#ff3860" }}>{byId[nomineeId] || "?"}</strong></span>
-            ) : (
-              <span style={{ fontSize: 12, color: "#6b4f99", fontStyle: "italic" }}>still deciding...</span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <Badge>#{n.place}</Badge>
+              <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff", fontWeight: 700 }}>{n.name}</span>
+              {nomineeId ? (
+                <span style={{ fontSize: 12, color: "#00ff9d" }}>✓ nominated <strong style={{ color: "#ff3860" }}>{byId[nomineeId] || "?"}</strong></span>
+              ) : (
+                <span style={{ fontSize: 12, color: "#6b4f99", fontStyle: "italic" }}>still deciding...</span>
+              )}
+            </div>
+            {nomineeId && reason && (
+              <div style={{ fontSize: 11, color: "#a68fd6", fontStyle: "italic", paddingLeft: 4 }}>"{reason}"</div>
             )}
           </div>
         );
@@ -37,6 +43,7 @@ export default function FatesPlayer({ gameId, player, players, round, readOnly =
   const [fates, setFates] = useState(null);
   const [challenge, setChallenge] = useState(null);
   const [choice, setChoice] = useState("");
+  const [reason, setReason] = useState("");
 
   useEffect(() => {
     const unsubscribe = subscribeGameState(gameId, KEY_FATES, setFates);
@@ -64,7 +71,7 @@ export default function FatesPlayer({ gameId, player, players, round, readOnly =
             The top 3 finishers are making their nominations.
           </p>
         </div>
-        <NominatorStatusList nominatorOrder={fates.nominatorOrder} nominations={fates.nominations} byId={byId} />
+        <NominatorStatusList nominatorOrder={fates.nominatorOrder} nominations={fates.nominations} nominationReasons={fates.nominationReasons} byId={byId} />
       </Card>
     );
   }
@@ -80,7 +87,7 @@ export default function FatesPlayer({ gameId, player, players, round, readOnly =
           <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#00ff9d", marginBottom: 6 }}>Nomination Submitted</div>
           <p style={{ color: "#f5f0ff", fontSize: 15, margin: 0 }}>You nominated <strong style={{ color: "#ff3860" }}>{name}</strong></p>
         </div>
-        <NominatorStatusList nominatorOrder={fates.nominatorOrder} nominations={fates.nominations} byId={byId} highlightId={player.id} />
+        <NominatorStatusList nominatorOrder={fates.nominatorOrder} nominations={fates.nominations} nominationReasons={fates.nominationReasons} byId={byId} highlightId={player.id} />
       </Card>
     );
   }
@@ -101,7 +108,7 @@ export default function FatesPlayer({ gameId, player, players, round, readOnly =
             Finished #{myEntry.place} — hasn't nominated yet.
           </p>
         </div>
-        <NominatorStatusList nominatorOrder={fates.nominatorOrder} nominations={fates.nominations} byId={byId} highlightId={player.id} />
+        <NominatorStatusList nominatorOrder={fates.nominatorOrder} nominations={fates.nominations} nominationReasons={fates.nominationReasons} byId={byId} highlightId={player.id} />
       </Card>
     );
   }
@@ -113,6 +120,7 @@ export default function FatesPlayer({ gameId, player, players, round, readOnly =
       const stillTaken = takenNomineeIds(fresh.nominations, player.id);
       if (stillTaken.has(choice)) return fresh; // someone else grabbed it first — abort, let the UI re-render disabled
       fresh.nominations = { ...(fresh.nominations || {}), [player.id]: choice };
+      fresh.nominationReasons = { ...(fresh.nominationReasons || {}), [player.id]: reason.trim() || null };
       return fresh;
     });
   };
@@ -127,19 +135,32 @@ export default function FatesPlayer({ gameId, player, players, round, readOnly =
       {(fates.nominatorOrder.length > 1) && (
         <Card style={{ marginBottom: 12 }}>
           <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>Live status</div>
-          <NominatorStatusList nominatorOrder={fates.nominatorOrder} nominations={fates.nominations} byId={byId} highlightId={player.id} />
+          <NominatorStatusList nominatorOrder={fates.nominatorOrder} nominations={fates.nominations} nominationReasons={fates.nominationReasons} byId={byId} highlightId={player.id} />
           <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 8, marginBottom: 0, fontStyle: "italic" }}>
             Nominees can't be duplicated — whoever's already been picked is grayed out below.
           </p>
         </Card>
       )}
-      <Card style={{ marginBottom: 16 }}>
+      <Card style={{ marginBottom: 12 }}>
         <MemoryWall
           candidates={others.map((p) => ({ playerId: p.id, name: p.display_name }))}
           players={players}
           selectedId={choice}
           onSelect={setChoice}
           disabledIds={others.filter((p) => !isValidNomination(player.id, p.id, winnerId, taken).ok).map((p) => p.id)}
+        />
+      </Card>
+      <Card style={{ marginBottom: 16 }}>
+        <label style={{ display: "block", fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+          Why? (optional)
+        </label>
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          maxLength={280}
+          rows={3}
+          placeholder="Say your piece..."
+          style={{ width: "100%", background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "10px 12px", color: "#f5f0ff", fontSize: 13, fontFamily: "'Orbitron', 'Segoe UI', sans-serif", resize: "vertical", boxSizing: "border-box" }}
         />
       </Card>
       <button onClick={submit} disabled={!choice} style={{

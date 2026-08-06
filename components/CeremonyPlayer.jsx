@@ -26,6 +26,7 @@ export default function CeremonyPlayer({ gameId, players, round }) {
   const [finale, setFinale] = useState(null);
   const [liveExile, setLiveExile] = useState(null);
   const [liveFates, setLiveFates] = useState(null);
+  const [showComments, setShowComments] = useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeGameState(gameId, KEY_EXILE_HISTORY, (v) => setExileHistory(v || []));
@@ -85,8 +86,20 @@ export default function CeremonyPlayer({ gameId, players, round }) {
     <div style={{ display: "grid", gap: 16 }}>
       <AnnouncementsFeed gameId={gameId} />
 
+      <button
+        onClick={() => setShowComments(!showComments)}
+        style={{
+          justifySelf: "start", background: showComments ? "rgba(255,45,149,0.13)" : "transparent",
+          border: "1px solid #3d1f5c", borderRadius: 8, padding: "6px 12px",
+          color: showComments ? "#ff2d95" : "#a68fd6", fontSize: 12, cursor: "pointer",
+          fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
+        }}
+      >
+        💬 {showComments ? "Hide" : "Show"} all comments
+      </button>
+
       {finale && (
-        <FinaleCard finale={finale} rows={finaleRows} byId={byId} />
+        <FinaleCard finale={finale} rows={finaleRows} byId={byId} showComments={showComments} />
       )}
 
       {ceremonyInProgress && (
@@ -101,7 +114,9 @@ export default function CeremonyPlayer({ gameId, players, round }) {
           <LiveNominationsRecap
             nominatorOrder={round.phase === "fates" ? liveFates?.nominatorOrder : liveExile?.fatesNominatorOrder}
             nominations={round.phase === "fates" ? liveFates?.nominations : liveExile?.fatesNominations}
+            nominationReasons={round.phase === "fates" ? liveFates?.nominationReasons : liveExile?.fatesNominationReasons}
             byId={byId}
+            showComments={showComments}
           />
         </Card>
       )}
@@ -111,7 +126,7 @@ export default function CeremonyPlayer({ gameId, players, round }) {
       ))}
 
       {roundsDesc.map((e) => (
-        <RoundCeremonyCard key={e.round} entry={e} challenge={challengeHistory.find((c) => c.round === e.round)} rows={rowsForRound(e.round)} byId={byId} />
+        <RoundCeremonyCard key={e.round} entry={e} challenge={challengeHistory.find((c) => c.round === e.round)} rows={rowsForRound(e.round)} byId={byId} showComments={showComments} />
       ))}
 
       {nothingYet && (
@@ -121,7 +136,7 @@ export default function CeremonyPlayer({ gameId, players, round }) {
   );
 }
 
-function LiveNominationsRecap({ nominatorOrder, nominations, byId }) {
+function LiveNominationsRecap({ nominatorOrder, nominations, nominationReasons, byId, showComments }) {
   if (!nominatorOrder?.length) return null;
   return (
     <div style={{ textAlign: "left", marginTop: 12 }}>
@@ -130,14 +145,19 @@ function LiveNominationsRecap({ nominatorOrder, nominations, byId }) {
       </div>
       <div style={{ display: "grid", gap: 4 }}>
         {nominatorOrder.map((n) => (
-          <p key={n.playerId} style={{ fontSize: 12, color: "#f5f0ff", margin: 0 }}>
-            #{n.place} <strong>{n.name}</strong>{" "}
-            {nominations?.[n.playerId] ? (
-              <>nominated <span style={{ color: "#ff3860" }}>{byId[nominations[n.playerId]] || "—"}</span></>
-            ) : (
-              <span style={{ color: "#6b4f99", fontStyle: "italic" }}>still deciding...</span>
+          <div key={n.playerId}>
+            <p style={{ fontSize: 12, color: "#f5f0ff", margin: 0 }}>
+              #{n.place} <strong>{n.name}</strong>{" "}
+              {nominations?.[n.playerId] ? (
+                <>nominated <span style={{ color: "#ff3860" }}>{byId[nominations[n.playerId]] || "—"}</span></>
+              ) : (
+                <span style={{ color: "#6b4f99", fontStyle: "italic" }}>still deciding...</span>
+              )}
+            </p>
+            {showComments && nominations?.[n.playerId] && nominationReasons?.[n.playerId] && (
+              <p style={{ fontSize: 11, color: "#a68fd6", fontStyle: "italic", margin: "2px 0 0" }}>"{nominationReasons[n.playerId]}"</p>
             )}
-          </p>
+          </div>
         ))}
       </div>
     </div>
@@ -178,7 +198,7 @@ function ChallengePlacementsList({ placements, gameType, rankDirection }) {
   );
 }
 
-function VoteRowsList({ rows }) {
+function VoteRowsList({ rows, showComments }) {
   if (rows.length === 0) return null;
   return (
     <div style={{ display: "grid", gap: 4, marginTop: 6 }}>
@@ -186,16 +206,17 @@ function VoteRowsList({ rows }) {
         <div key={i} style={{ fontSize: 12, color: "#a68fd6", padding: "4px 8px", background: "#0d0618", borderRadius: 6 }}>
           <strong style={{ color: "#f5f0ff" }}>{r.voter}</strong> → <span style={{ color: r.nullified ? "#6b4f99" : "#ff3860" }}>{r.target}</span>
           {r.nullified && <span style={{ color: "#6b4f99" }}> (nullified)</span>}
-          {r.reason && <div style={{ fontStyle: "italic", marginTop: 2 }}>"{r.reason}"</div>}
+          {showComments && r.reason && <div style={{ fontStyle: "italic", marginTop: 2 }}>"{r.reason}"</div>}
         </div>
       ))}
     </div>
   );
 }
 
-function RoundCeremonyCard({ entry: e, challenge, rows, byId }) {
+function RoundCeremonyCard({ entry: e, challenge, rows, byId, showComments }) {
   const nominatorOrder = e.fatesNominatorOrder || [];
   const nominations = e.fatesNominations || {};
+  const nominationReasons = e.fatesNominationReasons || {};
   const exiledNames = (e.exiledIds || []).map((id) => byId[id] || "?");
   const registryEntry = challenge?.gameType && GAME_REGISTRY[challenge.gameType];
   const rankDirection = registryEntry?.rank === "time-asc" ? "time-asc" : "score-desc";
@@ -227,10 +248,15 @@ function RoundCeremonyCard({ entry: e, challenge, rows, byId }) {
         {nominatorOrder.length > 0 ? (
           <div style={{ display: "grid", gap: 4 }}>
             {nominatorOrder.map((n) => (
-              <p key={n.playerId} style={{ fontSize: 12, color: "#f5f0ff", margin: 0 }}>
-                #{n.place} <strong>{n.name}</strong> nominated{" "}
-                <span style={{ color: "#ff3860" }}>{byId[nominations[n.playerId]] || "—"}</span>
-              </p>
+              <div key={n.playerId}>
+                <p style={{ fontSize: 12, color: "#f5f0ff", margin: 0 }}>
+                  #{n.place} <strong>{n.name}</strong> nominated{" "}
+                  <span style={{ color: "#ff3860" }}>{byId[nominations[n.playerId]] || "—"}</span>
+                </p>
+                {showComments && nominationReasons[n.playerId] && (
+                  <p style={{ fontSize: 11, color: "#a68fd6", fontStyle: "italic", margin: "2px 0 0" }}>"{nominationReasons[n.playerId]}"</p>
+                )}
+              </div>
             ))}
           </div>
         ) : (
@@ -249,12 +275,17 @@ function RoundCeremonyCard({ entry: e, challenge, rows, byId }) {
           Nominees: {(e.nominees || []).map((n) => n.name).join(", ")}
         </p>
         {e.chaosHolderId && (
-          <p style={{ fontSize: 11, color: "#a68fd6", fontStyle: "italic", margin: "0 0 4px" }}>
-            🃏 Power of Chaos held by {byId[e.chaosHolderId] || "?"}
-            {e.nullifiedId && <> — nullified <strong>{byId[e.nullifiedId] || "?"}</strong>'s votes</>}
-          </p>
+          <div style={{ margin: "0 0 4px" }}>
+            <p style={{ fontSize: 11, color: "#a68fd6", fontStyle: "italic", margin: 0 }}>
+              🃏 Power of Chaos held by {byId[e.chaosHolderId] || "?"}
+              {e.nullifiedId && <> — nullified <strong>{byId[e.nullifiedId] || "?"}</strong>'s votes</>}
+            </p>
+            {showComments && e.nullifiedReason && (
+              <p style={{ fontSize: 11, color: "#a68fd6", fontStyle: "italic", margin: "2px 0 0" }}>"{e.nullifiedReason}"</p>
+            )}
+          </div>
         )}
-        <VoteRowsList rows={rows} />
+        <VoteRowsList rows={rows} showComments={showComments} />
         <p style={{ fontSize: 13, color: "#f5f0ff", margin: "8px 0 0", fontWeight: 700 }}>
           {exiledNames.length > 0
             ? <>💀 <span style={{ color: "#ff3860" }}>{exiledNames.join(" and ")}</span> {exiledNames.length > 1 ? "were" : "was"} exiled.</>
@@ -265,7 +296,7 @@ function RoundCeremonyCard({ entry: e, challenge, rows, byId }) {
   );
 }
 
-function FinaleCard({ finale, rows, byId }) {
+function FinaleCard({ finale, rows, byId, showComments }) {
   const winnerName = finale.winnerId ? byId[finale.winnerId] : null;
   return (
     <Card style={{ borderColor: "rgba(255,45,149,0.5)" }}>
@@ -277,14 +308,19 @@ function FinaleCard({ finale, rows, byId }) {
         Finalists: {(finale.finalists || []).map((f) => f.name).join(", ")}
       </p>
       {finale.chaosHolderId && (
-        <p style={{ fontSize: 11, color: "#a68fd6", fontStyle: "italic", margin: "0 0 4px" }}>
-          🃏 Power of Chaos held by {byId[finale.chaosHolderId] || "?"}
-          {finale.nullifiedFinalistId && <> — nullified <strong>{byId[finale.nullifiedFinalistId] || "?"}</strong>, who couldn't win</>}
-        </p>
+        <div style={{ margin: "0 0 4px" }}>
+          <p style={{ fontSize: 11, color: "#a68fd6", fontStyle: "italic", margin: 0 }}>
+            🃏 Power of Chaos held by {byId[finale.chaosHolderId] || "?"}
+            {finale.nullifiedFinalistId && <> — nullified <strong>{byId[finale.nullifiedFinalistId] || "?"}</strong>, who couldn't win</>}
+          </p>
+          {showComments && finale.nullifiedReason && (
+            <p style={{ fontSize: 11, color: "#a68fd6", fontStyle: "italic", margin: "2px 0 0" }}>"{finale.nullifiedReason}"</p>
+          )}
+        </div>
       )}
       {finale.revealed ? (
         <>
-          <VoteRowsList rows={rows} />
+          <VoteRowsList rows={rows} showComments={showComments} />
           {winnerName && (
             <p style={{ fontSize: 15, color: "#f5f0ff", margin: "10px 0 0", fontWeight: 700, textAlign: "center" }}>
               🏆 <span style={{ color: "#00ff9d" }}>{winnerName}</span> wins Project B!

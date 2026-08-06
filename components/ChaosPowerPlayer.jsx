@@ -28,6 +28,8 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
   const [state, setState] = useState(null);
   const [votes, setVotes] = useState({});
   const [myPick, setMyPick] = useState(null);
+  const [reasonDraft, setReasonDraft] = useState("");
+  const [savingReason, setSavingReason] = useState(false);
   const [drawPicks, setDrawPicks] = useState({});
   const [drawSubmitting, setDrawSubmitting] = useState(null); // index currently being submitted
   const [justWon, setJustWon] = useState(false);
@@ -49,6 +51,14 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
     const unsubscribe = subscribeChaosSecret(gameId, context, setMyPick);
     return unsubscribe;
   }, [gameId, context]);
+
+  // Keep the draft in sync with whatever's actually saved — safe to do
+  // unconditionally since only this player can ever write their own
+  // chaos secret (RLS), so the only time this value changes remotely is
+  // right after THEY save it.
+  useEffect(() => {
+    setReasonDraft(myPick?.reason || "");
+  }, [myPick?.reason]);
 
   useEffect(() => {
     if (!drawContext) return;
@@ -168,10 +178,19 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
   const candidates = isExile ? state.nominees : state.finalists;
   const nomineeIds = candidates.map((c) => c.playerId);
   const voteRows = Object.entries(votes).map(([voterId, v]) => ({ voterId, targetId: v.targetId }));
+  const myPickId = myPick?.nomineeId || null;
 
   const pick = async (nomineeId) => {
-    const ok = await setChaosNullify(gameId, context, nomineeId);
+    const ok = await setChaosNullify(gameId, context, nomineeId, reasonDraft);
     if (!ok) alert("Couldn't lock that in — try again.");
+  };
+
+  const saveReason = async () => {
+    if (!myPickId) return;
+    setSavingReason(true);
+    const ok = await setChaosNullify(gameId, context, myPickId, reasonDraft);
+    setSavingReason(false);
+    if (!ok) alert("Couldn't save — try again.");
   };
 
   // Tie-break only becomes relevant once voting has actually closed —
@@ -180,10 +199,10 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
   if (!state.votingOpen) {
     if (isExile) {
       outcome = state.mode === "save"
-        ? computeSaveOutcome(voteRows, myPick, nomineeIds)
-        : computeEliminateOutcome(voteRows, myPick, nomineeIds);
+        ? computeSaveOutcome(voteRows, myPickId, nomineeIds)
+        : computeEliminateOutcome(voteRows, myPickId, nomineeIds);
     } else {
-      outcome = computeFinaleOutcome(voteRows, myPick, nomineeIds);
+      outcome = computeFinaleOutcome(voteRows, myPickId, nomineeIds);
     }
   }
   const needsTieBreak = outcome?.needsTieBreak && !state.tieBreakChoiceId;
@@ -223,20 +242,36 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
         </div>
       ) : state.tieBreakChoiceId ? (
         <p style={{ color: "#00ff9d", fontSize: 13, textAlign: "center", margin: 0 }}>✓ Tie broken — {byId[state.tieBreakChoiceId]}.</p>
-      ) : myPick ? (
+      ) : myPickId ? (
         <div style={{ textAlign: "center" }}>
-          <Badge color="#ff2d95">Locked in: {byId[myPick] || "?"}</Badge>
+          <Badge color="#ff2d95">Locked in: {byId[myPickId] || "?"}</Badge>
           {state.votingOpen && (
             <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 8, fontStyle: "italic" }}>You can still change your mind while voting's open.</p>
           )}
+          <Card style={{ marginTop: 12, textAlign: "left" }}>
+            <label style={{ display: "block", fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+              Why? (optional — shown when votes are revealed)
+            </label>
+            <textarea
+              value={reasonDraft}
+              onChange={(e) => setReasonDraft(e.target.value)}
+              maxLength={280}
+              rows={2}
+              placeholder="Say your piece..."
+              style={{ width: "100%", background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "10px 12px", color: "#f5f0ff", fontSize: 13, fontFamily: "'Orbitron', 'Segoe UI', sans-serif", resize: "vertical", boxSizing: "border-box", marginBottom: 8 }}
+            />
+            <Btn small onClick={saveReason} disabled={savingReason || reasonDraft === (myPick?.reason || "")}>
+              {savingReason ? "Saving..." : "Save"}
+            </Btn>
+          </Card>
           {state.votingOpen && (
             <div style={{ marginTop: 12 }}>
-              <MemoryWall candidates={candidates} players={players} selectedId={myPick} onSelect={pick} />
+              <MemoryWall candidates={candidates} players={players} selectedId={myPickId} onSelect={pick} />
             </div>
           )}
         </div>
       ) : (
-        <MemoryWall candidates={candidates} players={players} selectedId={myPick} onSelect={pick} />
+        <MemoryWall candidates={candidates} players={players} selectedId={myPickId} onSelect={pick} />
       )}
     </Card>
   );

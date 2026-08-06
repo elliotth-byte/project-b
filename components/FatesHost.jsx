@@ -58,26 +58,32 @@ export default function FatesHost({ gameId, players, round }) {
       <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
         {fates.nominatorOrder.map((nominator) => {
           const currentNominee = fates.nominations?.[nominator.playerId] || "";
+          const reason = fates.nominationReasons?.[nominator.playerId];
           const taken = takenNomineeIds(fates.nominations, nominator.playerId);
           return (
-            <div key={nominator.playerId} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <Badge>#{nominator.place}</Badge>
-              <span style={{ width: 110, fontSize: 13, fontWeight: 700, color: "#f5f0ff", flexShrink: 0 }}>{nominator.name}</span>
-              <select
-                value={currentNominee}
-                onChange={(e) => setNomination(nominator.playerId, e.target.value)}
-                style={{ flex: 1, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 10px", color: "#f5f0ff", fontSize: 12 }}
-              >
-                <option value="">— choose nominee —</option>
-                {alive.map((p) => {
-                  const check = isValidNomination(nominator.playerId, p.id, winnerId, taken);
-                  return (
-                    <option key={p.id} value={p.id} disabled={!check.ok && p.id !== currentNominee}>
-                      {p.display_name}{!check.ok && p.id !== currentNominee ? ` (${check.error})` : ""}
-                    </option>
-                  );
-                })}
-              </select>
+            <div key={nominator.playerId}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <Badge>#{nominator.place}</Badge>
+                <span style={{ width: 110, fontSize: 13, fontWeight: 700, color: "#f5f0ff", flexShrink: 0 }}>{nominator.name}</span>
+                <select
+                  value={currentNominee}
+                  onChange={(e) => setNomination(nominator.playerId, e.target.value)}
+                  style={{ flex: 1, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 10px", color: "#f5f0ff", fontSize: 12 }}
+                >
+                  <option value="">— choose nominee —</option>
+                  {alive.map((p) => {
+                    const check = isValidNomination(nominator.playerId, p.id, winnerId, taken);
+                    return (
+                      <option key={p.id} value={p.id} disabled={!check.ok && p.id !== currentNominee}>
+                        {p.display_name}{!check.ok && p.id !== currentNominee ? ` (${check.error})` : ""}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              {currentNominee && reason && (
+                <p style={{ fontSize: 11, color: "#a68fd6", fontStyle: "italic", margin: "4px 0 0 42px" }}>"{reason}"</p>
+              )}
             </div>
           );
         })}

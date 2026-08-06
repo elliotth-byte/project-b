@@ -11,7 +11,7 @@ import { requestAdvance } from "../lib/advanceNow";
 export default function ExileVoteHost({ gameId, players, round }) {
   const [exile, setExile] = useState(null);
   const [votes, setVotes] = useState({});
-  const [nullifiedId, setNullifiedId] = useState(null); // host CAN read this (see sql/add-chaos-secrets.sql) — just doesn't show it until reveal
+  const [chaosSecret, setChaosSecret] = useState(null); // { nomineeId, reason } | null — host CAN read this (see sql/add-chaos-secrets.sql) — just doesn't show it until reveal
   const [drawPicks, setDrawPicks] = useState({});
   const [revealOrder, setRevealOrder] = useState(null);
   const [revealIndex, setRevealIndex] = useState(-1);
@@ -38,7 +38,7 @@ export default function ExileVoteHost({ gameId, players, round }) {
 
   useEffect(() => {
     if (!round?.round) return;
-    const unsubscribe = subscribeChaosSecret(gameId, context, setNullifiedId);
+    const unsubscribe = subscribeChaosSecret(gameId, context, setChaosSecret);
     return unsubscribe;
   }, [gameId, context]);
 
@@ -67,6 +67,7 @@ export default function ExileVoteHost({ gameId, players, round }) {
   if (!exile) return <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>Loading...</p></Card>;
 
   const chaosHolder = players.find((p) => p.id === exile.chaosHolderId);
+  const nullifiedId = chaosSecret?.nomineeId || null;
   const voteRows = Object.entries(votes).map(([voterId, v]) => ({ voterId, targetId: v.targetId, reason: v.reason }));
   const nomineeIds = exile.nominees.map((n) => n.playerId);
   const byId = {};
@@ -125,7 +126,7 @@ export default function ExileVoteHost({ gameId, players, round }) {
 
   const buildResultsSummary = () => {
     const lines = voteRows.map((r) => `${players.find((p) => p.id === r.voterId)?.display_name || "?"} → ${byId[r.targetId] || "?"}${r.reason ? ` ("${r.reason}")` : ""}`);
-    const chaosLine = nullifiedId ? `🃏 ${chaosHolder?.display_name || "The Power of Chaos"} nullified ${byId[nullifiedId] || "?"}.` : "";
+    const chaosLine = nullifiedId ? `🃏 ${chaosHolder?.display_name || "The Power of Chaos"} nullified ${byId[nullifiedId] || "?"}.${chaosSecret?.reason ? ` ("${chaosSecret.reason}")` : ""}` : "";
     return `🃏 Exile Vote results — Round ${round.round}\n\n${lines.join("\n")}\n\n${chaosLine}`.trim();
   };
 
@@ -276,7 +277,14 @@ export default function ExileVoteHost({ gameId, players, round }) {
                   🃏 Reveal the Power of Chaos — {chaosHolder?.display_name || "?"} chose {nullifiedId ? byId[nullifiedId] || "?" : "no one"}
                 </Btn>
               ) : (
-                <Btn onClick={finishNow} disabled={busy || tieBreakUnresolved}>{busy ? "Working..." : "Finalize Exile & Continue"}</Btn>
+                <div>
+                  {chaosSecret?.reason && (
+                    <p style={{ color: "#a68fd6", fontSize: 12, fontStyle: "italic", margin: "0 0 10px", padding: "8px 12px", background: "#0d0618", borderRadius: 8 }}>
+                      🃏 "{chaosSecret.reason}"
+                    </p>
+                  )}
+                  <Btn onClick={finishNow} disabled={busy || tieBreakUnresolved}>{busy ? "Working..." : "Finalize Exile & Continue"}</Btn>
+                </div>
               )}
             </div>
           )}

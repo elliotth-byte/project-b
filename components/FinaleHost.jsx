@@ -13,7 +13,7 @@ const VOTES_KEY = "pb:finale-votes";
 export default function FinaleHost({ gameId, players, round }) {
   const [finale, setFinale] = useState(null);
   const [votes, setVotes] = useState({});
-  const [nullifiedId, setNullifiedId] = useState(null);
+  const [chaosSecret, setChaosSecret] = useState(null); // { nomineeId, reason } | null
   const [drawPicks, setDrawPicks] = useState({});
   const [busy, setBusy] = useState(false);
   const dirtyRef = useRef(new Set());
@@ -29,7 +29,7 @@ export default function FinaleHost({ gameId, players, round }) {
   }, [gameId]);
 
   useEffect(() => {
-    const unsubscribe = subscribeChaosSecret(gameId, FINALE_CONTEXT, setNullifiedId);
+    const unsubscribe = subscribeChaosSecret(gameId, FINALE_CONTEXT, setChaosSecret);
     return unsubscribe;
   }, [gameId]);
 
@@ -45,6 +45,7 @@ export default function FinaleHost({ gameId, players, round }) {
 
   const exiledPlayers = players.filter((p) => p.approved && !p.alive);
   const chaosHolder = players.find((p) => p.id === finale.chaosHolderId);
+  const nullifiedId = chaosSecret?.nomineeId || null;
   const byId = {};
   finale.finalists.forEach((f) => (byId[f.playerId] = f.name));
   const voteRows = Object.entries(votes).map(([voterId, v]) => ({ voterId, targetId: v.targetId, reason: v.reason }));
@@ -98,7 +99,7 @@ export default function FinaleHost({ gameId, players, round }) {
 
   const buildFinaleSummary = () => {
     const lines = voteRows.map((r) => `${players.find((p) => p.id === r.voterId)?.display_name || "?"} → ${byId[r.targetId] || "?"}${r.reason ? ` ("${r.reason}")` : ""}`);
-    const chaosLine = nullifiedId ? `🃏 ${chaosHolder?.display_name || "The Power of Chaos"} nullified ${byId[nullifiedId] || "?"} — they can't win.` : "";
+    const chaosLine = nullifiedId ? `🃏 ${chaosHolder?.display_name || "The Power of Chaos"} nullified ${byId[nullifiedId] || "?"} — they can't win.${chaosSecret?.reason ? ` ("${chaosSecret.reason}")` : ""}` : "";
     return `🔥 Finale votes — ${finale.finalists.map((f) => f.name).join(", ")}\n\n${lines.join("\n")}\n\n${chaosLine}`.trim();
   };
 

@@ -32,7 +32,7 @@ function VoterStatusList({ alivePlayers, votes, currentPlayerId }) {
 // Who nominated whom at this round's Fates Ceremony — this is never
 // secret (nominations were made in the open), so it's shown throughout
 // the Exile Vote too, not just after the vote itself is revealed.
-function NominationsRecap({ nominatorOrder, nominations, byId }) {
+function NominationsRecap({ nominatorOrder, nominations, nominationReasons, byId }) {
   if (!nominatorOrder?.length) return null;
   return (
     <Card style={{ marginBottom: 14 }}>
@@ -41,10 +41,15 @@ function NominationsRecap({ nominatorOrder, nominations, byId }) {
       </div>
       <div style={{ display: "grid", gap: 4 }}>
         {nominatorOrder.map((n) => (
-          <p key={n.playerId} style={{ fontSize: 12, color: "#f5f0ff", margin: 0 }}>
-            #{n.place} <strong>{n.name}</strong> nominated{" "}
-            <span style={{ color: "#ff3860" }}>{byId[nominations?.[n.playerId]] || "—"}</span>
-          </p>
+          <div key={n.playerId}>
+            <p style={{ fontSize: 12, color: "#f5f0ff", margin: 0 }}>
+              #{n.place} <strong>{n.name}</strong> nominated{" "}
+              <span style={{ color: "#ff3860" }}>{byId[nominations?.[n.playerId]] || "—"}</span>
+            </p>
+            {nominationReasons?.[n.playerId] && (
+              <p style={{ fontSize: 11, color: "#a68fd6", fontStyle: "italic", margin: "2px 0 0" }}>"{nominationReasons[n.playerId]}"</p>
+            )}
+          </div>
         ))}
       </div>
     </Card>
@@ -134,7 +139,7 @@ export default function ExileVotePlayer({ gameId, player, round, players, readOn
   const changeVote = () => { setSubmitted(false); setExisting(null); setChoice(existing?.targetId || ""); setReason(existing?.reason || ""); };
 
   const nominationsRecap = (
-    <NominationsRecap nominatorOrder={exile.fatesNominatorOrder} nominations={exile.fatesNominations} byId={byId} />
+    <NominationsRecap nominatorOrder={exile.fatesNominatorOrder} nominations={exile.fatesNominations} nominationReasons={exile.fatesNominationReasons} byId={byId} />
   );
 
   if (!votingOpen && !submitted) {
@@ -201,7 +206,9 @@ export default function ExileVotePlayer({ gameId, player, round, players, readOn
       {nominationsRecap}
       {voterStatus}
       <Card style={{ marginBottom: 14 }}>
-        <MemoryWall candidates={exile.nominees} players={players} selectedId={choice} onSelect={setChoice} />
+        {/* Nominees never include the voter themselves — a player can't
+            vote to eliminate/save themselves. */}
+        <MemoryWall candidates={exile.nominees.filter((n) => n.playerId !== player?.id)} players={players} selectedId={choice} onSelect={setChoice} />
       </Card>
       <Card style={{ marginBottom: 18 }}>
         <label style={{ display: "block", fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
