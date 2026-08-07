@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Btn, Card, Badge } from "./ui";
 import { subscribeGameState, storageUpdate } from "../lib/gameStorage";
-import { KEY_CHALLENGE } from "../lib/gameState";
+import { KEY_CHALLENGE, KEY_REENTRY } from "../lib/gameState";
 import { setReentryDecision } from "../lib/reentryData";
+import { REENTRY_STATUS } from "../lib/reentryLogic";
 import { subscribeScores, forfeitChallenge } from "../lib/challengeScores";
 import { GAME_REGISTRY } from "../lib/challengeGames";
 import Match3Player from "./games/Match3Player";
@@ -33,6 +34,7 @@ const GAME_COMPONENTS = {
 export default function ChallengePlayer({ gameId, player, round, readOnly = false }) {
   const [challenge, setChallenge] = useState(null);
   const [scores, setScores] = useState({});
+  const [reentry, setReentry] = useState([]);
   const [readyToPlay, setReadyToPlay] = useState(false);
   const [forfeiting, setForfeiting] = useState(false);
   const [deciding, setDeciding] = useState(false);
@@ -47,6 +49,11 @@ export default function ChallengePlayer({ gameId, player, round, readOnly = fals
     const unsubscribe = subscribeScores(gameId, round.round, setScores);
     return unsubscribe;
   }, [gameId, round?.round]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeGameState(gameId, KEY_REENTRY, (v) => setReentry(v || []));
+    return unsubscribe;
+  }, [gameId]);
 
   // A brand new challenge (new round, or the host re-starting one) always
   // needs the rules screen shown again — clicking "Go" on a previous
@@ -68,12 +75,19 @@ export default function ChallengePlayer({ gameId, player, round, readOnly = fals
   }
 
   // Exiled players get exactly one re-entry attempt, ever — and they
-  // decide, deliberately, per challenge, whether to use it here. Not
-  // deciding by the time everyone else finishes just counts as sitting
-  // this one out (see lib/roundEngine.js) — it costs nothing. Once they
-  // opt in, they're folded into the normal competing flow below, same as
-  // anyone else (see lib/reentryData.js's setReentryDecision).
-  const isReentryEligible = (challenge.reentryEligibleIds || []).includes(player?.id);
+  // decide, deliberately, per challenge, whether to use it here. Checked
+  // against their LIVE lib/reentryLogic.js status (PENDING = eligible),
+  // not a snapshot taken when the challenge started — a frozen snapshot
+  // meant a player who wasn't captured in it (a race right after their
+  // exile, a host resetting the round, anything) could be silently
+  // locked out of ever opting in, with nothing on screen explaining why.
+  // Not deciding by the time everyone else finishes just counts as
+  // sitting this one out (see lib/roundEngine.js) — it costs nothing.
+  // Once they opt in, they're folded into the normal competing flow
+  // below, same as anyone else (see lib/reentryData.js's
+  // setReentryDecision).
+  const myReentry = reentry.find((r) => r.playerId === player?.id);
+  const isReentryEligible = myReentry?.status === REENTRY_STATUS.PENDING;
   const reentryDecision = challenge.reentryDecisions?.[player?.id];
 
   if (isReentryEligible && reentryDecision !== "in") {

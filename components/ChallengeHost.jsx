@@ -240,26 +240,39 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
         1st place wins immunity{round.finalFour ? " — everyone else is automatically nominated (Final Four)." : "; the top 3 each get to make a nomination at the Fates Ceremony."}
       </p>
 
-      {challenge.reentryEligibleIds?.length > 0 && (
-        <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
-          <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
-            🔥 Re-entry — deciding whether to compete
+      {(() => {
+        // Union of the challenge's original snapshot and anyone
+        // currently PENDING — covers a player who opted in despite not
+        // being captured in the snapshot (see lib/reentryData.js's
+        // setReentryDecision, which no longer requires snapshot
+        // membership), so the host's list here can't miss someone who's
+        // actually deciding or has decided.
+        const liveEligibleIds = new Set([
+          ...(challenge.reentryEligibleIds || []),
+          ...reentry.filter((r) => r.status === REENTRY_STATUS.PENDING || challenge.reentryDecisions?.[r.playerId]).map((r) => r.playerId),
+        ]);
+        if (liveEligibleIds.size === 0) return null;
+        return (
+          <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+              🔥 Re-entry — deciding whether to compete
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {[...liveEligibleIds].map((id) => {
+                const name = players.find((p) => p.id === id)?.display_name || "?";
+                const decision = challenge.reentryDecisions?.[id];
+                const color = decision === "in" ? "#ff3860" : decision === "out" ? "#6b4f99" : "#a68fd6";
+                const label = decision === "in" ? `${name} — opted in` : decision === "out" ? `${name} — sitting out` : `${name} — deciding...`;
+                return (
+                  <span key={id} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 12, border: `1px solid ${color}`, color, opacity: decision === "out" ? 0.7 : 1 }}>
+                    {label}
+                  </span>
+                );
+              })}
+            </div>
           </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {challenge.reentryEligibleIds.map((id) => {
-              const name = players.find((p) => p.id === id)?.display_name || "?";
-              const decision = challenge.reentryDecisions?.[id];
-              const color = decision === "in" ? "#ff3860" : decision === "out" ? "#6b4f99" : "#a68fd6";
-              const label = decision === "in" ? `${name} — opted in` : decision === "out" ? `${name} — sitting out` : `${name} — deciding...`;
-              return (
-                <span key={id} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 12, border: `1px solid ${color}`, color, opacity: decision === "out" ? 0.7 : 1 }}>
-                  {label}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {isDigital ? (
         <div style={{ display: "grid", gap: 10, marginBottom: 12 }}>

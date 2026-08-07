@@ -28,7 +28,11 @@ function HeaderRow({ label, byColumn, columns, color = "#a68fd6" }) {
 // stacked header rows (matching how Big Brother's own voting-history
 // sheet stacks HOH/Nominations/Veto above its player grid) show that
 // round's Challenge Winner, Fates Winners (the top 3 who earned a
-// nomination), Nominees, and Power of Chaos holder, then who was Exiled.
+// nomination), Nominees, that round's vote count, who won (and used) the
+// Power of Chaos, then who was Exiled. Each player's own row is tagged
+// with a status badge — Winner, Exiled (with which round), or
+// Left/Removed — so it's clear at a glance what happened to them, not
+// just that their votes stop appearing.
 export default function VotingHistorySpreadsheet({ exileHistory, finaleState, players, gameName, challengeHistory }) {
   const grid = buildVotingGrid(exileHistory, finaleState, players, challengeHistory);
   if (grid.columns.length === 0) return null;
@@ -69,6 +73,7 @@ export default function VotingHistorySpreadsheet({ exileHistory, finaleState, pl
             <HeaderRow label="Challenge Winner" byColumn={grid.winnerByColumn} columns={grid.columns} color="#00ff9d" />
             <HeaderRow label="Fates Winners" byColumn={grid.fatesWinnersByColumn} columns={grid.columns} />
             <HeaderRow label="Nominees" byColumn={grid.nomineesByColumn} columns={grid.columns} />
+            <HeaderRow label="Vote Count" byColumn={grid.voteCountByColumn} columns={grid.columns} />
             <HeaderRow label="🃏 Power of Chaos" byColumn={grid.chaosByColumn} columns={grid.columns} />
             <HeaderRow label="Exiled" byColumn={grid.exiledByColumn} columns={grid.columns} color="#ff3860" />
           </thead>
@@ -77,7 +82,7 @@ export default function VotingHistorySpreadsheet({ exileHistory, finaleState, pl
               <tr key={r.playerId} style={{ borderBottom: "1px solid #150a28" }}>
                 <td style={{ padding: "6px 10px", whiteSpace: "nowrap", position: "sticky", left: 0, background: "#1a0a2e" }}>
                   <span style={{ color: "#f5f0ff", fontWeight: 700 }}>{r.name}</span>
-                  {r.isWinner && <span style={{ marginLeft: 6 }}><Badge color="#00ff9d">Winner</Badge></span>}
+                  {r.status && <span style={{ marginLeft: 6 }}><Badge color={r.status.color}>{r.status.label}</Badge></span>}
                 </td>
                 {r.cells.map((cell, i) => (
                   <td key={i} style={{ padding: "6px 10px", color: cell ? "#f5f0ff" : "#6b4f99", whiteSpace: "nowrap" }}>

@@ -83,6 +83,7 @@ export function Badge({ children, color = "#ff2d95" }) {
     "#ff3860": [255, 56, 96], "#c45c3c": [255, 56, 96], // legacy red
     "#00ff9d": [0, 255, 157], "#7a9a5c": [0, 255, 157], // legacy green
     "#00d9ff": [0, 217, 255], "#d4a843": [0, 217, 255],
+    "#6b4f99": [107, 79, 153],
   };
   const rgb = c[color] || [255, 45, 149];
   return (
