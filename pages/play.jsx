@@ -12,6 +12,7 @@ import CeremonyPlayer from "../components/CeremonyPlayer";
 import ChaosPowerPlayer from "../components/ChaosPowerPlayer";
 import ConfessionalPlayer from "../components/ConfessionalPlayer";
 import MusicPlayer from "../components/MusicPlayer";
+import HelpPanel from "../components/HelpPanel";
 import HomeLink from "../components/HomeLink";
 import LogoutButton from "../components/LogoutButton";
 import ChallengeErrorBoundary from "../components/ChallengeErrorBoundary";
@@ -24,6 +25,7 @@ const TABS = [
   { key: "game", label: "🎲 Game" },
   { key: "ceremony", label: "⚖️ Ceremony" },
   { key: "confessional", label: "🎥 Confessional" },
+  { key: "help", label: "❓ Help" },
 ];
 
 export default function PlayPage() {
@@ -337,6 +339,8 @@ export default function PlayPage() {
                 <ConfessionalPlayer gameId={gameId} player={{ id: myPlayer.id, name: myPlayer.name }} round={round?.round} />
               </ChallengeErrorBoundary>
             )}
+
+            {tab === "help" && <HelpPanel />}
           </>
         )}
       </div>
