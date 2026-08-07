@@ -137,7 +137,7 @@ export default function FinaleHost({ gameId, players, round }) {
         <div style={{ fontSize: 12, fontWeight: 700, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>
           Exiled players voting: {voteRows.length}/{exiledPlayers.length} in
         </div>
-        <div style={{ fontSize: 10, color: "#6b4f99", marginBottom: 8 }}>🃏 next to a name shows their Power of Chaos draw status — pink = holder, green = picked, gray = hasn't picked yet.</div>
+        <div style={{ fontSize: 10, color: "#6b4f99", marginBottom: 8 }}>🃏 next to a name shows their Power of Chaos draw status — green = won it, red = picked but didn't win, gray = hasn't picked yet.</div>
         <div style={{ display: "grid", gap: 6 }}>
           {exiledPlayers.map((voter) => (
             <div key={voter.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>

@@ -13,6 +13,7 @@ export default function MusicPlayer({ gameId, isHost = false }) {
   const [volume, setVolume] = useState(0.4);
   const [mood, setMood] = useState("dark");
   const [showControls, setShowControls] = useState(false);
+  const [audioError, setAudioError] = useState(null);
   const engineRef = useRef(null);
 
   // Players (not the host) follow whatever mood the host has broadcast
@@ -34,13 +35,27 @@ export default function MusicPlayer({ gameId, isHost = false }) {
     }
   };
 
+  // Errors here used to be silent — the ▶ button would flip to "playing"
+  // regardless of whether the browser's AudioContext actually unlocked,
+  // so a failure looked identical to "it's playing, just quiet." Now any
+  // failure to actually start is surfaced instead of assumed away.
   const startMusic = async (selectedMood) => {
-    await Tone.start();
-    disposeEngine();
-    engineRef.current = buildEngine(selectedMood || mood);
-    engineRef.current.masterVol.volume.value = -30 + volume * 30;
-    Tone.getTransport().start();
-    setPlaying(true);
+    try {
+      setAudioError(null);
+      await Tone.start();
+      if (Tone.getContext().state !== "running") {
+        throw new Error("Your browser blocked audio from starting — try the ▶ button again.");
+      }
+      disposeEngine();
+      engineRef.current = buildEngine(selectedMood || mood);
+      engineRef.current.masterVol.volume.value = -30 + volume * 30;
+      Tone.getTransport().start();
+      setPlaying(true);
+    } catch (err) {
+      disposeEngine();
+      setPlaying(false);
+      setAudioError(err?.message || "Couldn't start audio — try the ▶ button again.");
+    }
   };
 
   const stopMusic = () => {
@@ -120,27 +135,42 @@ export default function MusicPlayer({ gameId, isHost = false }) {
           <div style={{ fontSize: 10, color: "#6b4f99", textAlign: "center", marginTop: 4 }}>
             {Math.round(volume * 100)}%
           </div>
+          {audioError && (
+            <div style={{ fontSize: 11, color: "#ff3860", marginTop: 8, textAlign: "center" }}>⚠ {audioError}</div>
+          )}
         </div>
       )}
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
         {showControls && (
           <button onClick={() => setShowControls(false)} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 11, cursor: "pointer" }}>✕</button>
         )}
-        <button
-          onClick={() => { if (!playing) startMusic(); else stopMusic(); }}
-          style={{
-            width: 44, height: 44, borderRadius: "50%",
-            background: playing ? "linear-gradient(135deg, #ff2d95, #b829ff)" : "linear-gradient(135deg, #1a0a2e, #1a0a2e)",
-            border: `1px solid ${playing ? "#ff2d95" : "#3d1f5c"}`,
-            color: playing ? "#05010f" : "#6b4f99", fontSize: 18, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: playing ? "0 0 20px rgba(255,45,149,0.3)" : "0 4px 16px rgba(0,0,0,0.4)",
-            transition: "all 0.3s",
-          }}
-          title="Play/pause radio"
-        >
-          {playing ? "♫" : "♪"}
-        </button>
+        <div style={{ position: "relative" }}>
+          <button
+            onClick={() => { if (!playing) startMusic(); else stopMusic(); }}
+            style={{
+              width: 44, height: 44, borderRadius: "50%",
+              background: playing ? "linear-gradient(135deg, #ff2d95, #b829ff)" : "linear-gradient(135deg, #1a0a2e, #1a0a2e)",
+              border: `1px solid ${playing ? "#ff2d95" : "#3d1f5c"}`,
+              color: playing ? "#05010f" : "#6b4f99", fontSize: 18, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: playing ? "0 0 20px rgba(255,45,149,0.3)" : "0 4px 16px rgba(0,0,0,0.4)",
+              transition: "all 0.3s",
+            }}
+            title={audioError || "Play/pause radio"}
+          >
+            {playing ? "♫" : "♪"}
+          </button>
+          {audioError && !showControls && (
+            <span
+              onClick={() => setShowControls(true)}
+              title={audioError}
+              style={{
+                position: "absolute", top: -2, right: -2, width: 14, height: 14, borderRadius: "50%",
+                background: "#ff3860", border: "2px solid #05010f", cursor: "pointer",
+              }}
+            />
+          )}
+        </div>
         {!showControls && (
           <button
             onClick={() => setShowControls(true)}

@@ -107,8 +107,8 @@ export function Badge({ children, color = "#ff2d95" }) {
 export function ChaosStatusBadge({ holderId, playerId, drawPicks }) {
   const isHolder = holderId === playerId;
   const hasPicked = drawPicks?.[playerId] !== undefined;
-  const color = isHolder ? "#ff2d95" : hasPicked ? "#00ff9d" : "#3d1f5c";
-  const title = isHolder ? "Holds the Power of Chaos" : hasPicked ? "Made their Power of Chaos pick" : "Hasn't made their Power of Chaos pick yet";
+  const color = isHolder ? "#00ff9d" : hasPicked ? "#ff3860" : "#3d1f5c";
+  const title = isHolder ? "Won the Power of Chaos" : hasPicked ? "Picked, but didn't win it" : "Hasn't made their Power of Chaos pick yet";
   return (
     <span
       title={title}

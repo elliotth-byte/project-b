@@ -48,10 +48,11 @@ export default function VotingHistorySpreadsheet({ exileHistory, finaleState, pl
 
   return (
     <Card>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
         <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🗳 Voting History</h3>
         <Btn small onClick={download}>⬇ Download CSV</Btn>
       </div>
+      <div style={{ fontSize: 10, color: "#6b4f99", marginBottom: 10 }}><s style={{ textDecorationColor: "#ff3860" }}>Struck-through</s> votes were nullified by the Power of Chaos.</div>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <thead>
@@ -80,7 +81,14 @@ export default function VotingHistorySpreadsheet({ exileHistory, finaleState, pl
                 </td>
                 {r.cells.map((cell, i) => (
                   <td key={i} style={{ padding: "6px 10px", color: cell ? "#f5f0ff" : "#6b4f99", whiteSpace: "nowrap" }}>
-                    {cell || "—"}
+                    {cell ? (
+                      <span
+                        style={cell.nullified ? { textDecoration: "line-through", textDecorationColor: "#ff3860", textDecorationThickness: 2, color: "#6b4f99" } : undefined}
+                        title={cell.nullified ? "Nullified by the Power of Chaos" : undefined}
+                      >
+                        {cell.target}
+                      </span>
+                    ) : "—"}
                   </td>
                 ))}
               </tr>
