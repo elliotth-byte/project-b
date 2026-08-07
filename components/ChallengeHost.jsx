@@ -45,9 +45,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   }, [gameId]);
 
   const approvedAlive = players.filter((p) => p.approved && p.alive);
-  const allApproved = players.filter((p) => p.approved);
   const alivePicker = approvedAlive.map((p) => ({ id: p.id, name: p.display_name }));
-  const allPicker = allApproved.map((p) => ({ id: p.id, name: p.display_name }));
 
   // Every exiled player still eligible (hasn't used their one shot yet)
   // gets to opt in or out of THIS specific challenge, deliberately, from
@@ -63,7 +61,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
 
   const startChallenge = async () => {
     setBusy(true);
-    const { participants } = computeParticipants(config, { alive: alivePicker, allPlayers: allPicker });
+    const { participants } = computeParticipants(config, { alive: alivePicker });
     const participantIds = participants.map((p) => p.id);
     // Read fresh rather than trusting the subscribed `reentry` state above —
     // right after an Exile Vote resolves, a host clicking Start Challenge
@@ -165,7 +163,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
           </div>
         )}
 
-        <ParticipantPicker alive={alivePicker} allPlayers={allPicker} value={config} onChange={setConfig} />
+        <ParticipantPicker alive={alivePicker} value={config} onChange={setConfig} />
 
         {pendingReentrants.length > 0 && (
           <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>

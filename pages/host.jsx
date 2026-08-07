@@ -23,6 +23,7 @@ export default function HostPage() {
 
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  const [radioPortalNode, setRadioPortalNode] = useState(null);
   const [newSubtitle, setNewSubtitle] = useState("");
 
   const [editing, setEditing] = useState(false);
@@ -451,23 +452,30 @@ export default function HostPage() {
             players={players}
             gameName={game.name}
             adminExtra={
-              <GameAccessPanel
-                game={game}
-                players={players}
-                isPrimaryHost={isPrimaryHost}
-                origin={origin}
-                coHosts={coHosts}
-                inviteEmail={inviteEmail}
-                setInviteEmail={setInviteEmail}
-                inviteStatus={inviteStatus}
-                inviteCoHost={inviteCoHost}
-                removeCoHost={removeCoHost}
-              />
+              <>
+                <GameAccessPanel
+                  game={game}
+                  players={players}
+                  isPrimaryHost={isPrimaryHost}
+                  origin={origin}
+                  coHosts={coHosts}
+                  inviteEmail={inviteEmail}
+                  setInviteEmail={setInviteEmail}
+                  inviteStatus={inviteStatus}
+                  inviteCoHost={inviteCoHost}
+                  removeCoHost={removeCoHost}
+                />
+                {/* The radio's actual controls (see MusicPlayer.jsx) get
+                    portaled into this div — MusicPlayer itself stays
+                    mounted below, outside HostPanels, so the audio engine
+                    keeps running even when this tab isn't the active one. */}
+                <div ref={setRadioPortalNode} />
+              </>
             }
           />
         )}
       </div>
-      {game && <MusicPlayer key={`music-${game.id}`} gameId={game.id} isHost={true} />}
+      {game && <MusicPlayer key={`music-${game.id}`} gameId={game.id} isHost={true} portalTarget={radioPortalNode} />}
     </div>
   );
 }

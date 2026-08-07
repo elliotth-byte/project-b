@@ -2,7 +2,6 @@ import { DEFAULT_PARTICIPATION, computeParticipants } from "../lib/challengePart
 
 const boxStyle = { background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 };
 const rowStyle = { display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 8 };
-const toggleLabel = { display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: "#a68fd6", cursor: "pointer" };
 const chip = (active) => ({
   fontSize: 11, padding: "3px 9px", borderRadius: 12, cursor: "pointer",
   background: active ? "rgba(255,45,149,0.15)" : "transparent",
@@ -11,12 +10,14 @@ const chip = (active) => ({
 
 // Drop this inside a ChallengeSetupCard (it renders as `children`, above
 // the Start button). Keep the config in the host component's own state
-// and pass it to computeParticipants() inside start().
-export default function ParticipantPicker({ alive, allPlayers, shieldedNames = [], returnedNames = [], value, onChange }) {
+// and pass it to computeParticipants() inside start(). Exiled players
+// aren't handled here at all — see lib/reentryData.js's per-challenge
+// opt-in, which every eligible exiled player decides for themselves.
+export default function ParticipantPicker({ alive, value, onChange }) {
   const cfg = { ...DEFAULT_PARTICIPATION, ...value };
   const set = (patch) => onChange({ ...cfg, ...patch });
 
-  const { participants, spectators } = computeParticipants(cfg, { alive, allPlayers, shieldedNames, returnedNames });
+  const { participants, spectators } = computeParticipants(cfg, { alive });
 
   const toggleManual = (name) => {
     const selected = cfg.manualSelected.includes(name)
@@ -46,21 +47,6 @@ export default function ParticipantPicker({ alive, allPlayers, shieldedNames = [
           {alive.length === 0 && <span style={{ fontSize: 11, color: "#6b4f99", fontStyle: "italic" }}>No alive players.</span>}
         </div>
       )}
-
-      <div style={rowStyle}>
-        <label style={toggleLabel}>
-          <input type="checkbox" checked={cfg.excludeShielded} onChange={(e) => set({ excludeShielded: e.target.checked })} />
-          Exclude shielded players
-        </label>
-        <label style={toggleLabel}>
-          <input type="checkbox" checked={cfg.includeEliminatedSpectators} onChange={(e) => set({ includeEliminatedSpectators: e.target.checked })} />
-          Include eliminated players as spectators
-        </label>
-        <label style={toggleLabel}>
-          <input type="checkbox" checked={cfg.includeReturned} onChange={(e) => set({ includeReturned: e.target.checked })} />
-          Include returned players
-        </label>
-      </div>
 
       <div style={{ fontSize: 11.5, color: "#6b4f99" }}>
         {participants.length} participant{participants.length === 1 ? "" : "s"}

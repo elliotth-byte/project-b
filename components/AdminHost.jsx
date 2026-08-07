@@ -47,6 +47,24 @@ export default function AdminHost({ gameId, players, round }) {
     if (error) alert("Couldn't remove: " + error.message);
   };
 
+  // The manual undo for the above (or a genuine exile) — brings someone
+  // back to alive without needing to win a challenge for it. Also
+  // resolves any lingering re-entry record so they don't ALSO keep
+  // showing up as "eligible to opt into re-entry" once they're just a
+  // regular alive player again.
+  const restorePlayer = async (p) => {
+    if (!confirm(`Restore ${p.display_name}? They'll be alive again, as if never exiled.`)) return;
+    const { error } = await supabase.from("players").update({ alive: true, elimination_type: null }).eq("id", p.id);
+    if (error) { alert("Couldn't restore: " + error.message); return; }
+    await storageUpdate(gameId, KEY_REENTRY, (fresh) => {
+      const list = fresh || [];
+      const idx = list.findIndex((r) => r.playerId === p.id);
+      if (idx < 0) return list;
+      list[idx] = { ...list[idx], status: REENTRY_STATUS.RETURNED };
+      return list;
+    });
+  };
+
   const nameFor = (p) => names[p.id] ?? p.display_name;
 
   const saveName = async (p) => {
@@ -234,7 +252,10 @@ export default function AdminHost({ gameId, players, round }) {
               {p.alive ? (
                 <Btn small variant="ghost" onClick={() => removeApprovedPlayer(p)}>Remove</Btn>
               ) : (
-                <span style={{ fontSize: 11, color: "#6b4f99" }}>({p.elimination_type === "quit" ? "left" : "exiled"})</span>
+                <>
+                  <span style={{ fontSize: 11, color: "#6b4f99" }}>({p.elimination_type === "quit" ? "left" : "exiled"})</span>
+                  <Btn small variant="ghost" onClick={() => restorePlayer(p)}>Restore</Btn>
+                </>
               )}
             </div>
           ))}
