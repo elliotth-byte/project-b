@@ -1,45 +1,31 @@
 import { useState, useEffect } from "react";
-import { Card, Badge } from "./ui";
+import { Card } from "./ui";
 import { subscribeGameState } from "../lib/gameStorage";
 import { KEY_CHALLENGE_HISTORY, KEY_EXILE_HISTORY, KEY_REENTRY, KEY_FINALE, KEY_FATES, KEY_EXILE } from "../lib/gameState";
-import { GAME_REGISTRY } from "../lib/challengeGames";
-import { formatPlacementValue } from "../lib/challengeScores";
 import VotingHistorySpreadsheet from "./VotingHistorySpreadsheet";
 import AnnouncementsFeed from "./AnnouncementsFeed";
+import { LiveNominationsRecap, ChallengeResultsCard, RoundCeremonyCard, FinaleCard } from "./CeremonyCards";
+import { buildVotingRows } from "../lib/votingSpreadsheet";
 
-function LiveNominationsCard({ round, nominatorOrder, nominations, byId }) {
-  if (!nominatorOrder?.length) return null;
-  return (
-    <Card style={{ borderColor: "rgba(255,45,149,0.3)" }}>
-      <h3 style={{ color: "#ff2d95", margin: "0 0 6px", fontSize: 14, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
-        ⚖️ Round {round} — Nominations so far
-      </h3>
-      <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 8px", fontStyle: "italic" }}>
-        This round's ceremony hasn't wrapped up yet — nominations aren't secret, so they're shown here live.
-      </p>
-      <div style={{ display: "grid", gap: 3 }}>
-        {nominatorOrder.map((n) => (
-          <div key={n.playerId} style={{ fontSize: 12, color: "#f5f0ff" }}>
-            <Badge>#{n.place}</Badge> {n.name}{" "}
-            {nominations?.[n.playerId] ? (
-              <>nominated <strong style={{ color: "#ff3860" }}>{byId[nominations[n.playerId]] || "?"}</strong></>
-            ) : (
-              <span style={{ color: "#6b4f99", fontStyle: "italic" }}>still deciding...</span>
-            )}
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
+// ─── Host: History tab ───
+// Deliberately kept in lockstep with the player-facing Ceremony tab
+// (CeremonyPlayer.jsx) — same round/finale/challenge cards (shared via
+// CeremonyCards.jsx), same page-by-page navigation, same comments and
+// voting-sheet toggles. The host gets two things on top of what players
+// see: the "Re-entry attempts" summary below, and — like the Ceremony
+// tab already did — nothing here shows a live vote tally before it's
+// actually revealed; the host already has that live view on the Current
+// Round tab, so this stays a clean recap rather than a duplicate.
 export default function HistoryTab({ gameId, players, gameName, round }) {
   const [challengeHistory, setChallengeHistory] = useState([]);
   const [exileHistory, setExileHistory] = useState([]);
   const [reentry, setReentry] = useState([]);
-  const [finaleState, setFinaleState] = useState(null);
+  const [finale, setFinale] = useState(null);
   const [liveFates, setLiveFates] = useState(null);
   const [liveExile, setLiveExile] = useState(null);
+  const [showComments, setShowComments] = useState(false);
+  const [showVotingSheet, setShowVotingSheet] = useState(false);
+  const [pageIndex, setPageIndex] = useState(0);
 
   useEffect(() => {
     const unsubscribe = subscribeGameState(gameId, KEY_CHALLENGE_HISTORY, (v) => setChallengeHistory(v || []));
@@ -54,7 +40,7 @@ export default function HistoryTab({ gameId, players, gameName, round }) {
     return unsubscribe;
   }, [gameId]);
   useEffect(() => {
-    const unsubscribe = subscribeGameState(gameId, KEY_FINALE, setFinaleState);
+    const unsubscribe = subscribeGameState(gameId, KEY_FINALE, setFinale);
     return unsubscribe;
   }, [gameId]);
   // Live (not-yet-history) nomination state — nominations aren't secret,
@@ -73,101 +59,147 @@ export default function HistoryTab({ gameId, players, gameName, round }) {
   const byId = {};
   players.forEach((p) => (byId[p.id] = p.display_name));
 
+  const votingRows = buildVotingRows(exileHistory, finale?.revealed ? finale : null, byId);
+  const rowsForRound = (r) => votingRows.filter((row) => row.context === `Round ${r}`);
+  const finaleRows = votingRows.filter((row) => row.context === "Finale");
+
+  const roundsDesc = [...exileHistory].sort((a, b) => b.round - a.round);
+  const standaloneChallenges = [...challengeHistory]
+    .filter((c) => !exileHistory.some((e) => e.round === c.round))
+    .sort((a, b) => b.round - a.round);
+
   const currentRoundHasHistory = exileHistory.some((e) => e.round === round?.round);
-  const liveNominatorOrder = round?.phase === "fates" ? liveFates?.nominatorOrder : round?.phase === "exile" ? liveExile?.fatesNominatorOrder : null;
-  const liveNominations = round?.phase === "fates" ? liveFates?.nominations : round?.phase === "exile" ? liveExile?.fatesNominations : null;
-  const showLiveNominations = !currentRoundHasHistory && liveNominatorOrder?.length > 0;
+  const ceremonyInProgress = !finale && (round?.phase === "fates" || round?.phase === "exile") && !currentRoundHasHistory;
 
-  if (challengeHistory.length === 0 && exileHistory.length === 0 && !showLiveNominations) {
-    return (
-      <div style={{ display: "grid", gap: 16 }}>
-        <AnnouncementsFeed gameId={gameId} />
-        <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>No completed rounds yet.</p></Card>
-      </div>
-    );
-  }
+  const nothingYet = !finale && roundsDesc.length === 0 && standaloneChallenges.length === 0 && !ceremonyInProgress;
 
-  const rounds = [...new Set([...challengeHistory.map((c) => c.round), ...exileHistory.map((e) => e.round)])].sort((a, b) => a - b);
+  const pages = [];
+  if (finale) pages.push({ type: "finale" });
+  if (ceremonyInProgress) pages.push({ type: "inProgress" });
+  const roundNumbers = [...new Set([...standaloneChallenges.map((c) => c.round), ...roundsDesc.map((e) => e.round)])].sort((a, b) => b - a);
+  roundNumbers.forEach((r) => {
+    pages.push(roundsDesc.some((e) => e.round === r) ? { type: "round", round: r } : { type: "challenge", round: r });
+  });
+
+  useEffect(() => { setPageIndex(0); }, [pages.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const clampedIndex = Math.min(pageIndex, Math.max(0, pages.length - 1));
+  const currentPage = pages[clampedIndex];
+
+  const pageLabel = (p) => {
+    if (!p) return "";
+    if (p.type === "finale") return "Finale";
+    if (p.type === "inProgress") return `Round ${round.round} — in progress`;
+    return `Round ${p.round}`;
+  };
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <AnnouncementsFeed gameId={gameId} />
 
-      {showLiveNominations && (
-        <LiveNominationsCard round={round.round} nominatorOrder={liveNominatorOrder} nominations={liveNominations} byId={byId} />
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button
+          onClick={() => setShowComments(!showComments)}
+          style={{
+            background: showComments ? "rgba(255,45,149,0.13)" : "transparent",
+            border: "1px solid #3d1f5c", borderRadius: 8, padding: "6px 12px",
+            color: showComments ? "#ff2d95" : "#a68fd6", fontSize: 12, cursor: "pointer",
+            fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
+          }}
+        >
+          💬 {showComments ? "Hide" : "Show"} all comments
+        </button>
+        <button
+          onClick={() => setShowVotingSheet(!showVotingSheet)}
+          style={{
+            background: showVotingSheet ? "rgba(255,45,149,0.13)" : "transparent",
+            border: "1px solid #3d1f5c", borderRadius: 8, padding: "6px 12px",
+            color: showVotingSheet ? "#ff2d95" : "#a68fd6", fontSize: 12, cursor: "pointer",
+            fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
+          }}
+        >
+          🗳 {showVotingSheet ? "Hide" : "Show"} voting sheet
+        </button>
+      </div>
+
+      {showVotingSheet && (
+        <VotingHistorySpreadsheet exileHistory={exileHistory} finaleState={finale} players={players} gameName={gameName} challengeHistory={challengeHistory} />
       )}
 
-      {rounds.map((r) => {
-        const c = challengeHistory.find((x) => x.round === r);
-        const e = exileHistory.find((x) => x.round === r);
-        const registryEntry = c?.gameType && GAME_REGISTRY[c.gameType];
-        const rankDirection = registryEntry?.rank === "time-asc" ? "time-asc" : "score-desc";
-        const hasNominations = e?.fatesNominatorOrder?.length > 0;
-        return (
-          <Card key={r}>
-            <h3 style={{ color: "#ff2d95", margin: "0 0 10px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
-              Round {r} {c?.finalFour && <Badge color="#ff3860">Final Four</Badge>}
-            </h3>
-            {c && (
-              <div style={{ marginBottom: (e || hasNominations) ? 10 : 0 }}>
-                <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
-                  Challenge{c.gameType && registryEntry && ` — ${registryEntry.icon} ${registryEntry.label}`}
-                </div>
-                <div style={{ display: "grid", gap: 3 }}>
-                  {[...(c.placements || [])].sort((a, b) => a.place - b.place).map((p) => {
-                    const scoreLabel = formatPlacementValue(p, c.gameType, rankDirection);
-                    return (
-                      <div key={p.playerId} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12 }}>
-                        <span style={{ color: p.place === 1 ? "#ff2d95" : "#a68fd6", fontWeight: p.place === 1 ? 700 : 500 }}>
-                          #{p.place} {p.name}
-                        </span>
-                        {scoreLabel && <span style={{ color: p.forfeited ? "#ff3860" : "#6b4f99" }}>{scoreLabel}</span>}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            {hasNominations && (
-              <div style={{ marginBottom: e ? 10 : 0 }}>
-                <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
-                  Fates Ceremony — Nominations
-                </div>
-                <div style={{ display: "grid", gap: 3 }}>
-                  {e.fatesNominatorOrder.map((n) => {
-                    const nomineeId = e.fatesNominations?.[n.playerId];
-                    return (
-                      <div key={n.playerId} style={{ fontSize: 12, color: "#f5f0ff" }}>
-                        <Badge>#{n.place}</Badge> {n.name} nominated{" "}
-                        <strong style={{ color: "#ff3860" }}>{nomineeId ? byId[nomineeId] || "?" : "no one"}</strong>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            {e && (
-              <div>
-                <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
-                  Exile Vote {e.mode === "save" && <Badge color="#ff3860">Double Elimination</Badge>}
-                </div>
-                <p style={{ fontSize: 12, color: "#f5f0ff", margin: 0 }}>
-                  Nominees: {(e.nominees || []).map((n) => n.name).join(", ")}
-                  {e.exiledIds?.length > 0 && (
-                    <> — <strong style={{ color: "#ff3860" }}>{e.exiledIds.map((id) => byId[id] || "?").join(", ")}</strong> exiled</>
-                  )}
-                </p>
-                {e.nullifiedId && (
-                  <p style={{ fontSize: 11, color: "#a68fd6", margin: "4px 0 0", fontStyle: "italic" }}>
-                    🃏 Power of Chaos nullified {byId[e.nullifiedId] || "?"}
-                  </p>
-                )}
-              </div>
-            )}
-          </Card>
-        );
-      })}
+      {pages.length > 1 && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <button
+            onClick={() => setPageIndex((i) => Math.min(pages.length - 1, i + 1))}
+            disabled={clampedIndex >= pages.length - 1}
+            style={{
+              background: "transparent", border: "1px solid #3d1f5c", borderRadius: 8, width: 36, height: 36,
+              color: clampedIndex >= pages.length - 1 ? "#3d1f5c" : "#a68fd6", fontSize: 16,
+              cursor: clampedIndex >= pages.length - 1 ? "default" : "pointer", flexShrink: 0,
+            }}
+            title="Older"
+          >
+            ‹
+          </button>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#f5f0ff", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
+            {pageLabel(currentPage)}
+          </span>
+          <button
+            onClick={() => setPageIndex((i) => Math.max(0, i - 1))}
+            disabled={clampedIndex <= 0}
+            style={{
+              background: "transparent", border: "1px solid #3d1f5c", borderRadius: 8, width: 36, height: 36,
+              color: clampedIndex <= 0 ? "#3d1f5c" : "#a68fd6", fontSize: 16,
+              cursor: clampedIndex <= 0 ? "default" : "pointer", flexShrink: 0,
+            }}
+            title="More recent"
+          >
+            ›
+          </button>
+        </div>
+      )}
 
+      {currentPage?.type === "finale" && (
+        <FinaleCard finale={finale} rows={finaleRows} byId={byId} showComments={showComments} />
+      )}
+
+      {currentPage?.type === "inProgress" && (
+        <Card style={{ textAlign: "center", borderColor: "rgba(255,45,149,0.3)" }}>
+          <div style={{ fontSize: 24, marginBottom: 4 }}>{round.phase === "fates" ? "⚖️" : "🃏"}</div>
+          <p style={{ color: "#f5f0ff", fontSize: 14, fontWeight: 700, margin: "0 0 4px", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
+            Round {round.round}'s {round.phase === "fates" ? "Fates Ceremony" : "Exile Vote"} is underway
+          </p>
+          <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic", margin: 0 }}>
+            This round's full breakdown shows up here once it's revealed — see the Current Round tab for live status.
+          </p>
+          <LiveNominationsRecap
+            nominatorOrder={round.phase === "fates" ? liveFates?.nominatorOrder : liveExile?.fatesNominatorOrder}
+            nominations={round.phase === "fates" ? liveFates?.nominations : liveExile?.fatesNominations}
+            nominationReasons={round.phase === "fates" ? liveFates?.nominationReasons : liveExile?.fatesNominationReasons}
+            byId={byId}
+            showComments={showComments}
+          />
+        </Card>
+      )}
+
+      {currentPage?.type === "challenge" && (
+        <ChallengeResultsCard entry={challengeHistory.find((c) => c.round === currentPage.round)} />
+      )}
+
+      {currentPage?.type === "round" && (
+        <RoundCeremonyCard
+          entry={roundsDesc.find((e) => e.round === currentPage.round)}
+          challenge={challengeHistory.find((c) => c.round === currentPage.round)}
+          rows={rowsForRound(currentPage.round)}
+          byId={byId}
+          showComments={showComments}
+        />
+      )}
+
+      {nothingYet && (
+        <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>No completed rounds yet.</p></Card>
+      )}
+
+      {/* Host-only extra — not shown on the player-facing Ceremony tab. */}
       {reentry.length > 0 && (
         <Card>
           <h3 style={{ color: "#f5f0ff", margin: "0 0 8px", fontSize: 14, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🔥 Re-entry attempts</h3>
@@ -183,8 +215,6 @@ export default function HistoryTab({ gameId, players, gameName, round }) {
           </div>
         </Card>
       )}
-
-      <VotingHistorySpreadsheet exileHistory={exileHistory} finaleState={finaleState} players={players} gameName={gameName} challengeHistory={challengeHistory} />
     </div>
   );
 }
