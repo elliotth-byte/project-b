@@ -6,6 +6,7 @@ import { GAME_REGISTRY } from "../lib/challengeGames";
 import { formatPlacementValue } from "../lib/challengeScores";
 import { buildVotingRows } from "../lib/votingSpreadsheet";
 import AnnouncementsFeed from "./AnnouncementsFeed";
+import VotingHistorySpreadsheet from "./VotingHistorySpreadsheet";
 
 // ─── Player-facing Ceremony tab ───
 // Unlike FatesPlayer/ExileVotePlayer/FinalePlayer (which only render while
@@ -27,6 +28,8 @@ export default function CeremonyPlayer({ gameId, players, round }) {
   const [liveExile, setLiveExile] = useState(null);
   const [liveFates, setLiveFates] = useState(null);
   const [showComments, setShowComments] = useState(false);
+  const [showVotingSheet, setShowVotingSheet] = useState(false);
+  const [pageIndex, setPageIndex] = useState(0);
 
   useEffect(() => {
     const unsubscribe = subscribeGameState(gameId, KEY_EXILE_HISTORY, (v) => setExileHistory(v || []));
@@ -82,27 +85,102 @@ export default function CeremonyPlayer({ gameId, players, round }) {
 
   const nothingYet = !finale && roundsDesc.length === 0 && standaloneChallenges.length === 0 && !ceremonyInProgress;
 
+  // One page per "thing that happened" — most recent first — flipped
+  // through with arrows instead of scrolling past every round at once.
+  // The Finale (if it exists) and an in-progress ceremony (if there is
+  // one) always lead, since they're the most current thing going on.
+  const pages = [];
+  if (finale) pages.push({ type: "finale" });
+  if (ceremonyInProgress) pages.push({ type: "inProgress" });
+  const roundNumbers = [...new Set([...standaloneChallenges.map((c) => c.round), ...roundsDesc.map((e) => e.round)])].sort((a, b) => b - a);
+  roundNumbers.forEach((r) => {
+    pages.push(roundsDesc.some((e) => e.round === r) ? { type: "round", round: r } : { type: "challenge", round: r });
+  });
+
+  // New rounds/reveals should always bring the player back to "what just
+  // happened," not leave them stranded on whatever page they were on.
+  useEffect(() => { setPageIndex(0); }, [pages.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const clampedIndex = Math.min(pageIndex, Math.max(0, pages.length - 1));
+  const currentPage = pages[clampedIndex];
+
+  const pageLabel = (p) => {
+    if (!p) return "";
+    if (p.type === "finale") return "Finale";
+    if (p.type === "inProgress") return `Round ${round.round} — in progress`;
+    return `Round ${p.round}`;
+  };
+
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <AnnouncementsFeed gameId={gameId} />
 
-      <button
-        onClick={() => setShowComments(!showComments)}
-        style={{
-          justifySelf: "start", background: showComments ? "rgba(255,45,149,0.13)" : "transparent",
-          border: "1px solid #3d1f5c", borderRadius: 8, padding: "6px 12px",
-          color: showComments ? "#ff2d95" : "#a68fd6", fontSize: 12, cursor: "pointer",
-          fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
-        }}
-      >
-        💬 {showComments ? "Hide" : "Show"} all comments
-      </button>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button
+          onClick={() => setShowComments(!showComments)}
+          style={{
+            background: showComments ? "rgba(255,45,149,0.13)" : "transparent",
+            border: "1px solid #3d1f5c", borderRadius: 8, padding: "6px 12px",
+            color: showComments ? "#ff2d95" : "#a68fd6", fontSize: 12, cursor: "pointer",
+            fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
+          }}
+        >
+          💬 {showComments ? "Hide" : "Show"} all comments
+        </button>
+        <button
+          onClick={() => setShowVotingSheet(!showVotingSheet)}
+          style={{
+            background: showVotingSheet ? "rgba(255,45,149,0.13)" : "transparent",
+            border: "1px solid #3d1f5c", borderRadius: 8, padding: "6px 12px",
+            color: showVotingSheet ? "#ff2d95" : "#a68fd6", fontSize: 12, cursor: "pointer",
+            fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
+          }}
+        >
+          🗳 {showVotingSheet ? "Hide" : "Show"} voting sheet
+        </button>
+      </div>
 
-      {finale && (
+      {showVotingSheet && (
+        <VotingHistorySpreadsheet exileHistory={exileHistory} finaleState={finale} players={players} challengeHistory={challengeHistory} />
+      )}
+
+      {pages.length > 1 && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <button
+            onClick={() => setPageIndex((i) => Math.min(pages.length - 1, i + 1))}
+            disabled={clampedIndex >= pages.length - 1}
+            style={{
+              background: "transparent", border: "1px solid #3d1f5c", borderRadius: 8, width: 36, height: 36,
+              color: clampedIndex >= pages.length - 1 ? "#3d1f5c" : "#a68fd6", fontSize: 16,
+              cursor: clampedIndex >= pages.length - 1 ? "default" : "pointer", flexShrink: 0,
+            }}
+            title="Older"
+          >
+            ‹
+          </button>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#f5f0ff", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
+            {pageLabel(currentPage)}
+          </span>
+          <button
+            onClick={() => setPageIndex((i) => Math.max(0, i - 1))}
+            disabled={clampedIndex <= 0}
+            style={{
+              background: "transparent", border: "1px solid #3d1f5c", borderRadius: 8, width: 36, height: 36,
+              color: clampedIndex <= 0 ? "#3d1f5c" : "#a68fd6", fontSize: 16,
+              cursor: clampedIndex <= 0 ? "default" : "pointer", flexShrink: 0,
+            }}
+            title="More recent"
+          >
+            ›
+          </button>
+        </div>
+      )}
+
+      {currentPage?.type === "finale" && (
         <FinaleCard finale={finale} rows={finaleRows} byId={byId} showComments={showComments} />
       )}
 
-      {ceremonyInProgress && (
+      {currentPage?.type === "inProgress" && (
         <Card style={{ textAlign: "center", borderColor: "rgba(255,45,149,0.3)" }}>
           <div style={{ fontSize: 24, marginBottom: 4 }}>{round.phase === "fates" ? "⚖️" : "🃏"}</div>
           <p style={{ color: "#f5f0ff", fontSize: 14, fontWeight: 700, margin: "0 0 4px", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
@@ -121,13 +199,19 @@ export default function CeremonyPlayer({ gameId, players, round }) {
         </Card>
       )}
 
-      {standaloneChallenges.map((c) => (
-        <ChallengeResultsCard key={`challenge-${c.round}`} entry={c} />
-      ))}
+      {currentPage?.type === "challenge" && (
+        <ChallengeResultsCard entry={challengeHistory.find((c) => c.round === currentPage.round)} />
+      )}
 
-      {roundsDesc.map((e) => (
-        <RoundCeremonyCard key={e.round} entry={e} challenge={challengeHistory.find((c) => c.round === e.round)} rows={rowsForRound(e.round)} byId={byId} showComments={showComments} />
-      ))}
+      {currentPage?.type === "round" && (
+        <RoundCeremonyCard
+          entry={roundsDesc.find((e) => e.round === currentPage.round)}
+          challenge={challengeHistory.find((c) => c.round === currentPage.round)}
+          rows={rowsForRound(currentPage.round)}
+          byId={byId}
+          showComments={showComments}
+        />
+      )}
 
       {nothingYet && (
         <Card><p style={{ color: "#6b4f99", fontStyle: "italic", margin: 0 }}>No ceremonies yet — they'll show up here once Round 1's Challenge wraps up.</p></Card>
