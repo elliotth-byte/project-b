@@ -13,12 +13,15 @@ import ChaosPowerPlayer from "../components/ChaosPowerPlayer";
 import ConfessionalPlayer from "../components/ConfessionalPlayer";
 import MusicPlayer from "../components/MusicPlayer";
 import HelpPanel from "../components/HelpPanel";
+import RoundRevealGate from "../components/RoundRevealGate";
 import HomeLink from "../components/HomeLink";
 import LogoutButton from "../components/LogoutButton";
 import ChallengeErrorBoundary from "../components/ChallengeErrorBoundary";
 import RoundTimerBanner from "../components/RoundTimerBanner";
 import { Card } from "../components/ui";
-import { subscribeRound, PHASES } from "../lib/gameState";
+import { subscribeRound, PHASES, KEY_EXILE_HISTORY } from "../lib/gameState";
+import { subscribeGameState } from "../lib/gameStorage";
+import { subscribeRevealAck } from "../lib/revealAck";
 import { useRoundWatcher } from "../lib/useRoundWatcher";
 
 const TABS = [
@@ -40,6 +43,8 @@ export default function PlayPage() {
   const [tab, setTab] = useState("game");
   const [gameInfo, setGameInfo] = useState(null);
   const [quitBusy, setQuitBusy] = useState(false);
+  const [exileHistory, setExileHistory] = useState([]);
+  const [revealAck, setRevealAck] = useState({});
 
   useRoundWatcher(gameId);
 
@@ -62,6 +67,25 @@ export default function PlayPage() {
     const unsubscribe = subscribeRound(gameId, setRound);
     return unsubscribe;
   }, [gameId]);
+
+  // Drives the forced dramatic reveal below — see RoundRevealGate.jsx.
+  // Only the most recent Exile round ever gates the screen (not a
+  // marathon of every round someone might have missed), and only once
+  // that round has actually landed in history (i.e. genuinely revealed,
+  // not just "voting closed").
+  useEffect(() => {
+    if (!gameId) return;
+    const unsubscribe = subscribeGameState(gameId, KEY_EXILE_HISTORY, (v) => setExileHistory(v || []));
+    return unsubscribe;
+  }, [gameId]);
+
+  const latestExileEntry = exileHistory.length > 0 ? exileHistory.reduce((a, b) => (b.round > a.round ? b : a)) : null;
+
+  useEffect(() => {
+    if (!gameId || !latestExileEntry) { setRevealAck({}); return; }
+    const unsubscribe = subscribeRevealAck(gameId, latestExileEntry.round, setRevealAck);
+    return unsubscribe;
+  }, [gameId, latestExileEntry?.round]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Full roster (needed by FatesPlayer to list nomination targets, and
   // by FinalePlayer to know who's a finalist).
@@ -193,6 +217,12 @@ export default function PlayPage() {
   const approved = joined && !!myPlayer?.approved;
   const gameEnded = round?.phase === PHASES.ENDED;
 
+  // Once a round's Exile Vote has actually landed in history, this
+  // player's whole screen locks into RoundRevealGate until they've
+  // clicked through it — see the effect above for why only the latest
+  // round ever triggers this.
+  const pendingReveal = approved && !!myPlayer.color && !!playerName && !!latestExileEntry && !revealAck[player?.id];
+
   const handleQuit = async () => {
     if (!myPlayer) return;
     const verb = approved ? "quit this game" : "cancel your join request";
@@ -253,7 +283,7 @@ export default function PlayPage() {
           </div>
         )}
 
-        {gameEnded && approved && (
+        {gameEnded && approved && !pendingReveal && (
           <div style={{ marginBottom: 20, textAlign: "center", padding: "28px 20px", background: "linear-gradient(160deg, #1a0a2e 0%, #1a0a2e 100%)", border: "2px solid #ff2d95", borderRadius: 12 }}>
             <div style={{ fontSize: 36, marginBottom: 8 }}>🏆</div>
             <p style={{ color: "#f5f0ff", fontSize: 18, fontWeight: 700, margin: 0, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
@@ -262,7 +292,7 @@ export default function PlayPage() {
           </div>
         )}
 
-        {exiled && approved && !gameEnded && (
+        {exiled && approved && !gameEnded && !pendingReveal && (
           <div style={{
             marginBottom: 20, textAlign: "center", padding: "24px 20px",
             background: "linear-gradient(160deg, #200a1a 0%, #120612 100%)",
@@ -275,7 +305,13 @@ export default function PlayPage() {
           </div>
         )}
 
-        {approved && myPlayer.color && playerName && (
+        {pendingReveal && (
+          <ChallengeErrorBoundary label="Round Reveal">
+            <RoundRevealGate gameId={gameId} player={player} players={allPlayers} entry={latestExileEntry} />
+          </ChallengeErrorBoundary>
+        )}
+
+        {approved && myPlayer.color && playerName && !pendingReveal && (
           <>
             <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #3d1f5c" }}>
               {TABS.map((t) => (
