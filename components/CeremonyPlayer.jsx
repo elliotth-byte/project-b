@@ -306,26 +306,26 @@ function RoundCeremonyCard({ entry: e, challenge, rows, byId, showComments }) {
   const rankDirection = registryEntry?.rank === "time-asc" ? "time-asc" : "score-desc";
 
   return (
-    <Card>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+    <div style={{ display: "grid", gap: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
           Round {e.round} Ceremony
         </h3>
         {e.mode === "save" && <Badge color="#ff3860">Double Elimination</Badge>}
       </div>
 
-      {/* Challenge section — placements and scores */}
+      {/* Challenge bubble — placements and scores */}
       {challenge && (
-        <div style={{ marginBottom: 14 }}>
+        <Card>
           <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
             ⚔️ Challenge{registryEntry && ` — ${registryEntry.icon} ${registryEntry.label}`}
           </div>
           <ChallengePlacementsList placements={challenge.placements} gameType={challenge.gameType} rankDirection={rankDirection} />
-        </div>
+        </Card>
       )}
 
-      {/* Fates section — who nominated whom, in finishing order */}
-      <div style={{ marginBottom: 14 }}>
+      {/* Fates Ceremony bubble — who nominated whom, in finishing order */}
+      <Card>
         <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
           ⚖️ Fates Ceremony
         </div>
@@ -348,10 +348,10 @@ function RoundCeremonyCard({ entry: e, challenge, rows, byId, showComments }) {
             Final Four — everyone besides the Challenge winner was automatically nominated.
           </p>
         )}
-      </div>
+      </Card>
 
-      {/* Exile Vote section */}
-      <div>
+      {/* Exile Vote bubble */}
+      <Card>
         <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
           🃏 Exile Vote {e.mode === "save" ? "(voting to SAVE)" : "(voting to eliminate)"}
         </div>
@@ -375,8 +375,8 @@ function RoundCeremonyCard({ entry: e, challenge, rows, byId, showComments }) {
             ? <>💀 <span style={{ color: "#ff3860" }}>{exiledNames.join(" and ")}</span> {exiledNames.length > 1 ? "were" : "was"} exiled.</>
             : "No one was exiled this round."}
         </p>
-      </div>
-    </Card>
+      </Card>
+    </div>
   );
 }
 
