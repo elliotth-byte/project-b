@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Card, Btn } from "./ui";
-import { subscribeGroupChat, sendGroupMessage, fetchAllThreads, fetchThreadMessages, subscribeAnyDmActivity } from "../lib/chatData";
+import { subscribeGroupChat, sendGroupMessage, fetchAllThreads, fetchThreadMessages, subscribeAnyThreadActivity } from "../lib/chatData";
 
 function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -30,7 +30,7 @@ export default function ChatHostPanel({ gameId, players }) {
   const reloadThreads = async () => setThreads(await fetchAllThreads(gameId));
   useEffect(() => {
     reloadThreads();
-    const unsubscribe = subscribeAnyDmActivity(gameId, reloadThreads);
+    const unsubscribe = subscribeAnyThreadActivity(gameId, reloadThreads);
     return unsubscribe;
   }, [gameId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -61,7 +61,7 @@ export default function ChatHostPanel({ gameId, players }) {
   return (
     <Card>
       <div style={{ display: "flex", gap: 4, marginBottom: 12, borderBottom: "1px solid #3d1f5c" }}>
-        {[{ key: "group", label: "💬 Group Chat" }, { key: "dm", label: `✉️ Player DMs (${threads.length})` }].map((t) => (
+        {[{ key: "group", label: "💬 Group Chat" }, { key: "dm", label: `✉️ Threads (${threads.length})` }].map((t) => (
           <button key={t.key} onClick={() => { setMode(t.key); setOpenThreadId(null); }} style={{
             background: mode === t.key ? "rgba(255,45,149,0.13)" : "transparent",
             color: mode === t.key ? "#ff2d95" : "#a68fd6",
@@ -114,12 +114,12 @@ export default function ChatHostPanel({ gameId, players }) {
               </div>
             ))}
           </div>
-          <p style={{ fontSize: 10, color: "#6b4f99", fontStyle: "italic", textAlign: "center", marginTop: 6 }}>Read-only — hosts can watch but not post into a player's DM.</p>
+          <p style={{ fontSize: 10, color: "#6b4f99", fontStyle: "italic", textAlign: "center", marginTop: 6 }}>Read-only — hosts can watch but not post into a player's thread.</p>
         </div>
       ) : (
         <div style={{ display: "grid", gap: 6 }}>
           {threads.length === 0 ? (
-            <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No DM conversations yet.</p>
+            <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No DMs or groups yet.</p>
           ) : (
             threads.map((t) => (
               <button
@@ -131,7 +131,10 @@ export default function ChatHostPanel({ gameId, players }) {
                   padding: "10px 14px", color: "#f5f0ff", fontSize: 13, cursor: "pointer", textAlign: "left",
                 }}
               >
-                {byId[t.player_a_id] || "?"} ↔ {byId[t.player_b_id] || "?"}
+                <span>
+                  {t.is_exile_room ? "🔥 Exile Room" : t.name || (t.memberIds || []).map((id) => byId[id] || "?").join(" ↔ ")}
+                  {t.is_group && !t.is_exile_room && <span style={{ color: "#6b4f99", fontSize: 10 }}> · group ({(t.memberIds || []).length})</span>}
+                </span>
                 <span style={{ color: "#6b4f99", fontSize: 16 }}>›</span>
               </button>
             ))

@@ -1,9 +1,17 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Card, Btn } from "./ui";
-import { subscribeGroupChat, sendGroupMessage, getOrCreateThread, fetchMyThreads, subscribeThreadMessages, sendDM } from "../lib/chatData";
+import {
+  subscribeGroupChat, sendGroupMessage, subscribeGroupChatReads, markGroupChatRead,
+  createOrGetThread, fetchMyThreads, fetchExileRoom, subscribeThreadMessages, sendThreadMessage,
+  markThreadRead, fetchThreadReads, subscribeThreadReads, fetchLatestMessageTimestamps, subscribeAnyThreadActivity,
+} from "../lib/chatData";
 
 function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function UnreadDot() {
+  return <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: "#ff3860", marginLeft: 5 }} />;
 }
 
 function MessageBubble({ mine, name, body, time }) {
@@ -63,7 +71,7 @@ function Composer({ onSend, placeholder }) {
   );
 }
 
-function GroupChatView({ gameId, player, realName }) {
+function GroupChatView({ gameId, player, realName, onRead }) {
   const [messages, setMessages] = useState([]);
   const listRef = useRef(null);
 
@@ -75,6 +83,10 @@ function GroupChatView({ gameId, player, realName }) {
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages.length]);
+
+  // Viewing the tab is what counts as "read" — matches how the other
+  // rooms work (opening a thread marks it read the same way).
+  useEffect(() => { onRead?.(); }, [messages.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows = messages.map((m) => ({
     id: m.id,
@@ -89,10 +101,16 @@ function GroupChatView({ gameId, player, realName }) {
   );
 }
 
-function DmThreadView({ thread, player, players, onBack }) {
+function threadLabel(thread, player, byId) {
+  if (thread.name) return thread.name;
+  const others = (thread.otherMemberIds || thread.memberIds?.filter((id) => id !== player.id) || []);
+  return others.map((id) => byId[id] || "?").join(", ") || "?";
+}
+
+function ThreadView({ thread, player, byId, onBack, onRead }) {
   const [messages, setMessages] = useState([]);
   const listRef = useRef(null);
-  const otherName = players.find((p) => p.id === thread.otherPlayerId)?.display_name || "?";
+  const label = threadLabel(thread, player, byId);
 
   useEffect(() => {
     const unsubscribe = subscribeThreadMessages(thread.id, setMessages);
@@ -103,134 +121,251 @@ function DmThreadView({ thread, player, players, onBack }) {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages.length]);
 
+  useEffect(() => { onRead?.(thread.id); }, [thread.id, messages.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const rows = messages.map((m) => ({
     id: m.id,
-    node: <MessageBubble mine={m.sender_id === player.id} name={otherName} body={m.body} time={m.created_at} />,
+    node: <MessageBubble mine={m.sender_id === player.id} name={byId[m.sender_id] || "?"} body={m.body} time={m.created_at} />,
   }));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "60vh" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <button onClick={onBack} style={{ background: "none", border: "none", color: "#a68fd6", fontSize: 13, cursor: "pointer" }}>‹ Back</button>
-        <strong style={{ color: "#f5f0ff", fontSize: 13 }}>{otherName}</strong>
+        <strong style={{ color: "#f5f0ff", fontSize: 13 }}>{label}</strong>
       </div>
       <MessageList messages={rows} containerRef={listRef} />
-      <Composer placeholder={`Message ${otherName}...`} onSend={(t) => sendDM(thread.id, player.id, t)} />
+      <Composer placeholder={`Message ${label}...`} onSend={(t) => sendThreadMessage(thread.id, player.id, t)} />
     </div>
   );
 }
 
-function DmListView({ gameId, player, players, openThread, setOpenThread }) {
+function unreadForThread(thread, reads, lastMessageAt) {
+  if (!lastMessageAt) return false;
+  const readAt = reads[thread.id];
+  if (!readAt) return true;
+  return new Date(lastMessageAt).getTime() > new Date(readAt).getTime();
+}
+
+function ExileRoomView({ gameId, player, players, byId, onRead }) {
+  const [thread, setThread] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    fetchExileRoom(gameId).then((t) => { if (active) { setThread(t); setLoading(false); } });
+    return () => { active = false; };
+  }, [gameId]);
+
+  if (loading) return <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>Loading...</p>;
+  if (!thread) {
+    return <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No one's been exiled yet — this room opens up the moment someone is.</p>;
+  }
+  return <ThreadView thread={thread} player={player} byId={byId} onBack={() => {}} onRead={onRead} />;
+}
+
+function MessagesView({ gameId, player, players, byId, openThread, setOpenThread, reads, onRead }) {
   const [threads, setThreads] = useState([]);
   const [picking, setPicking] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [groupName, setGroupName] = useState("");
+  const [creating, setCreating] = useState(false);
 
   const reload = async () => setThreads(await fetchMyThreads(gameId, player.id));
   useEffect(() => { reload(); }, [gameId, player.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const startWith = async (otherId) => {
-    const { thread, error } = await getOrCreateThread(gameId, player.id, otherId);
-    if (thread) {
-      setOpenThread({ ...thread, otherPlayerId: otherId });
-      setPicking(false);
-      reload();
-    } else {
+  const toggleSelect = (id) => setSelectedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+
+  const startThread = async () => {
+    if (selectedIds.length === 0) return;
+    setCreating(true);
+    const { threadId, error } = await createOrGetThread(gameId, [player.id, ...selectedIds], selectedIds.length > 1 ? (groupName.trim() || null) : null);
+    setCreating(false);
+    if (!threadId) {
       alert("Couldn't start that conversation: " + (error || "unknown error — check the browser console for details."));
+      return;
     }
+    setPicking(false);
+    setSelectedIds([]);
+    setGroupName("");
+    await reload();
+    const fresh = await fetchMyThreads(gameId, player.id);
+    setThreads(fresh);
+    const found = fresh.find((t) => t.id === threadId);
+    setOpenThread(found || { id: threadId, memberIds: [player.id, ...selectedIds], otherMemberIds: selectedIds });
   };
 
   if (openThread) {
-    return <DmThreadView thread={openThread} player={player} players={players} onBack={() => { setOpenThread(null); reload(); }} />;
+    return <ThreadView thread={openThread} player={player} byId={byId} onBack={() => { setOpenThread(null); reload(); }} onRead={onRead} />;
   }
 
   const others = players.filter((p) => p.id !== player.id && p.approved);
-  const alreadyThreaded = new Set(threads.map((t) => t.otherPlayerId));
 
   return (
     <div>
-      {threads.length > 0 ? (
+      {threads.length > 0 && (
         <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
-          {threads.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setOpenThread(t)}
-              style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8,
-                padding: "10px 14px", color: "#f5f0ff", fontSize: 13, cursor: "pointer", textAlign: "left",
-              }}
-            >
-              {players.find((p) => p.id === t.otherPlayerId)?.display_name || "?"}
-              <span style={{ color: "#6b4f99", fontSize: 16 }}>›</span>
-            </button>
-          ))}
+          {threads.map((t) => {
+            return (
+              <button
+                key={t.id}
+                onClick={() => setOpenThread(t)}
+                style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8,
+                  padding: "10px 14px", color: "#f5f0ff", fontSize: 13, cursor: "pointer", textAlign: "left",
+                }}
+              >
+                <span>{threadLabel(t, player, byId)}{t.is_group && <span style={{ color: "#6b4f99", fontSize: 10 }}> · group</span>}</span>
+                <span style={{ display: "flex", alignItems: "center" }}>
+                  {unreadForThread(t, reads.thread, reads.latest[t.id]) && <UnreadDot />}
+                  <span style={{ color: "#6b4f99", fontSize: 16, marginLeft: 6 }}>›</span>
+                </span>
+              </button>
+            );
+          })}
         </div>
-      ) : (
-        !picking && <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic", margin: "0 0 12px" }}>No conversations yet.</p>
       )}
+      {threads.length === 0 && !picking && <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic", margin: "0 0 12px" }}>No conversations yet.</p>}
 
       {picking ? (
         <div>
-          <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Start a DM with...</div>
-          <div style={{ display: "grid", gap: 6, marginBottom: 10 }}>
-            {others.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => startWith(p.id)}
-                style={{
-                  background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "10px 14px",
-                  color: "#f5f0ff", fontSize: 13, cursor: "pointer", textAlign: "left",
-                }}
-              >
-                {p.display_name}{alreadyThreaded.has(p.id) && <span style={{ color: "#6b4f99", fontSize: 11 }}> (message again)</span>}
-              </button>
-            ))}
+          <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+            Select one person for a DM, or several for a group
           </div>
-          <Btn small variant="ghost" onClick={() => setPicking(false)}>Cancel</Btn>
+          <div style={{ display: "grid", gap: 6, marginBottom: 10 }}>
+            {others.map((p) => {
+              const selected = selectedIds.includes(p.id);
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => toggleSelect(p.id)}
+                  style={{
+                    background: selected ? "rgba(255,45,149,0.15)" : "#0d0618",
+                    border: `1px solid ${selected ? "#ff2d95" : "#3d1f5c"}`,
+                    borderRadius: 8, padding: "10px 14px", color: "#f5f0ff", fontSize: 13, cursor: "pointer", textAlign: "left",
+                  }}
+                >
+                  {selected ? "✓ " : ""}{p.display_name}
+                </button>
+              );
+            })}
+          </div>
+          {selectedIds.length > 1 && (
+            <input
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              placeholder="Group name (optional)"
+              style={{ width: "100%", boxSizing: "border-box", background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "8px 12px", color: "#f5f0ff", fontSize: 13, marginBottom: 10 }}
+            />
+          )}
+          <div style={{ display: "flex", gap: 8 }}>
+            <Btn small onClick={startThread} disabled={selectedIds.length === 0 || creating}>
+              {creating ? "Starting..." : selectedIds.length > 1 ? `Start group (${selectedIds.length})` : "Start DM"}
+            </Btn>
+            <Btn small variant="ghost" onClick={() => { setPicking(false); setSelectedIds([]); setGroupName(""); }}>Cancel</Btn>
+          </div>
         </div>
       ) : (
-        <Btn small onClick={() => setPicking(true)}>+ New DM</Btn>
+        <Btn small onClick={() => setPicking(true)}>+ New Chat</Btn>
       )}
     </div>
   );
 }
 
 // ─── Chat ───
-// Group chat and DMs both post as this player specifically — see
-// lib/chatData.js for why group chat lives in game_state (same broad
-// visibility it already needs) while DMs get their own tables (real
-// privacy, host-readable — see sql/add-dms.sql). Only shown at all when
-// the host has turned chat on for this season (settings.chatEnabled).
-export default function ChatPanel({ gameId, player, players, realName }) {
-  const [mode, setMode] = useState("group"); // "group" | "dm"
+// Three rooms: the main Group chat (everyone, lives in game_state — see
+// lib/chatData.js), the Exile Room (auto-managed, opens the moment
+// someone's actually exiled, membership kept in sync by
+// lib/roundEngine.js), and Messages (1:1 DMs and player-created multi-
+// member groups, both the same underlying model — see
+// sql/add-group-chat.sql). Only shown at all when the host has turned
+// chat on for this season (settings.chatEnabled).
+export default function ChatPanel({ gameId, player, players, realName, isExiled }) {
+  const [mode, setMode] = useState("group"); // "group" | "exile" | "messages"
   const [openThread, setOpenThread] = useState(null);
+  const [groupReadAt, setGroupReadAt] = useState(null);
+  const [groupLatestAt, setGroupLatestAt] = useState(null);
+  const [threadReads, setThreadReads] = useState({});
+  const [threadLatest, setThreadLatest] = useState({});
+
+  const byId = useMemo(() => {
+    const m = {};
+    (players || []).forEach((p) => (m[p.id] = p.display_name));
+    return m;
+  }, [players]);
+
+  // Unread signals — best-effort, not pixel-perfect: group chat compares
+  // the newest message's timestamp against this player's last-read mark;
+  // threads do the same per-thread. Both are cheap enough to just poll
+  // alongside the realtime subscriptions the underlying data already has.
+  useEffect(() => {
+    const unsubMessages = subscribeGroupChat(gameId, (msgs) => setGroupLatestAt(msgs.length ? msgs[msgs.length - 1].createdAt : null));
+    const unsubReads = subscribeGroupChatReads(gameId, (reads) => setGroupReadAt(reads[player.id] || null));
+    return () => { unsubMessages(); unsubReads(); };
+  }, [gameId, player.id]);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => { const m = await fetchThreadReads(player.id); if (active) setThreadReads(m); };
+    load();
+    const unsubscribe = subscribeThreadReads(player.id, load);
+    return () => { active = false; unsubscribe(); };
+  }, [player.id]);
+
+  useEffect(() => {
+    let active = true;
+    const load = () => {
+      fetchMyThreads(gameId, player.id).then((threads) => {
+        if (!active || threads.length === 0) return;
+        fetchLatestMessageTimestamps(threads.map((t) => t.id)).then((latest) => { if (active) setThreadLatest(latest); });
+      });
+    };
+    load();
+    const unsubscribe = subscribeAnyThreadActivity(gameId, load);
+    return () => { active = false; unsubscribe(); };
+  }, [gameId, player.id]);
+
+  const groupUnread = groupLatestAt && (!groupReadAt || groupLatestAt > groupReadAt);
+  const anyThreadUnread = Object.keys(threadLatest).some((id) => unreadForThread({ id }, threadReads, threadLatest[id]));
+
+  const markGroupReadNow = () => markGroupChatRead(gameId, player.id);
+  const markThreadReadNow = (threadId) => markThreadRead(threadId, player.id);
+
+  const tabs = [
+    { key: "group", label: "💬 Group", unread: groupUnread },
+    ...(isExiled ? [{ key: "exile", label: "🔥 Exile" }] : []),
+    { key: "messages", label: "✉️ Messages", unread: anyThreadUnread },
+  ];
 
   return (
     <div>
       <div style={{ display: "flex", gap: 4, marginBottom: 12, borderBottom: "1px solid #3d1f5c" }}>
-        {[{ key: "group", label: "💬 Group" }, { key: "dm", label: "✉️ Direct Messages" }].map((t) => (
+        {tabs.map((t) => (
           <button key={t.key} onClick={() => { setMode(t.key); setOpenThread(null); }} style={{
             flex: 1, background: mode === t.key ? "rgba(255,45,149,0.13)" : "transparent",
             color: mode === t.key ? "#ff2d95" : "#a68fd6",
             border: "none", borderRadius: "8px 8px 0 0", padding: "8px 6px",
-            fontSize: 12, fontWeight: 600, cursor: "pointer",
+            fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
             borderBottom: mode === t.key ? "2px solid #ff2d95" : "2px solid transparent",
           }}>
-            {t.label}
+            {t.label}{t.unread && <UnreadDot />}
           </button>
         ))}
       </div>
 
       <Card>
-        {mode === "group" ? (
-          <GroupChatView gameId={gameId} player={player} realName={realName} />
-        ) : (
-          <DmListView gameId={gameId} player={player} players={players} openThread={openThread} setOpenThread={setOpenThread} />
+        {mode === "group" && <GroupChatView gameId={gameId} player={player} realName={realName} onRead={markGroupReadNow} />}
+        {mode === "exile" && isExiled && <ExileRoomView gameId={gameId} player={player} players={players} byId={byId} onRead={markThreadReadNow} />}
+        {mode === "messages" && (
+          <MessagesView
+            gameId={gameId} player={player} players={players} byId={byId}
+            openThread={openThread} setOpenThread={setOpenThread}
+            reads={{ thread: threadReads, latest: threadLatest }}
+            onRead={markThreadReadNow}
+          />
         )}
       </Card>
-
-      <p style={{ fontSize: 10, color: "#6b4f99", fontStyle: "italic", marginTop: 8, textAlign: "center" }}>
-        The host can read direct messages, same as confessionals.
-      </p>
     </div>
   );
 }

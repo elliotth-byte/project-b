@@ -24,6 +24,7 @@ import { subscribeRound, subscribeSettings, PHASES, KEY_EXILE_HISTORY } from "..
 import { subscribeGameState } from "../lib/gameStorage";
 import { subscribeRevealAck } from "../lib/revealAck";
 import { resolveIdentities, identityComplete } from "../lib/playerIdentity";
+import { useHasUnreadChat } from "../lib/useChatUnread";
 import { useRoundWatcher } from "../lib/useRoundWatcher";
 
 const BASE_TABS = [
@@ -51,6 +52,13 @@ export default function PlayPage() {
   const [settings, setSettings] = useState(null);
 
   useRoundWatcher(gameId);
+
+  // Hooks must run unconditionally, before any early returns below — this
+  // is intentionally called this early (using the raw state directly,
+  // not the `approved`/`player` derived consts further down which don't
+  // exist yet at this point in the component) rather than being tucked
+  // in next to where its result is actually used.
+  const hasUnreadChat = useHasUnreadChat(gameId, myPlayer?.id, !!(joined && myPlayer?.approved && settings?.chatEnabled));
 
   // Once the game ends there's nothing left to do on the Game tab — default
   // players over to Ceremony so they land on the recap instead of an empty tab.
@@ -341,10 +349,13 @@ export default function PlayPage() {
                   flex: 1, background: tab === t.key ? "rgba(255,45,149,0.13)" : "transparent",
                   color: tab === t.key ? "#ff2d95" : "#a68fd6",
                   border: "none", borderRadius: "8px 8px 0 0", padding: "10px 6px",
-                  fontSize: 13, fontWeight: 600, cursor: "pointer",
+                  fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
                   borderBottom: tab === t.key ? "2px solid #ff2d95" : "2px solid transparent",
                 }}>
                   {t.label}
+                  {t.key === "chat" && hasUnreadChat && tab !== "chat" && (
+                    <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: "#ff3860" }} />
+                  )}
                 </button>
               ))}
             </div>
@@ -400,7 +411,7 @@ export default function PlayPage() {
 
             {tab === "chat" && settings?.chatEnabled && (
               <ChallengeErrorBoundary label="Chat">
-                <ChatPanel gameId={gameId} player={player} players={identityAllPlayers} realName={myPlayer.name} />
+                <ChatPanel gameId={gameId} player={player} players={identityAllPlayers} realName={myPlayer.name} isExiled={exiled} />
               </ChallengeErrorBoundary>
             )}
 
