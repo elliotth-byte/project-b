@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 import { signInHost, signOut, isHost } from "../lib/auth";
@@ -89,11 +89,32 @@ export default function HostPage() {
   // switching tabs, refreshing, or bookmarking a specific season lands back
   // on it. Falls back to the most recent season, and auto-creates a first
   // one for a brand-new host with none yet.
+  //
+  // autoCreateAttempted guards that last part specifically: without it,
+  // deleting your only season empties `games`, which re-runs this effect,
+  // which — since "no seasons at all" looked identical whether that's
+  // because you're brand new or because you just deliberately deleted
+  // your last one — would immediately create a fresh replacement. That
+  // made a delete look like it "duplicated" the season right back. This
+  // only allows the auto-create to happen once per page load, so a
+  // deliberate delete actually leaves you with zero seasons until you
+  // choose to make a new one.
+  const autoCreateAttempted = useRef(false);
+
   useEffect(() => {
     if (games === null) return;
     (async () => {
       const fromUrl = typeof router.query.game === "string" ? router.query.game : null;
-      if (fromUrl && games.some((g) => g.id === fromUrl)) {
+      // The `&& !g.archived` here matters more than it looks: archiving a
+      // season doesn't remove it from `games`, just flags it, and
+      // `router.query.game` can still be pointing at the just-archived
+      // season's id for a moment after archiving (router.push updates the
+      // URL asynchronously, while `games` updates immediately) — without
+      // this check, this effect could re-select the archived season the
+      // instant it re-runs, right out from under the redirect that was
+      // supposed to move you off it. That's what made archiving look like
+      // it didn't stick / "un-archived itself."
+      if (fromUrl && games.some((g) => g.id === fromUrl && !g.archived)) {
         setActiveGameId(fromUrl);
         return;
       }
@@ -106,6 +127,8 @@ export default function HostPage() {
         return;
       }
       if (games.length > 0) return; // only archived seasons exist — don't auto-create another
+      if (autoCreateAttempted.current) return; // see the comment above — don't recreate after a deliberate delete
+      autoCreateAttempted.current = true;
 
       // No seasons at all yet — create the first one automatically.
       const created = await createSeason("Project B", "");
@@ -165,7 +188,18 @@ export default function HostPage() {
     setGames((prev) => prev.map((g) => (g.id === updated.id ? updated : g)));
     if (id === activeGameId) {
       const next = visibleGames.find((g) => g.id !== id);
-      if (next) switchTo(next.id);
+      if (next) {
+        switchTo(next.id);
+      } else {
+        // No other live season — clear activeGameId explicitly, not just
+        // the URL. router.replace alone leaves activeGameId (React state)
+        // still pointing at the season we just archived, and `game` is
+        // derived from THAT state, not the URL — so the UI would keep
+        // showing the archived season as if it were still active even
+        // after the address bar looked clean.
+        setActiveGameId(null);
+        router.replace("/host", undefined, { shallow: true });
+      }
     }
   };
 
@@ -186,9 +220,17 @@ export default function HostPage() {
     const remaining = (games || []).filter((x) => x.id !== g.id);
     setGames(remaining);
     if (g.id === activeGameId) {
-      const next = remaining.find((x) => !x.archived) || remaining[0];
-      if (next) switchTo(next.id);
-      else router.replace("/host", undefined, { shallow: true });
+      // Only ever fall back to another LIVE season here — never an
+      // archived one (that was the other half of archived seasons
+      // seeming to "come back": this used to fall back to remaining[0]
+      // unconditionally, which could itself be archived).
+      const next = remaining.find((x) => !x.archived);
+      if (next) {
+        switchTo(next.id);
+      } else {
+        setActiveGameId(null); // see the comment in archiveSeason above — same reasoning
+        router.replace("/host", undefined, { shallow: true });
+      }
     }
   };
 
@@ -325,7 +367,10 @@ export default function HostPage() {
         </div>
 
         {/* ---------------- Season switcher ---------------- */}
-        {games && games.length > 0 && (
+        {/* Always shown once `games` has loaded (even as an empty array —
+            e.g. right after deleting your only season) so "+ New Season"
+            is never stranded behind a season that no longer exists. */}
+        {games && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
             {visibleGames.map((g) => {
               const active = g.id === activeGameId;
@@ -389,6 +434,12 @@ export default function HostPage() {
               </div>
             )}
           </div>
+        )}
+
+        {games && !game && !creating && (
+          <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: "8px 0 16px" }}>
+            No active season — click "+ New Season" above to start one.
+          </p>
         )}
 
         {creating && (
