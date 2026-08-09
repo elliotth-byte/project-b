@@ -23,6 +23,7 @@ import { Card } from "../components/ui";
 import { subscribeRound, subscribeSettings, PHASES, KEY_EXILE_HISTORY } from "../lib/gameState";
 import { subscribeGameState } from "../lib/gameStorage";
 import { subscribeRevealAck } from "../lib/revealAck";
+import { resolveIdentities, identityComplete } from "../lib/playerIdentity";
 import { useRoundWatcher } from "../lib/useRoundWatcher";
 
 const BASE_TABS = [
@@ -143,13 +144,13 @@ export default function PlayPage() {
     (async () => {
       const { data: existing } = await supabase
         .from("players")
-        .select("id, display_name, alive, elimination_type, approved, color")
+        .select("id, display_name, alive, elimination_type, approved, color, alias")
         .eq("game_id", gameId)
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (existing) {
-        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, approved: existing.approved, color: existing.color });
+        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, approved: existing.approved, color: existing.color, alias: existing.alias });
         setJoined(true);
         return;
       }
@@ -180,12 +181,12 @@ export default function PlayPage() {
       const { data: created, error } = await supabase
         .from("players")
         .insert({ game_id: gameId, user_id: session.user.id, display_name: displayNameFromUser(user), approved: false })
-        .select("id, display_name, alive, elimination_type, approved, color")
+        .select("id, display_name, alive, elimination_type, approved, color, alias")
         .single();
       if (error) {
         setJoinError(`Couldn't join this game: ${error.message}${error.code ? ` [code=${error.code}]` : ""}${error.details ? ` — ${error.details}` : ""} (user_id=${session.user.id})`);
       } else {
-        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, approved: created.approved, color: created.color });
+        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, approved: created.approved, color: created.color, alias: created.alias });
         setJoined(true);
       }
     })();
@@ -196,8 +197,8 @@ export default function PlayPage() {
   useEffect(() => {
     if (!myPlayer?.id) return;
     const load = async () => {
-      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, approved, color").eq("id", myPlayer.id).maybeSingle();
-      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, approved: data.approved, color: data.color }));
+      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, approved, color, alias").eq("id", myPlayer.id).maybeSingle();
+      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, approved: data.approved, color: data.color, alias: data.alias }));
     };
     const channel = supabase
       .channel(`self-player-${myPlayer.id}`)
@@ -220,17 +221,24 @@ export default function PlayPage() {
   }
 
   const playerName = myPlayer?.name;
-  const player = myPlayer ? { id: myPlayer.id, name: myPlayer.name } : null;
+  const identityAllPlayers = resolveIdentities(allPlayers, { settings, round, isHost: false });
+  // The player's own displayed name follows the same override — once
+  // their alias is confirmed, that's who they are for the season,
+  // including to themselves, right down to what shows up in "Playing
+  // as..." up top and what name their own chat/confessional posts carry.
+  const effectivePlayerName = settings?.aliasEnabled && myPlayer?.alias && round?.phase !== PHASES.ENDED ? myPlayer.alias : playerName;
+  const player = myPlayer ? { id: myPlayer.id, name: effectivePlayerName } : null;
   const exiled = joined && myPlayer && myPlayer.alive === false;
   const quitByChoice = exiled && myPlayer.eliminationType === "quit";
   const approved = joined && !!myPlayer?.approved;
   const gameEnded = round?.phase === PHASES.ENDED;
+  const needsIdentity = joined && myPlayer && !identityComplete(myPlayer, settings);
 
   // Once a round's Exile Vote has actually landed in history, this
   // player's whole screen locks into RoundRevealGate until they've
   // clicked through it — see the effect above for why only the latest
   // round ever triggers this.
-  const pendingReveal = approved && !!myPlayer.color && !!playerName && !!latestExileEntry && !revealAck[player?.id];
+  const pendingReveal = approved && !needsIdentity && !!playerName && !!latestExileEntry && !revealAck[player?.id];
 
   const handleQuit = async () => {
     if (!myPlayer) return;
@@ -249,7 +257,7 @@ export default function PlayPage() {
     <div style={{ ...pageStyle, alignItems: "flex-start", flexDirection: "column" }}>
       <div style={{ display: "flex", justifyContent: "space-between", width: "100%", maxWidth: 400, margin: "0 auto 12px" }}>
         <HomeLink />
-        <span style={{ color: "#a68fd6", fontSize: 13 }}>Playing as {playerName || "..."}</span>
+        <span style={{ color: "#a68fd6", fontSize: 13 }}>Playing as {effectivePlayerName || "..."}</span>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           {joined && myPlayer && myPlayer.alive !== false && !gameEnded && (
             <button onClick={handleQuit} disabled={quitBusy} style={{
@@ -272,11 +280,16 @@ export default function PlayPage() {
         )}
         {joinError && <p style={{ color: "#ff3860" }}>{joinError}</p>}
 
-        {joined && myPlayer && !myPlayer.color && (
-          <ColorPicker player={myPlayer} allPlayers={allPlayers} onPicked={(hex) => setMyPlayer((p) => p && ({ ...p, color: hex }))} />
+        {joined && myPlayer && needsIdentity && (
+          <ColorPicker
+            player={myPlayer}
+            allPlayers={allPlayers}
+            aliasEnabled={settings?.aliasEnabled}
+            onPicked={(row) => setMyPlayer((p) => p && ({ ...p, color: row.color, alias: row.alias }))}
+          />
         )}
 
-        {joined && myPlayer && myPlayer.color && !myPlayer.approved && (
+        {joined && myPlayer && !needsIdentity && !myPlayer.approved && (
           <div style={{
             marginBottom: 20, textAlign: "center", padding: "28px 20px",
             background: "linear-gradient(160deg, #1a0a2e 0%, #1a0a2e 100%)",
@@ -316,11 +329,11 @@ export default function PlayPage() {
 
         {pendingReveal && (
           <ChallengeErrorBoundary label="Round Reveal">
-            <RoundRevealGate gameId={gameId} player={player} players={allPlayers} entry={latestExileEntry} />
+            <RoundRevealGate gameId={gameId} player={player} players={identityAllPlayers} entry={latestExileEntry} />
           </ChallengeErrorBoundary>
         )}
 
-        {approved && myPlayer.color && playerName && !pendingReveal && (
+        {approved && !needsIdentity && playerName && !pendingReveal && (
           <>
             <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #3d1f5c" }}>
               {BASE_TABS.filter((t) => t.key !== "chat" || settings?.chatEnabled).map((t) => (
@@ -350,18 +363,18 @@ export default function PlayPage() {
                   <ChallengeErrorBoundary label="Challenge"><ChallengePlayer gameId={gameId} player={player} round={round} /></ChallengeErrorBoundary>
                 )}
                 {round?.phase === PHASES.FATES && (
-                  <ChallengeErrorBoundary label="Fates Ceremony"><FatesPlayer gameId={gameId} player={player} players={allPlayers} round={round} /></ChallengeErrorBoundary>
+                  <ChallengeErrorBoundary label="Fates Ceremony"><FatesPlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} /></ChallengeErrorBoundary>
                 )}
                 {round?.phase === PHASES.EXILE && !exiled && (
                   <ChallengeErrorBoundary label="Exile Vote">
-                    <ChaosPowerPlayer gameId={gameId} round={round} player={player} players={allPlayers} />
-                    <ExileVotePlayer gameId={gameId} player={player} round={round} players={allPlayers} />
+                    <ChaosPowerPlayer gameId={gameId} round={round} player={player} players={identityAllPlayers} />
+                    <ExileVotePlayer gameId={gameId} player={player} round={round} players={identityAllPlayers} />
                   </ChallengeErrorBoundary>
                 )}
                 {round?.phase === PHASES.FINALE && (
                   <ChallengeErrorBoundary label="Finale">
-                    <ChaosPowerPlayer gameId={gameId} round={round} player={player} players={allPlayers} />
-                    <FinalePlayer gameId={gameId} player={player} round={round} players={allPlayers} />
+                    <ChaosPowerPlayer gameId={gameId} round={round} player={player} players={identityAllPlayers} />
+                    <FinalePlayer gameId={gameId} player={player} round={round} players={identityAllPlayers} />
                   </ChallengeErrorBoundary>
                 )}
               </>
@@ -375,7 +388,7 @@ export default function PlayPage() {
 
             {tab === "ceremony" && (
               <ChallengeErrorBoundary label="Ceremony">
-                <CeremonyPlayer gameId={gameId} players={allPlayers} round={round} />
+                <CeremonyPlayer gameId={gameId} players={identityAllPlayers} round={round} />
               </ChallengeErrorBoundary>
             )}
 
@@ -387,7 +400,7 @@ export default function PlayPage() {
 
             {tab === "chat" && settings?.chatEnabled && (
               <ChallengeErrorBoundary label="Chat">
-                <ChatPanel gameId={gameId} player={player} players={allPlayers} />
+                <ChatPanel gameId={gameId} player={player} players={identityAllPlayers} realName={myPlayer.name} />
               </ChallengeErrorBoundary>
             )}
 

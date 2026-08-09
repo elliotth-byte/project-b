@@ -25,6 +25,7 @@ export default function AdminHost({ gameId, players, round }) {
   }, [gameId]);
 
   const pending = players.filter((p) => !p.approved);
+  const seasonStarted = !!round && round.phase !== PHASES.LOBBY;
 
   const approvePlayer = async (p) => {
     const { error } = await supabase.from("players").update({ approved: true }).eq("id", p.id);
@@ -235,6 +236,19 @@ export default function AdminHost({ gameId, players, round }) {
             suddenly show up mid-season for a game already underway; you can safely leave it off for an existing season and only turn
             it on for a fresh one. DMs are readable by you, same as confessionals — players see a note saying so.
           </label>
+          <label style={{
+            display: "flex", alignItems: "center", gap: 6, fontSize: 12.5,
+            color: seasonStarted ? "#3d1f5c" : "#a68fd6", cursor: seasonStarted ? "not-allowed" : "pointer",
+          }}>
+            <input
+              type="checkbox" checked={settings.aliasEnabled} disabled={seasonStarted}
+              onChange={(e) => saveSettings({ aliasEnabled: e.target.checked })}
+            />
+            🏛 Alias mode — players pick a mythological codename (14 options) alongside their color, and it completely replaces
+            their real name everywhere in the game for everyone but you — leaderboards, votes, chat, all of it. You always see real
+            names; players see aliases. Real identities are automatically revealed to everyone once the game ends.{" "}
+            <strong>{seasonStarted ? "Locked — can only be changed before Round 1 starts." : "Only changeable now, before Round 1 starts."}</strong>
+          </label>
           {savingSettings && <span style={{ fontSize: 11, color: "#00ff9d" }}>Saved.</span>}
         </div>
       </Card>
@@ -254,6 +268,7 @@ export default function AdminHost({ gameId, players, round }) {
                 onChange={(e) => setNames({ ...names, [p.id]: e.target.value })}
                 style={{ flex: 1, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 10px", color: "#f5f0ff", fontSize: 13 }}
               />
+              {p.alias && <span style={{ fontSize: 11, color: "#a68fd6", whiteSpace: "nowrap" }} title="Their alias — only you see both">🏛 {p.alias}</span>}
               <Btn small onClick={() => saveName(p)} disabled={saving[p.id] || nameFor(p) === p.display_name}>
                 {saving[p.id] ? "Saving..." : "Save"}
               </Btn>

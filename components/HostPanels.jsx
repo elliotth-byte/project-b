@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Btn, Card, Badge } from "./ui";
 import { subscribeRound, subscribeSettings, startSeason as startSeasonState, PHASES } from "../lib/gameState";
 import { fetchAllConfessionals, subscribeConfessionalsTable } from "../lib/confessionalsData";
+import { resolveIdentities } from "../lib/playerIdentity";
 import ChallengeErrorBoundary from "./ChallengeErrorBoundary";
 import ChallengeHost from "./ChallengeHost";
 import FatesHost from "./FatesHost";
@@ -54,6 +55,10 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
   const approvedPlayers = players.filter((p) => p.approved);
   const alive = approvedPlayers.filter((p) => p.alive);
   const pendingCount = players.filter((p) => !p.approved).length;
+  // "View as Player" needs to show exactly what that player sees — aliases
+  // included, once the season has them on — not the host's own always-real
+  // view. See lib/playerIdentity.js.
+  const playerViewRoster = resolveIdentities(players, { settings, round, isHost: false });
 
   const TABS = BASE_TABS
     .filter((t) => t.key !== "chat" || settings?.chatEnabled)
@@ -167,19 +172,20 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
                 <option value="">— select a player —</option>
                 {players.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.display_name}{!p.approved ? " (pending)" : p.alive === false ? " (exiled)" : ""}
+                    {p.display_name}{p.alias ? ` (${p.alias})` : ""}{!p.approved ? " (pending)" : p.alive === false ? " (exiled)" : ""}
                   </option>
                 ))}
               </select>
               <p style={{ color: "#6b4f99", fontSize: 11, margin: "8px 0 0", fontStyle: "italic" }}>
-                Shows exactly what this player sees right now — read-only, so nothing you do here affects the game.
+                Shows exactly what this player sees right now — including their alias in place of everyone's real name, if the
+                season has that on — read-only, so nothing you do here affects the game.
               </p>
             </Card>
             {viewAsPlayerId && (
               <PlayerViewer
                 gameId={gameId}
-                targetPlayer={players.find((p) => p.id === viewAsPlayerId) || null}
-                allPlayers={players}
+                targetPlayer={playerViewRoster.find((p) => p.id === viewAsPlayerId) || null}
+                allPlayers={playerViewRoster}
                 round={round}
                 onExit={() => setViewAsPlayerId("")}
               />

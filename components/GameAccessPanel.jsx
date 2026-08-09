@@ -111,9 +111,10 @@ export default function GameAccessPanel({
       </div>
 
       <div style={{ marginTop: 12, color: "#a68fd6", fontSize: 13 }}>
-        Players in game: {players.length === 0 ? "none yet" : players.map((p) =>
-          !p.approved ? `${p.display_name} (pending)` : p.alive ? p.display_name : `${p.display_name} (exiled)`
-        ).join(", ")}
+        Players in game: {players.length === 0 ? "none yet" : players.map((p) => {
+          const label = p.alias ? `${p.display_name} (${p.alias})` : p.display_name;
+          return !p.approved ? `${label} (pending)` : p.alive ? label : `${label} (exiled)`;
+        }).join(", ")}
       </div>
     </div>
   );

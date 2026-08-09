@@ -58,7 +58,7 @@ function Composer({ onSend, placeholder }) {
   );
 }
 
-function GroupChatView({ gameId, player }) {
+function GroupChatView({ gameId, player, realName }) {
   const [messages, setMessages] = useState([]);
   const listRef = useRef(null);
 
@@ -79,7 +79,7 @@ function GroupChatView({ gameId, player }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "60vh" }}>
       <MessageList messages={rows} containerRef={listRef} />
-      <Composer placeholder="Message everyone..." onSend={(t) => sendGroupMessage(gameId, player.id, player.name, t)} />
+      <Composer placeholder="Message everyone..." onSend={(t) => sendGroupMessage(gameId, player.id, player.name, t, realName)} />
     </div>
   );
 }
@@ -193,7 +193,7 @@ function DmListView({ gameId, player, players, openThread, setOpenThread }) {
 // visibility it already needs) while DMs get their own tables (real
 // privacy, host-readable — see sql/add-dms.sql). Only shown at all when
 // the host has turned chat on for this season (settings.chatEnabled).
-export default function ChatPanel({ gameId, player, players }) {
+export default function ChatPanel({ gameId, player, players, realName }) {
   const [mode, setMode] = useState("group"); // "group" | "dm"
   const [openThread, setOpenThread] = useState(null);
 
@@ -215,7 +215,7 @@ export default function ChatPanel({ gameId, player, players }) {
 
       <Card>
         {mode === "group" ? (
-          <GroupChatView gameId={gameId} player={player} />
+          <GroupChatView gameId={gameId} player={player} realName={realName} />
         ) : (
           <DmListView gameId={gameId} player={player} players={players} openThread={openThread} setOpenThread={setOpenThread} />
         )}
