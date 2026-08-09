@@ -55,7 +55,8 @@ export default function PlayerViewer({ gameId, targetPlayer, allPlayers, round, 
         border: "1px solid rgba(255,45,149,0.3)", borderRadius: 8,
       }}>
         <span style={{ fontSize: 13, color: "#f5f0ff" }}>
-          👁️ Viewing as <strong style={{ color: "#ff2d95" }}>{targetPlayer.display_name}</strong> — read-only
+          👁️ Viewing as <strong style={{ color: "#ff2d95" }}>{targetPlayer.real_display_name || targetPlayer.display_name}</strong>
+          {targetPlayer.alias && <> (alias: {targetPlayer.display_name})</>} — read-only
         </span>
         {onExit && (
           <button onClick={onExit} style={{ background: "none", border: "none", color: "#a68fd6", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>

@@ -10,8 +10,12 @@ import { ALIASES, takenAliases } from "../lib/aliases";
 // see components/AdminHost.jsx for the toggle. Without alias mode, this
 // behaves exactly like it always has: pick a color, done immediately.
 export default function ColorPicker({ player, allPlayers, aliasEnabled, onPicked }) {
-  const [step, setStep] = useState("color"); // "color" | "alias" | "confirm"
-  const [color, setColor] = useState(null);
+  // A player might already have a color from before alias mode was
+  // turned on (it can be toggled any time before Round 1 starts) — start
+  // them straight at the alias step instead of making them re-pick a
+  // color they've already chosen.
+  const [step, setStep] = useState(player.color && aliasEnabled ? "alias" : "color"); // "color" | "alias" | "confirm"
+  const [color, setColor] = useState(player.color || null);
   const [alias, setAlias] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);

@@ -40,9 +40,14 @@ function Composer({ onSend, placeholder }) {
     const t = text.trim();
     if (!t || sending) return;
     setSending(true);
+    const prevText = t;
     setText("");
-    await onSend(t);
+    const result = await onSend(t);
     setSending(false);
+    if (result && result.ok === false) {
+      setText(prevText); // don't lose what they typed on a failed send
+      alert("Couldn't send: " + (result.error || "unknown error — check the browser console for details."));
+    }
   };
   return (
     <div style={{ display: "flex", gap: 8, paddingTop: 8 }}>
@@ -123,11 +128,13 @@ function DmListView({ gameId, player, players, openThread, setOpenThread }) {
   useEffect(() => { reload(); }, [gameId, player.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startWith = async (otherId) => {
-    const thread = await getOrCreateThread(gameId, player.id, otherId);
+    const { thread, error } = await getOrCreateThread(gameId, player.id, otherId);
     if (thread) {
       setOpenThread({ ...thread, otherPlayerId: otherId });
       setPicking(false);
       reload();
+    } else {
+      alert("Couldn't start that conversation: " + (error || "unknown error — check the browser console for details."));
     }
   };
 
