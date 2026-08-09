@@ -80,7 +80,9 @@ export default function ChatHostPanel({ gameId, players }) {
             {messages.length === 0 && <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No messages yet.</p>}
             {messages.map((m) => (
               <div key={m.id} style={{ marginBottom: 8, fontSize: 12 }}>
-                <span style={{ color: m.senderId === "host" ? "#ff2d95" : "#f5f0ff", fontWeight: 700 }}>{m.senderRealName || m.senderName}</span>
+                <span style={{ color: m.senderId === "host" ? "#ff2d95" : "#f5f0ff", fontWeight: 700 }}>
+                  {m.senderRealName && m.senderRealName !== m.senderName ? `${m.senderRealName} (${m.senderName})` : m.senderRealName || m.senderName}
+                </span>
                 <span style={{ color: "#6b4f99", fontSize: 10, marginLeft: 6 }}>{fmtTime(m.createdAt)}</span>
                 <div style={{ color: "#a68fd6" }}>{m.body}</div>
               </div>

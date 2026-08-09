@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Btn, Card, Badge } from "./ui";
 import { subscribeRound, subscribeSettings, startSeason as startSeasonState, PHASES } from "../lib/gameState";
 import { fetchAllConfessionals, subscribeConfessionalsTable } from "../lib/confessionalsData";
-import { resolveIdentities } from "../lib/playerIdentity";
+import { resolveIdentities, resolveIdentitiesForHost } from "../lib/playerIdentity";
 import ChallengeErrorBoundary from "./ChallengeErrorBoundary";
 import ChallengeHost from "./ChallengeHost";
 import FatesHost from "./FatesHost";
@@ -59,6 +59,14 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
   // included, once the season has them on — not the host's own always-real
   // view. See lib/playerIdentity.js.
   const playerViewRoster = resolveIdentities(players, { settings, round, isHost: false });
+  // Everywhere ELSE in the host UI (Challenge/Fates/Exile/Finale, History,
+  // host Chat) — real name with the alias alongside, baked right into
+  // display_name so every one of those components shows both without
+  // needing its own alias-specific code. NOT used for Admin's own
+  // player list/rename tool, which needs the real, uncombined value to
+  // actually edit it — that one still reads `players` directly.
+  const hostRoster = resolveIdentitiesForHost(players, { settings, round });
+  const hostApprovedRoster = hostRoster.filter((p) => p.approved);
 
   const TABS = BASE_TABS
     .filter((t) => t.key !== "chat" || settings?.chatEnabled)
@@ -123,16 +131,16 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
             <>
               <RoundTimerBanner round={round} />
               {round.phase === PHASES.CHALLENGE && (
-                <ChallengeErrorBoundary label="Challenge"><ChallengeHost gameId={gameId} players={approvedPlayers} round={round} settings={settings} /></ChallengeErrorBoundary>
+                <ChallengeErrorBoundary label="Challenge"><ChallengeHost gameId={gameId} players={hostApprovedRoster} round={round} settings={settings} /></ChallengeErrorBoundary>
               )}
               {round.phase === PHASES.FATES && (
-                <ChallengeErrorBoundary label="Fates Ceremony"><FatesHost gameId={gameId} players={approvedPlayers} round={round} /></ChallengeErrorBoundary>
+                <ChallengeErrorBoundary label="Fates Ceremony"><FatesHost gameId={gameId} players={hostApprovedRoster} round={round} /></ChallengeErrorBoundary>
               )}
               {round.phase === PHASES.EXILE && (
-                <ChallengeErrorBoundary label="Exile Vote"><ExileVoteHost gameId={gameId} players={approvedPlayers} round={round} /></ChallengeErrorBoundary>
+                <ChallengeErrorBoundary label="Exile Vote"><ExileVoteHost gameId={gameId} players={hostApprovedRoster} round={round} /></ChallengeErrorBoundary>
               )}
               {round.phase === PHASES.FINALE && (
-                <ChallengeErrorBoundary label="Finale"><FinaleHost gameId={gameId} players={approvedPlayers} round={round} /></ChallengeErrorBoundary>
+                <ChallengeErrorBoundary label="Finale"><FinaleHost gameId={gameId} players={hostApprovedRoster} round={round} /></ChallengeErrorBoundary>
               )}
             </>
           )}
@@ -147,13 +155,13 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
 
       {tab === "chat" && settings?.chatEnabled && (
         <ChallengeErrorBoundary label="Chat">
-          <ChatHostPanel gameId={gameId} players={approvedPlayers} />
+          <ChatHostPanel gameId={gameId} players={hostApprovedRoster} />
         </ChallengeErrorBoundary>
       )}
 
       {tab === "history" && (
         <ChallengeErrorBoundary label="History">
-          <HistoryTab gameId={gameId} players={approvedPlayers} gameName={gameName} round={round} />
+          <HistoryTab gameId={gameId} players={hostApprovedRoster} gameName={gameName} round={round} />
         </ChallengeErrorBoundary>
       )}
 
