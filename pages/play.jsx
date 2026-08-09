@@ -13,21 +13,23 @@ import ChaosPowerPlayer from "../components/ChaosPowerPlayer";
 import ConfessionalPlayer from "../components/ConfessionalPlayer";
 import MusicPlayer from "../components/MusicPlayer";
 import HelpPanel from "../components/HelpPanel";
+import ChatPanel from "../components/ChatPanel";
 import RoundRevealGate from "../components/RoundRevealGate";
 import HomeLink from "../components/HomeLink";
 import LogoutButton from "../components/LogoutButton";
 import ChallengeErrorBoundary from "../components/ChallengeErrorBoundary";
 import RoundTimerBanner from "../components/RoundTimerBanner";
 import { Card } from "../components/ui";
-import { subscribeRound, PHASES, KEY_EXILE_HISTORY } from "../lib/gameState";
+import { subscribeRound, subscribeSettings, PHASES, KEY_EXILE_HISTORY } from "../lib/gameState";
 import { subscribeGameState } from "../lib/gameStorage";
 import { subscribeRevealAck } from "../lib/revealAck";
 import { useRoundWatcher } from "../lib/useRoundWatcher";
 
-const TABS = [
+const BASE_TABS = [
   { key: "game", label: "🎲 Game" },
   { key: "ceremony", label: "⚖️ Ceremony" },
   { key: "confessional", label: "🎥 Confessional" },
+  { key: "chat", label: "💬 Chat" },
   { key: "help", label: "❓ Help" },
 ];
 
@@ -45,6 +47,7 @@ export default function PlayPage() {
   const [quitBusy, setQuitBusy] = useState(false);
   const [exileHistory, setExileHistory] = useState([]);
   const [revealAck, setRevealAck] = useState({});
+  const [settings, setSettings] = useState(null);
 
   useRoundWatcher(gameId);
 
@@ -65,6 +68,12 @@ export default function PlayPage() {
   useEffect(() => {
     if (!gameId) return;
     const unsubscribe = subscribeRound(gameId, setRound);
+    return unsubscribe;
+  }, [gameId]);
+
+  useEffect(() => {
+    if (!gameId) return;
+    const unsubscribe = subscribeSettings(gameId, setSettings);
     return unsubscribe;
   }, [gameId]);
 
@@ -314,7 +323,7 @@ export default function PlayPage() {
         {approved && myPlayer.color && playerName && !pendingReveal && (
           <>
             <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #3d1f5c" }}>
-              {TABS.map((t) => (
+              {BASE_TABS.filter((t) => t.key !== "chat" || settings?.chatEnabled).map((t) => (
                 <button key={t.key} onClick={() => setTab(t.key)} style={{
                   flex: 1, background: tab === t.key ? "rgba(255,45,149,0.13)" : "transparent",
                   color: tab === t.key ? "#ff2d95" : "#a68fd6",
@@ -373,6 +382,12 @@ export default function PlayPage() {
             {tab === "confessional" && (
               <ChallengeErrorBoundary label="Confessional">
                 <ConfessionalPlayer gameId={gameId} player={{ id: myPlayer.id, name: myPlayer.name }} round={round?.round} />
+              </ChallengeErrorBoundary>
+            )}
+
+            {tab === "chat" && settings?.chatEnabled && (
+              <ChallengeErrorBoundary label="Chat">
+                <ChatPanel gameId={gameId} player={player} players={allPlayers} />
               </ChallengeErrorBoundary>
             )}
 

@@ -8,6 +8,7 @@ import FatesHost from "./FatesHost";
 import ExileVoteHost from "./ExileVoteHost";
 import FinaleHost from "./FinaleHost";
 import ConfessionalsHost from "./ConfessionalsHost";
+import ChatHostPanel from "./ChatHostPanel";
 import AdminHost from "./AdminHost";
 import HistoryTab from "./HistoryTab";
 import RoundTimerBanner from "./RoundTimerBanner";
@@ -16,6 +17,7 @@ import PlayerViewer from "./PlayerViewer";
 const BASE_TABS = [
   { key: "round", label: "🎲 Current Round" },
   { key: "confessionals", label: "🎥 Confessionals" },
+  { key: "chat", label: "💬 Chat" },
   { key: "history", label: "📜 History" },
   { key: "viewas", label: "👁️ View as Player" },
   { key: "admin", label: "🛠 Admin" },
@@ -53,11 +55,13 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
   const alive = approvedPlayers.filter((p) => p.alive);
   const pendingCount = players.filter((p) => !p.approved).length;
 
-  const TABS = BASE_TABS.map((t) => {
-    if (t.key === "confessionals" && unreadConfessionals > 0) return { ...t, label: `${t.label} (${unreadConfessionals})` };
-    if (t.key === "admin" && pendingCount > 0) return { ...t, label: `${t.label} (${pendingCount})` };
-    return t;
-  });
+  const TABS = BASE_TABS
+    .filter((t) => t.key !== "chat" || settings?.chatEnabled)
+    .map((t) => {
+      if (t.key === "confessionals" && unreadConfessionals > 0) return { ...t, label: `${t.label} (${unreadConfessionals})` };
+      if (t.key === "admin" && pendingCount > 0) return { ...t, label: `${t.label} (${pendingCount})` };
+      return t;
+    });
 
   const [startError, setStartError] = useState("");
 
@@ -133,6 +137,12 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
       {tab === "confessionals" && (
         <ChallengeErrorBoundary label="Confessionals">
           <ConfessionalsHost gameId={gameId} round={round?.round} />
+        </ChallengeErrorBoundary>
+      )}
+
+      {tab === "chat" && settings?.chatEnabled && (
+        <ChallengeErrorBoundary label="Chat">
+          <ChatHostPanel gameId={gameId} players={approvedPlayers} />
         </ChallengeErrorBoundary>
       )}
 

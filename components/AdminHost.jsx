@@ -229,6 +229,12 @@ export default function AdminHost({ gameId, players, round }) {
             <input type="checkbox" checked={settings.infiniteTime} onChange={(e) => saveSettings({ infiniteTime: e.target.checked })} />
             ∞ Infinite time — no phase gets an automatic timer at all; every Challenge/Fates Ceremony/Exile Vote/Finale runs until the host ends it
           </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#a68fd6", cursor: "pointer" }}>
+            <input type="checkbox" checked={settings.chatEnabled} onChange={(e) => saveSettings({ chatEnabled: e.target.checked })} />
+            💬 Chat — adds a Chat tab for players (group chat + DMs with each other) and one for you. Off by default so it doesn't
+            suddenly show up mid-season for a game already underway; you can safely leave it off for an existing season and only turn
+            it on for a fresh one. DMs are readable by you, same as confessionals — players see a note saying so.
+          </label>
           {savingSettings && <span style={{ fontSize: 11, color: "#00ff9d" }}>Saved.</span>}
         </div>
       </Card>
