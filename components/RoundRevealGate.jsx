@@ -19,7 +19,12 @@ export default function RoundRevealGate({ gameId, player, players, entry }) {
   const byId = {};
   (players || []).forEach((p) => (byId[p.id] = p.display_name));
 
-  const voteOrder = buildRevealOrder(entry.voteRows);
+  // Prefer the order computed once, server-side, at reveal time (see
+  // lib/roundEngine.js) — that's what guarantees every player sees the
+  // SAME sequence. Falls back to computing it fresh only for a round
+  // that was finalized before this existed (it won't have revealOrder
+  // stored), so old history doesn't crash.
+  const voteOrder = entry.revealOrder || buildRevealOrder(entry.voteRows);
   const exiledNames = (entry.exiledIds || []).map((id) => byId[id] || "?");
   const chaosHolderName = entry.chaosHolderId ? byId[entry.chaosHolderId] : null;
 

@@ -219,9 +219,11 @@ export default function AdminHost({ gameId, players, round }) {
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#a68fd6", cursor: "pointer" }}>
             <input type="checkbox" checked={settings.autoAdvance} onChange={(e) => saveSettings({ autoAdvance: e.target.checked })} />
             Automatically move on once a phase's timer runs out, OR the moment everyone's actually finished (every competitor done with
-            the challenge, all 3 Fates nominations in, every eligible vote cast) — whichever comes first. Uncheck to require a manual
-            "Finish Now" click every time, which is worth doing if you like to run a live reveal ceremony for the Exile Vote or Finale,
-            since otherwise the last vote landing can advance the round out from under you.
+            the challenge, all 3 Fates nominations in, every eligible vote cast) — whichever comes first. This is the setting that makes
+            async play work with nobody needing to be watching. Voting itself always closes automatically once everyone's voted
+            regardless of this setting — turning it off only means the round then WAITS for your "Finalize Exile & Continue" click
+            instead of finishing on its own, which is worth doing if you'd rather run a live, unhurried reveal ceremony for the Exile
+            Vote or Finale.
           </label>
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#ff2d95", cursor: "pointer", fontWeight: 700 }}>
             <input type="checkbox" checked={settings.infiniteTime} onChange={(e) => saveSettings({ infiniteTime: e.target.checked })} />

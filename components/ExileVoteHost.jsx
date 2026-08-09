@@ -163,13 +163,20 @@ export default function ExileVoteHost({ gameId, players, round }) {
         {chaosHolder ? (
           <p style={{ fontSize: 12, color: nullifiedId ? "#00ff9d" : "#a68fd6", margin: 0 }}>
             <strong style={{ color: "#ff3860" }}>{chaosHolder.display_name}</strong> claimed it.{" "}
-            {nullifiedId ? "✓ Their pick is locked in — secret until you reveal it below." : "Waiting on them to choose, from their own screen."}
+            {nullifiedId ? (
+              <>✓ Locked in: nullifying <strong style={{ color: "#ff3860" }}>{byId[nullifiedId] || "?"}</strong> — visible to you now, still secret from players until you reveal it below.</>
+            ) : (
+              "Waiting on them to choose, from their own screen."
+            )}
           </p>
         ) : (
           <p style={{ fontSize: 12, color: "#a68fd6", margin: 0 }}>
             Every voter got one shot at a mystery-card draw on their own screen ({alive.length} cards, one Power of Chaos) — {Object.keys(drawPicks).length}/{alive.length} have picked so far.
             {exile.votingOpen ? " Still up for grabs." : " Voting's closed with nobody claiming it — no one holds it this round."}
           </p>
+        )}
+        {nullifiedId && chaosSecret?.reason && (
+          <p style={{ fontSize: 11, color: "#a68fd6", fontStyle: "italic", margin: "6px 0 0" }}>"{chaosSecret.reason}"</p>
         )}
       </div>
 
