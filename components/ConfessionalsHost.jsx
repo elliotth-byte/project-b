@@ -74,7 +74,11 @@ export default function ConfessionalsHost({ gameId, round, players }) {
     reload();
   };
 
-  const players = [...new Set(items.map((c) => c.player_name))].sort();
+  // Distinct player NAMES that actually appear in the confessional inbox
+  // — just for the filter dropdown below. Deliberately not called
+  // `players` (that's the roster prop, full player objects, used for the
+  // prompt-targeting picker above).
+  const playerNamesInInbox = [...new Set(items.map((c) => c.player_name))].sort();
   const rounds = [...new Set(items.map((c) => c.round).filter(Boolean))].sort((a, b) => a - b);
 
   let filtered = items.filter((c) => !c.archived || filterPlayer === "__archived__");
@@ -198,7 +202,7 @@ export default function ConfessionalsHost({ gameId, round, players }) {
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
           <select value={filterPlayer} onChange={(e) => setFilterPlayer(e.target.value)} style={selStyle}>
             <option value="">All players</option>
-            {players.map((p) => <option key={p} value={p}>{p}</option>)}
+            {playerNamesInInbox.map((p) => <option key={p} value={p}>{p}</option>)}
             <option value="__archived__">📦 Archived only</option>
           </select>
           <select value={filterRound} onChange={(e) => setFilterRound(e.target.value)} style={selStyle}>
