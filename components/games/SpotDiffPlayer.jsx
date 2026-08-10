@@ -28,10 +28,15 @@ export default function SpotDiffPlayer({ gameId, round, challenge, player }) {
   const foundCount = differences.filter((d) => d.found).length;
 
   useEffect(() => {
-    const a = canvasARef.current?.getContext("2d");
-    const b = canvasBRef.current?.getContext("2d");
-    if (a) drawScene(a, W, H, scene.sceneA);
-    if (b) {
+    let raf;
+    const draw = () => {
+      const a = canvasARef.current?.getContext("2d");
+      const b = canvasBRef.current?.getContext("2d");
+      // If the refs aren't attached to the DOM yet on this pass (can
+      // happen on the very first render in some browsers), try again on
+      // the next frame instead of silently drawing nothing.
+      if (!a || !b) { raf = requestAnimationFrame(draw); return; }
+      drawScene(a, W, H, scene.sceneA);
       drawScene(b, W, H, scene.sceneB);
       differences.forEach((d) => {
         if (d.found) {
@@ -39,7 +44,9 @@ export default function SpotDiffPlayer({ gameId, round, challenge, player }) {
           b.beginPath(); b.arc(d.x, d.y, d.r, 0, Math.PI * 2); b.stroke();
         }
       });
-    }
+    };
+    draw();
+    return () => { if (raf) cancelAnimationFrame(raf); };
   }, [differences]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const reportComposite = (found, final, penalty = penaltyMs) => {

@@ -113,6 +113,26 @@ export default function AdminHost({ gameId, players, round }) {
       setRoundResetStatus("Can't reset — this round's Exile Vote has already been revealed and someone's been eliminated. Use Reset Season if you need to undo that.");
       return;
     }
+    // The check above only protects THIS round's own exile data. It used
+    // to be possible for a PREVIOUS round's exile to still be sitting in
+    // this same slot — un-recorded into history, because of a separate
+    // bug (see lib/roundEngine.js's recordExileHistoryIfMissing) — and
+    // get silently deleted by the blanket storageDelete below the moment
+    // a host reset a LATER round, permanently destroying that earlier
+    // round's ceremony data with no warning. Block outright instead of
+    // guessing at an auto-recovery here; better to make the host go
+    // check what's going on than risk deleting it a second time.
+    if (exile && exile.round !== roundNum) {
+      setRoundResetBusy(false);
+      setRoundResetStatus(`Can't reset — there's still Exile Vote data left over from round ${exile.round} sitting here, unresolved. Resetting could permanently destroy it. Check that round's voting history first (it may need manual recovery) before trying this again.`);
+      return;
+    }
+    const fates = await storageGet(gameId, KEY_FATES);
+    if (fates && fates.round !== roundNum) {
+      setRoundResetBusy(false);
+      setRoundResetStatus(`Can't reset — there's still Fates Ceremony data left over from round ${fates.round} sitting here, unresolved. Resetting could permanently destroy it. Check that round's voting history first before trying this again.`);
+      return;
+    }
 
     await Promise.all([
       storageSet(gameId, KEY_CHALLENGE, {
