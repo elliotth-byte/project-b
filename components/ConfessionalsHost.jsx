@@ -2,11 +2,11 @@ import { useState, useEffect } from "react";
 import { Btn, Card, Badge } from "./ui";
 import {
   CONFESSIONAL_TAGS, fetchAllConfessionals, updateConfessional, subscribeConfessionalsTable,
-  subscribeConfessionalPrompt, setConfessionalPrompt, clearConfessionalPrompt, respondToConfessional,
+  subscribeConfessionalPrompts, addConfessionalPrompt, removeConfessionalPrompt, respondToConfessional,
 } from "../lib/confessionalsData";
 import CopyMessage from "./CopyMessage";
 
-export default function ConfessionalsHost({ gameId, round }) {
+export default function ConfessionalsHost({ gameId, round, players }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterPlayer, setFilterPlayer] = useState("");
@@ -19,7 +19,8 @@ export default function ConfessionalsHost({ gameId, round }) {
   const [groupBy, setGroupBy] = useState("none");
   const [compact, setCompact] = useState(true);
   const [promptDraft, setPromptDraft] = useState("");
-  const [prompt, setPrompt] = useState(null);
+  const [promptTargets, setPromptTargets] = useState([]); // player ids — empty = everyone
+  const [prompts, setPrompts] = useState([]);
   const [recapMode, setRecapMode] = useState(false);
   const [recapSelected, setRecapSelected] = useState([]);
   const [recapOpts, setRecapOpts] = useState({ names: true, anonymous: false, rounds: true, tags: false });
@@ -40,7 +41,7 @@ export default function ConfessionalsHost({ gameId, round }) {
   }, [gameId]);
 
   useEffect(() => {
-    const unsubscribe = subscribeConfessionalPrompt(gameId, setPrompt);
+    const unsubscribe = subscribeConfessionalPrompts(gameId, setPrompts);
     return unsubscribe;
   }, [gameId]);
 
@@ -112,8 +113,15 @@ export default function ConfessionalsHost({ gameId, round }) {
     return [["", filtered]];
   })();
 
-  const savePrompt = async () => { await setConfessionalPrompt(gameId, promptDraft.trim(), round); setPromptDraft(""); };
-  const deactivatePrompt = async () => { await clearConfessionalPrompt(gameId); };
+  const savePrompt = async () => {
+    await addConfessionalPrompt(gameId, promptDraft, round, promptTargets);
+    setPromptDraft("");
+    setPromptTargets([]);
+  };
+  const togglePromptTarget = (id) => setPromptTargets((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  const deactivatePrompt = async (promptId) => { await removeConfessionalPrompt(gameId, promptId); };
+  const byPlayerId = {};
+  (players || []).forEach((p) => (byPlayerId[p.id] = p.display_name));
 
   const buildRecapText = () => {
     const chosen = items.filter((c) => recapSelected.includes(c.id));
@@ -139,21 +147,51 @@ export default function ConfessionalsHost({ gameId, round }) {
           Private player confessionals. Visible only here — players can't see each other's, this is never posted automatically.
         </p>
 
-        {/* Prompt */}
+        {/* Prompts */}
         <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
-          <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>Tonight's Prompt</div>
-          {prompt?.active ? (
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 13, color: "#f5f0ff" }}>{prompt.prompt}</span>
-              <Btn small variant="ghost" onClick={deactivatePrompt}>Deactivate</Btn>
-            </div>
-          ) : (
-            <div style={{ display: "flex", gap: 6 }}>
-              <input value={promptDraft} onChange={(e) => setPromptDraft(e.target.value)} placeholder="e.g. Who do you trust least after tonight?"
-                style={{ flex: 1, background: "#1a0a2e", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 10px", color: "#f5f0ff", fontSize: 12 }} />
-              <Btn small onClick={savePrompt} disabled={!promptDraft.trim()}>Set Prompt</Btn>
+          <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+            Confessional Prompts{prompts.length > 0 && ` (${prompts.length} active)`}
+          </div>
+
+          {prompts.length > 0 && (
+            <div style={{ display: "grid", gap: 6, marginBottom: 10 }}>
+              {prompts.map((p) => (
+                <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, background: "#1a0a2e", borderRadius: 6, padding: "6px 10px" }}>
+                  <span style={{ fontSize: 12, color: "#f5f0ff" }}>
+                    {p.prompt}
+                    <span style={{ display: "block", fontSize: 10, color: p.targetPlayerIds ? "#ff2d95" : "#6b4f99", marginTop: 2 }}>
+                      {p.targetPlayerIds ? `→ ${p.targetPlayerIds.map((id) => byPlayerId[id] || "?").join(", ")}` : "→ Everyone"}
+                    </span>
+                  </span>
+                  <Btn small variant="ghost" onClick={() => deactivatePrompt(p.id)}>Deactivate</Btn>
+                </div>
+              ))}
             </div>
           )}
+
+          <input
+            value={promptDraft} onChange={(e) => setPromptDraft(e.target.value)} placeholder="e.g. Who do you trust least after tonight?"
+            style={{ width: "100%", boxSizing: "border-box", background: "#1a0a2e", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 10px", color: "#f5f0ff", fontSize: 12, marginBottom: 8 }}
+          />
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
+            {(players || []).map((p) => {
+              const selected = promptTargets.includes(p.id);
+              return (
+                <button key={p.id} onClick={() => togglePromptTarget(p.id)} style={{
+                  fontSize: 11, padding: "4px 10px", borderRadius: 12, cursor: "pointer",
+                  background: selected ? "rgba(255,45,149,0.15)" : "transparent",
+                  border: `1px solid ${selected ? "#ff2d95" : "#3d1f5c"}`,
+                  color: selected ? "#ff2d95" : "#a68fd6",
+                }}>{selected ? "✓ " : ""}{p.display_name}</button>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 11, color: "#6b4f99", fontStyle: "italic" }}>
+              {promptTargets.length === 0 ? "No one selected — sends to everyone." : `Sends only to ${promptTargets.length} selected player${promptTargets.length === 1 ? "" : "s"}.`}
+            </span>
+            <Btn small onClick={savePrompt} disabled={!promptDraft.trim()}>Send Prompt</Btn>
+          </div>
         </div>
 
         {/* Filters */}

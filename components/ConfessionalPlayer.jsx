@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Btn, Card } from "./ui";
 import {
-  CONFESSIONAL_TAGS, submitConfessional, fetchOwnConfessionals, subscribeConfessionalPrompt,
+  CONFESSIONAL_TAGS, submitConfessional, fetchOwnConfessionals, subscribeConfessionalPrompts,
   subscribeConfessionalsTable,
 } from "../lib/confessionalsData";
 
@@ -13,12 +13,18 @@ export default function ConfessionalPlayer({ gameId, player, round, readOnly = f
   const [mine, setMine] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const hasUnseenReply = mine.some((c) => c.host_reply);
-  const [prompt, setPrompt] = useState(null);
+  const [allPrompts, setAllPrompts] = useState([]);
 
   useEffect(() => {
-    const unsubscribe = subscribeConfessionalPrompt(gameId, (v) => setPrompt(v?.active ? v : null));
+    const unsubscribe = subscribeConfessionalPrompts(gameId, setAllPrompts);
     return unsubscribe;
   }, [gameId]);
+
+  // A prompt applies to this player if it's global (no targeting) or they're
+  // specifically named — several can apply at once if the host sent more
+  // than one.
+  const prompts = allPrompts.filter((p) => !p.targetPlayerIds || p.targetPlayerIds.includes(player?.id));
+  const prompt = prompts[prompts.length - 1] || null; // most recent one attaches to a new submission
 
   useEffect(() => {
     if (!player?.id) return;
@@ -67,10 +73,16 @@ export default function ConfessionalPlayer({ gameId, player, round, readOnly = f
               Confessionals are visible only to you and the host — no other player can ever see them.</>}
       </p>
 
-      {prompt && (
-        <div style={{ background: "rgba(255,45,149,0.1)", border: "1px solid rgba(255,45,149,0.3)", borderRadius: 8, padding: "10px 12px", marginBottom: 12 }}>
-          <div style={{ fontSize: 10, color: "#ff2d95", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Tonight's prompt</div>
-          <div style={{ fontSize: 13, color: "#f5f0ff" }}>{prompt.prompt}</div>
+      {prompts.length > 0 && (
+        <div style={{ marginBottom: 12, display: "grid", gap: 6 }}>
+          {prompts.map((p) => (
+            <div key={p.id} style={{ background: "rgba(255,45,149,0.1)", border: "1px solid rgba(255,45,149,0.3)", borderRadius: 8, padding: "10px 12px" }}>
+              <div style={{ fontSize: 10, color: "#ff2d95", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>
+                {p.targetPlayerIds ? "A prompt just for you" : "Tonight's prompt"}
+              </div>
+              <div style={{ fontSize: 13, color: "#f5f0ff" }}>{p.prompt}</div>
+            </div>
+          ))}
         </div>
       )}
 
