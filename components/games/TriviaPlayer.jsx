@@ -1,59 +1,84 @@
 import { useState, useEffect, useRef } from "react";
 import { Card, Badge } from "../ui";
 import GameResultCard from "./GameResultCard";
-import { pickTriviaQuestions } from "../../lib/games/triviaData";
+import { pickTriviaCategories, DIFFICULTY_POINTS } from "../../lib/games/triviaData";
 import { reportScore } from "../../lib/challengeScores";
+
+const CHOOSE_SEC = 8; // window to pick a difficulty before it auto-picks Easy for you
+
+const DIFFICULTY_META = {
+  easy: { label: "Easy", points: DIFFICULTY_POINTS.easy, color: "#00ff9d" },
+  medium: { label: "Medium", points: DIFFICULTY_POINTS.medium, color: "#ffd700" },
+  hard: { label: "Hard", points: DIFFICULTY_POINTS.hard, color: "#ff3860" },
+};
 
 export default function TriviaPlayer({ gameId, round, challenge, player }) {
   const cfg = challenge?.gameConfig || { questions: 10, secPerQuestion: 10 };
   const seed = (challenge?.startedAt || 1) + (player?.id ? player.id.length : 0);
-  const [questions] = useState(() => pickTriviaQuestions(seed, cfg.questions || 10));
+  const [categories] = useState(() => pickTriviaCategories(seed, cfg.questions || 10));
   const [index, setIndex] = useState(0);
-  const [correctCount, setCorrectCount] = useState(0);
+  const [phase, setPhase] = useState("choosing"); // "choosing" | "answering" | "revealed"
+  const [difficulty, setDifficulty] = useState(null);
+  const [score, setScore] = useState(0);
   const [selected, setSelected] = useState(null);
-  const [revealed, setRevealed] = useState(false);
-  const [secLeft, setSecLeft] = useState(cfg.secPerQuestion || 10);
+  const [secLeft, setSecLeft] = useState(CHOOSE_SEC);
   const [done, setDone] = useState(false);
   const reportedRef = useRef(false);
 
-  const current = questions[index];
+  const currentCategory = categories[index];
+  const currentQuestion = difficulty ? currentCategory[difficulty] : null;
 
+  const chooseDifficulty = (d) => {
+    if (phase !== "choosing") return;
+    setDifficulty(d);
+    setPhase("answering");
+    setSecLeft(cfg.secPerQuestion || 10);
+  };
+
+  // One shared countdown, its meaning depends on phase — picking a
+  // difficulty (short window, auto-resolves to Easy so nobody stalls the
+  // round) or answering the chosen question.
   useEffect(() => {
-    if (done || revealed) return;
-    if (secLeft <= 0) { lockAnswer(null); return; }
+    if (done || phase === "revealed") return;
+    if (secLeft <= 0) {
+      if (phase === "choosing") chooseDifficulty("easy");
+      else lockAnswer(null);
+      return;
+    }
     const t = window.setTimeout(() => setSecLeft((s) => s - 1), 1000);
     return () => window.clearTimeout(t);
-  }, [secLeft, done, revealed]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [secLeft, done, phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const lockAnswer = (choiceIdx) => {
-    if (revealed) return;
+    if (phase !== "answering") return;
     setSelected(choiceIdx);
-    setRevealed(true);
-    const correct = choiceIdx === current.answer;
-    if (correct) setCorrectCount((c) => c + 1);
+    setPhase("revealed");
+    const correct = choiceIdx === currentQuestion.answer;
+    if (correct) setScore((s) => s + DIFFICULTY_POINTS[difficulty]);
 
     window.setTimeout(() => {
       const nextIndex = index + 1;
-      if (nextIndex >= questions.length) {
+      if (nextIndex >= categories.length) {
         setDone(true);
       } else {
         setIndex(nextIndex);
+        setDifficulty(null);
         setSelected(null);
-        setRevealed(false);
-        setSecLeft(cfg.secPerQuestion || 10);
+        setPhase("choosing");
+        setSecLeft(CHOOSE_SEC);
       }
-    }, 900);
+    }, 1100);
   };
 
   useEffect(() => {
     if (done && !reportedRef.current) {
       reportedRef.current = true;
-      reportScore(gameId, round.round, player.id, player.name, correctCount, { final: true });
+      reportScore(gameId, round.round, player.id, player.name, score, { final: true });
     }
-  }, [done, correctCount]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [done, score]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (done) {
-    return <GameResultCard icon="❓" title="Trivia Complete" valueLabel={`${correctCount}/${questions.length} correct`} />;
+    return <GameResultCard icon="❓" title="Trivia Complete" valueLabel={`${score} pts`} />;
   }
 
   return (
@@ -62,23 +87,56 @@ export default function TriviaPlayer({ gameId, round, challenge, player }) {
         <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>❓ Trivia</h3>
         <Badge color={secLeft <= 3 ? "#ff3860" : "#ff2d95"}>{secLeft}s</Badge>
       </div>
-      <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 8px" }}>Question {index + 1} of {questions.length} — {correctCount} correct so far</p>
-      <p style={{ color: "#f5f0ff", fontSize: 16, fontWeight: 600, margin: "0 0 14px", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>{current.q}</p>
-      <div style={{ display: "grid", gap: 8 }}>
-        {current.options.map((opt, i) => {
-          let bg = "#0d0618", border = "#3d1f5c", color = "#f5f0ff";
-          if (revealed) {
-            if (i === current.answer) { bg = "rgba(0,255,157,0.15)"; border = "#00ff9d"; color = "#00ff9d"; }
-            else if (i === selected) { bg = "rgba(255,56,96,0.15)"; border = "#ff3860"; color = "#ff3860"; }
-          }
-          return (
-            <button key={i} onClick={() => lockAnswer(i)} disabled={revealed} style={{
-              textAlign: "left", padding: "10px 14px", borderRadius: 8, cursor: revealed ? "default" : "pointer",
-              background: bg, border: `2px solid ${border}`, color, fontSize: 14, fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
-            }}>{opt}</button>
-          );
-        })}
-      </div>
+      <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 4px" }}>Round {index + 1} of {categories.length} — {score} pts so far</p>
+      <p style={{ color: "#a68fd6", fontSize: 12, textTransform: "uppercase", letterSpacing: 1, margin: "0 0 12px", fontWeight: 700 }}>
+        📁 {currentCategory.category}
+      </p>
+
+      {phase === "choosing" && (
+        <div style={{ display: "grid", gap: 8 }}>
+          <p style={{ color: "#f5f0ff", fontSize: 13, margin: "0 0 4px" }}>Choose your difficulty — higher risk, higher reward.</p>
+          {["hard", "medium", "easy"].map((d) => {
+            const meta = DIFFICULTY_META[d];
+            return (
+              <button key={d} onClick={() => chooseDifficulty(d)} style={{
+                textAlign: "left", padding: "12px 14px", borderRadius: 8, cursor: "pointer",
+                background: `${meta.color}14`, border: `2px solid ${meta.color}`, color: meta.color,
+                fontSize: 14, fontWeight: 700, fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+              }}>
+                {meta.label}
+                <span style={{ fontSize: 12 }}>{meta.points} pt{meta.points > 1 ? "s" : ""}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {(phase === "answering" || phase === "revealed") && currentQuestion && (
+        <>
+          <div style={{ marginBottom: 8 }}>
+            <span style={{ fontSize: 10, color: DIFFICULTY_META[difficulty].color, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>
+              {DIFFICULTY_META[difficulty].label} — worth {DIFFICULTY_META[difficulty].points} pt{DIFFICULTY_META[difficulty].points > 1 ? "s" : ""}
+            </span>
+          </div>
+          <p style={{ color: "#f5f0ff", fontSize: 16, fontWeight: 600, margin: "0 0 14px", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>{currentQuestion.q}</p>
+          <div style={{ display: "grid", gap: 8 }}>
+            {currentQuestion.options.map((opt, i) => {
+              let bg = "#0d0618", border = "#3d1f5c", color = "#f5f0ff";
+              if (phase === "revealed") {
+                if (i === currentQuestion.answer) { bg = "rgba(0,255,157,0.15)"; border = "#00ff9d"; color = "#00ff9d"; }
+                else if (i === selected) { bg = "rgba(255,56,96,0.15)"; border = "#ff3860"; color = "#ff3860"; }
+              }
+              return (
+                <button key={i} onClick={() => lockAnswer(i)} disabled={phase === "revealed"} style={{
+                  textAlign: "left", padding: "10px 14px", borderRadius: 8, cursor: phase === "revealed" ? "default" : "pointer",
+                  background: bg, border: `2px solid ${border}`, color, fontSize: 14, fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
+                }}>{opt}</button>
+              );
+            })}
+          </div>
+        </>
+      )}
     </Card>
   );
 }

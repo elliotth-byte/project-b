@@ -1,13 +1,18 @@
 import { colorFor } from "../lib/playerColors";
 
-// A grid of big, chunky, colored tiles — one per candidate — used for
-// every "pick a player" moment (nominations, exile votes, finale votes).
-// candidates: [{ playerId, name }]. players: full roster (for color lookup).
+// A grid of big, chunky tiles — one per candidate — used for every "pick
+// a player" moment (nominations, exile votes, finale votes). Shows an
+// avatar image when the season has one set for that player (see
+// lib/avatarIdentity.js's effectiveAvatarUrl), falling back to their
+// color swatch otherwise — the original, always-available default.
+// candidates: [{ playerId, name }]. players: full roster (for color/
+// avatar lookup).
 export default function MemoryWall({ candidates, players, selectedId, onSelect, disabledIds = [] }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
       {candidates.map((c) => {
         const color = colorFor(players, c.playerId);
+        const avatarUrl = (players || []).find((p) => p.id === c.playerId)?.effectiveAvatarUrl;
         const selected = selectedId === c.playerId;
         const disabled = disabledIds.includes(c.playerId);
         return (
@@ -26,10 +31,20 @@ export default function MemoryWall({ candidates, players, selectedId, onSelect, 
               padding: 8,
             }}
           >
-            <div style={{
-              width: 40, height: 40, borderRadius: "50%", background: color,
-              boxShadow: `0 0 14px ${color}cc`, border: "2px solid rgba(255,255,255,0.5)",
-            }} />
+            {avatarUrl ? (
+              <img
+                src={avatarUrl} alt=""
+                style={{
+                  width: 64, height: 64, borderRadius: "50%", objectFit: "cover",
+                  boxShadow: `0 0 14px ${color}cc`, border: "2px solid rgba(255,255,255,0.5)",
+                }}
+              />
+            ) : (
+              <div style={{
+                width: 40, height: 40, borderRadius: "50%", background: color,
+                boxShadow: `0 0 14px ${color}cc`, border: "2px solid rgba(255,255,255,0.5)",
+              }} />
+            )}
             <span style={{
               fontSize: 15, fontWeight: 900, color: selected ? color : "#f5f0ff",
               textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center",

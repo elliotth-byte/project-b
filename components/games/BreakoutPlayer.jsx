@@ -18,6 +18,8 @@ export default function BreakoutPlayer({ gameId, round, challenge, player }) {
   const [done, setDone] = useState(false);
   const doneRef = useRef(false);
   const reportedRef = useRef(false);
+  const [countdown, setCountdown] = useState(3); // 3-2-1-GO before the ball actually moves
+  const countdownRef = useRef(3);
 
   const freshBricks = () => {
     const bricks = [];
@@ -34,6 +36,18 @@ export default function BreakoutPlayer({ gameId, round, challenge, player }) {
     };
   }, []);
 
+  // 3-2-1-GO countdown before the ball starts moving — gives a player a
+  // beat to get oriented instead of the ball launching the instant the
+  // board renders.
+  useEffect(() => {
+    if (countdownRef.current <= 0) return;
+    const t = window.setTimeout(() => {
+      countdownRef.current -= 1;
+      setCountdown(countdownRef.current);
+    }, 700);
+    return () => window.clearTimeout(t);
+  }, [countdown]);
+
   useEffect(() => {
     if (timeUp || doneRef.current) return;
     let raf;
@@ -42,7 +56,33 @@ export default function BreakoutPlayer({ gameId, round, challenge, player }) {
 
     const loop = () => {
       const st = stateRef.current;
-      if (!st || doneRef.current) return;
+      if (!st || doneRef.current) { raf = requestAnimationFrame(loop); return; }
+
+      // Defensive: if the paddle (or ball) position was ever corrupted
+      // into something non-finite — from any cause, a stray NaN
+      // anywhere upstream — this recovers instead of silently rendering
+      // nothing forever. fillRect with a NaN coordinate draws nothing
+      // and throws no error, which is exactly what an invisible paddle
+      // with no console error would look like.
+      if (!Number.isFinite(st.paddleX)) st.paddleX = W / 2 - PADDLE_W / 2;
+      if (!Number.isFinite(st.ballX) || !Number.isFinite(st.ballY)) { st.ballX = W / 2; st.ballY = H - 40; }
+      st.paddleX = Math.max(0, Math.min(W - PADDLE_W, st.paddleX));
+
+      if (countdownRef.current > 0) {
+        // Still draw the static board during the countdown — just skip
+        // all movement/collision this frame.
+        if (ctx) {
+          ctx.clearRect(0, 0, W, H);
+          ctx.fillStyle = "#ff2d95";
+          for (const b of st.bricks) if (b.alive) ctx.fillRect(b.c * BRICK_W + 1, b.r * BRICK_H + 20, BRICK_W - 2, BRICK_H - 2);
+          ctx.fillStyle = "#f5f0ff";
+          ctx.fillRect(st.paddleX, H - 20, PADDLE_W, PADDLE_H);
+          ctx.beginPath(); ctx.arc(st.ballX, st.ballY, BALL_R, 0, Math.PI * 2); ctx.fill();
+        }
+        raf = requestAnimationFrame(loop);
+        return;
+      }
+
       st.ballX += st.vx; st.ballY += st.vy;
       if (st.ballX < BALL_R || st.ballX > W - BALL_R) st.vx = -st.vx;
       if (st.ballY < BALL_R) st.vy = -st.vy;
@@ -120,7 +160,16 @@ export default function BreakoutPlayer({ gameId, round, challenge, player }) {
 
   const onPointerMove = (e) => {
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    // Scale factor between the canvas's CSS-rendered size and its actual
+    // internal pixel space — needed now that the canvas has responsive
+    // CSS sizing below (rect.width won't always equal W). Without this,
+    // touch/mouse coordinates would be wrong on any screen where the two
+    // differ, same fix SpotDiffPlayer.jsx already uses.
+    const scaleX = W / rect.width;
+    const touch = e.touches?.[0];
+    const clientX = touch ? touch.clientX : e.clientX;
+    if (clientX == null) return; // e.g. a stray touchend with no active touch
+    const x = (clientX - rect.left) * scaleX;
     if (stateRef.current) stateRef.current.paddleX = Math.max(0, Math.min(W - PADDLE_W, x - PADDLE_W / 2));
   };
 
@@ -134,11 +183,23 @@ export default function BreakoutPlayer({ gameId, round, challenge, player }) {
         <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🧱 Breakout {level > 1 ? `— Board ${level}` : ""}</h3>
         <Badge>{"❤️".repeat(lives)} · {score} pts</Badge>
       </div>
-      <canvas
-        ref={canvasRef} width={W} height={H}
-        onMouseMove={onPointerMove} onTouchMove={onPointerMove}
-        style={{ background: "#0d0618", borderRadius: 10, border: "1px solid #3d1f5c", touchAction: "none" }}
-      />
+      <div style={{ position: "relative", width: "100%", maxWidth: W, margin: "0 auto" }}>
+        <canvas
+          ref={canvasRef} width={W} height={H}
+          onMouseMove={onPointerMove} onTouchMove={onPointerMove}
+          style={{ width: "100%", maxWidth: W, height: "auto", background: "#0d0618", borderRadius: 10, border: "1px solid #3d1f5c", touchAction: "none", display: "block" }}
+        />
+        {countdown > 0 && (
+          <div style={{
+            position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+            background: "rgba(5,1,15,0.55)", borderRadius: 10, pointerEvents: "none",
+          }}>
+            <span style={{ fontSize: 48, fontWeight: 900, color: "#ff2d95", textShadow: "0 0 20px #ff2d95", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
+              {countdown}
+            </span>
+          </div>
+        )}
+      </div>
       <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 8 }}>
         <button onClick={() => movePaddle(-24)} style={arrowStyle}>←</button>
         <button onClick={() => movePaddle(24)} style={arrowStyle}>→</button>

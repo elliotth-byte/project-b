@@ -72,14 +72,21 @@ export default function WordScramblePlayer({ gameId, round, challenge, player })
         position: "relative", width: arenaW, height: arenaH, margin: "0 auto 12px",
         background: "#0d0618", borderRadius: 10, border: "1px solid #3d1f5c", overflow: "hidden",
       }}>
-        {visibleLetters.map((l, i) => (
-          <div key={i} style={{
-            position: "absolute", left: l.x, top: l.y,
-            fontSize: 20, fontWeight: 900, color: WORD_COLORS[l.wi],
-            fontFamily: WORD_FONTS[l.wi % WORD_FONTS.length],
-            textShadow: `0 0 8px ${WORD_COLORS[l.wi]}66`, userSelect: "none", pointerEvents: "none",
-          }}>{l.char}</div>
-        ))}
+        {visibleLetters.map((l, i) => {
+          // Opacity oscillates between a faint 0.08 (never fully gone —
+          // still playable, just hard to screenshot-and-solve-later) and
+          // a full 1, on each letter's own randomized cycle.
+          const opacity = 0.08 + 0.92 * (0.5 + 0.5 * Math.sin((Date.now() / l.fadePeriodMs) * Math.PI * 2 + l.fadePhase));
+          return (
+            <div key={i} style={{
+              position: "absolute", left: l.x, top: l.y,
+              fontSize: 20, fontWeight: 900, color: WORD_COLORS[l.wi],
+              fontFamily: WORD_FONTS[l.wi % WORD_FONTS.length],
+              textShadow: `0 0 8px ${WORD_COLORS[l.wi]}66`, userSelect: "none", pointerEvents: "none",
+              opacity, transition: "opacity 0.05s linear",
+            }}>{l.char}</div>
+          );
+        })}
       </div>
       <div style={{ display: "grid", gap: 6 }}>
         {words.map((word, i) => (

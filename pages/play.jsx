@@ -14,6 +14,7 @@ import ConfessionalPlayer from "../components/ConfessionalPlayer";
 import MusicPlayer from "../components/MusicPlayer";
 import HelpPanel from "../components/HelpPanel";
 import ChatPanel from "../components/ChatPanel";
+import PlayerAvatarUpload from "../components/PlayerAvatarUpload";
 import RoundRevealGate from "../components/RoundRevealGate";
 import HomeLink from "../components/HomeLink";
 import LogoutButton from "../components/LogoutButton";
@@ -24,6 +25,7 @@ import { subscribeRound, subscribeSettings, PHASES, KEY_EXILE_HISTORY } from "..
 import { subscribeGameState } from "../lib/gameStorage";
 import { subscribeRevealAck } from "../lib/revealAck";
 import { resolveIdentities, identityComplete } from "../lib/playerIdentity";
+import { resolveAvatars } from "../lib/avatarIdentity";
 import { useHasUnreadChat } from "../lib/useChatUnread";
 import { useRoundWatcher } from "../lib/useRoundWatcher";
 
@@ -152,13 +154,13 @@ export default function PlayPage() {
     (async () => {
       const { data: existing } = await supabase
         .from("players")
-        .select("id, display_name, alive, elimination_type, approved, color, alias")
+        .select("id, display_name, alive, elimination_type, approved, color, alias, avatar_url")
         .eq("game_id", gameId)
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (existing) {
-        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, approved: existing.approved, color: existing.color, alias: existing.alias });
+        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, approved: existing.approved, color: existing.color, alias: existing.alias, avatarUrl: existing.avatar_url });
         setJoined(true);
         return;
       }
@@ -189,12 +191,12 @@ export default function PlayPage() {
       const { data: created, error } = await supabase
         .from("players")
         .insert({ game_id: gameId, user_id: session.user.id, display_name: displayNameFromUser(user), approved: false })
-        .select("id, display_name, alive, elimination_type, approved, color, alias")
+        .select("id, display_name, alive, elimination_type, approved, color, alias, avatar_url")
         .single();
       if (error) {
         setJoinError(`Couldn't join this game: ${error.message}${error.code ? ` [code=${error.code}]` : ""}${error.details ? ` — ${error.details}` : ""} (user_id=${session.user.id})`);
       } else {
-        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, approved: created.approved, color: created.color, alias: created.alias });
+        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, approved: created.approved, color: created.color, alias: created.alias, avatarUrl: created.avatar_url });
         setJoined(true);
       }
     })();
@@ -205,8 +207,8 @@ export default function PlayPage() {
   useEffect(() => {
     if (!myPlayer?.id) return;
     const load = async () => {
-      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, approved, color, alias").eq("id", myPlayer.id).maybeSingle();
-      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, approved: data.approved, color: data.color, alias: data.alias }));
+      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, approved, color, alias, avatar_url").eq("id", myPlayer.id).maybeSingle();
+      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, approved: data.approved, color: data.color, alias: data.alias, avatarUrl: data.avatar_url }));
     };
     const channel = supabase
       .channel(`self-player-${myPlayer.id}`)
@@ -229,7 +231,7 @@ export default function PlayPage() {
   }
 
   const playerName = myPlayer?.name;
-  const identityAllPlayers = resolveIdentities(allPlayers, { settings, round, isHost: false });
+  const identityAllPlayers = resolveAvatars(resolveIdentities(allPlayers, { settings, round, isHost: false }), settings);
   // The player's own displayed name follows the same override — once
   // their alias is confirmed, that's who they are for the season,
   // including to themselves, right down to what shows up in "Playing
@@ -362,6 +364,13 @@ export default function PlayPage() {
 
             {tab === "game" && !gameEnded && (
               <>
+                {settings?.avatarMode === "player_upload" && (
+                  <PlayerAvatarUpload
+                    player={player}
+                    avatarUrl={myPlayer.avatarUrl}
+                    onChanged={(url) => setMyPlayer((p) => p && ({ ...p, avatarUrl: url }))}
+                  />
+                )}
                 <div style={{ marginBottom: 16 }}><RoundTimerBanner round={round} /></div>
                 {(!round || round.phase === PHASES.LOBBY) && (
                   <Card style={{ marginBottom: 20, textAlign: "center" }}>
@@ -371,7 +380,7 @@ export default function PlayPage() {
                   </Card>
                 )}
                 {round?.phase === PHASES.CHALLENGE && (
-                  <ChallengeErrorBoundary label="Challenge"><ChallengePlayer gameId={gameId} player={player} round={round} /></ChallengeErrorBoundary>
+                  <ChallengeErrorBoundary label="Challenge"><ChallengePlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} /></ChallengeErrorBoundary>
                 )}
                 {round?.phase === PHASES.FATES && (
                   <ChallengeErrorBoundary label="Fates Ceremony"><FatesPlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} /></ChallengeErrorBoundary>

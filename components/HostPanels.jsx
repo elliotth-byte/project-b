@@ -3,6 +3,7 @@ import { Btn, Card, Badge } from "./ui";
 import { subscribeRound, subscribeSettings, startSeason as startSeasonState, PHASES } from "../lib/gameState";
 import { fetchAllConfessionals, subscribeConfessionalsTable } from "../lib/confessionalsData";
 import { resolveIdentities, resolveIdentitiesForHost } from "../lib/playerIdentity";
+import { resolveAvatars } from "../lib/avatarIdentity";
 import ChallengeErrorBoundary from "./ChallengeErrorBoundary";
 import ChallengeHost from "./ChallengeHost";
 import FatesHost from "./FatesHost";
@@ -58,14 +59,14 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
   // "View as Player" needs to show exactly what that player sees — aliases
   // included, once the season has them on — not the host's own always-real
   // view. See lib/playerIdentity.js.
-  const playerViewRoster = resolveIdentities(players, { settings, round, isHost: false });
+  const playerViewRoster = resolveAvatars(resolveIdentities(players, { settings, round, isHost: false }), settings);
   // Everywhere ELSE in the host UI (Challenge/Fates/Exile/Finale, History,
   // host Chat) — real name with the alias alongside, baked right into
   // display_name so every one of those components shows both without
   // needing its own alias-specific code. NOT used for Admin's own
   // player list/rename tool, which needs the real, uncombined value to
   // actually edit it — that one still reads `players` directly.
-  const hostRoster = resolveIdentitiesForHost(players, { settings, round });
+  const hostRoster = resolveAvatars(resolveIdentitiesForHost(players, { settings, round }), settings);
   const hostApprovedRoster = hostRoster.filter((p) => p.approved);
 
   const TABS = BASE_TABS

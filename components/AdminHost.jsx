@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Btn, Card, DurationInput } from "./ui";
 import { supabase } from "../lib/supabaseClient";
 import { storageDelete, storageGet, storageSet, storageUpdate } from "../lib/gameStorage";
@@ -9,6 +9,8 @@ import {
   initRound, PHASES,
 } from "../lib/gameState";
 import { REENTRY_STATUS } from "../lib/reentryLogic";
+import { AVATAR_COLLECTIONS } from "../lib/avatarCollections";
+import { uploadAvatar, removeAvatar } from "../lib/avatarUpload";
 
 export default function AdminHost({ gameId, players, round }) {
   const [names, setNames] = useState({});
@@ -18,6 +20,7 @@ export default function AdminHost({ gameId, players, round }) {
   const [status, setStatus] = useState("");
   const [settings, setLocalSettings] = useState(DEFAULT_SETTINGS);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [adminSubTab, setAdminSubTab] = useState("roster"); // "roster" | "setup"
 
   useEffect(() => {
     const unsubscribe = subscribeSettings(gameId, setLocalSettings);
@@ -81,6 +84,32 @@ export default function AdminHost({ gameId, players, round }) {
     setSavingSettings(true);
     await setSettings(gameId, patch);
     setSavingSettings(false);
+  };
+
+  // Avatar moderation — available regardless of mode, since a photo set
+  // under one mode doesn't disappear just because the host later
+  // switches modes (see the grid below, always visible once any upload
+  // mode has ever been used). hostUploadFileInputs lets each player's
+  // row have its own hidden <input type=file>, referenced by player id.
+  const hostUploadFileInputs = useRef({});
+  const [avatarBusyId, setAvatarBusyId] = useState(null);
+  const [avatarError, setAvatarError] = useState("");
+
+  const hostUploadAvatar = async (playerId, file) => {
+    setAvatarBusyId(playerId);
+    setAvatarError("");
+    const res = await uploadAvatar(playerId, file);
+    setAvatarBusyId(null);
+    if (!res.ok) setAvatarError(res.error || "Couldn't upload — try again.");
+  };
+
+  const hostRemoveAvatar = async (playerId, playerName) => {
+    if (!confirm(`Remove ${playerName}'s avatar photo?`)) return;
+    setAvatarBusyId(playerId);
+    setAvatarError("");
+    const res = await removeAvatar(playerId);
+    setAvatarBusyId(null);
+    if (!res.ok) setAvatarError(res.error || "Couldn't remove — try again.");
   };
 
   const [confirmRoundReset, setConfirmRoundReset] = useState(false);
@@ -197,159 +226,279 @@ export default function AdminHost({ gameId, players, round }) {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      {pending.length > 0 && (
-        <Card style={{ borderColor: "rgba(255,45,149,0.5)" }}>
-          <h3 style={{ color: "#ff2d95", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
-            ⏳ Pending Approval ({pending.length})
-          </h3>
-          <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
-            These players have joined but can't do anything until you approve them.
-          </p>
-          <div style={{ display: "grid", gap: 6 }}>
-            {pending.map((p) => (
-              <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0d0618", borderRadius: 6, padding: "8px 12px" }}>
-                <span style={{ fontSize: 13, color: "#f5f0ff" }}>{p.display_name}</span>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <Btn small onClick={() => approvePlayer(p)}>Approve</Btn>
-                  <Btn small variant="ghost" onClick={() => rejectPlayer(p)}>Remove</Btn>
-                </div>
+      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #3d1f5c" }}>
+        {[{ key: "roster", label: "👥 Roster & Resets" }, { key: "setup", label: "⚙️ Season Setup" }].map((t) => (
+          <button key={t.key} onClick={() => setAdminSubTab(t.key)} style={{
+            background: adminSubTab === t.key ? "rgba(255,45,149,0.13)" : "transparent",
+            color: adminSubTab === t.key ? "#ff2d95" : "#a68fd6",
+            border: "none", borderRadius: "8px 8px 0 0", padding: "8px 14px",
+            fontSize: 12.5, fontWeight: 600, cursor: "pointer",
+            borderBottom: adminSubTab === t.key ? "2px solid #ff2d95" : "2px solid transparent",
+          }}>
+            {t.label}{t.key === "roster" && pending.length > 0 ? ` (${pending.length})` : ""}
+          </button>
+        ))}
+      </div>
+
+      {adminSubTab === "roster" && (
+        <>
+          {pending.length > 0 && (
+            <Card style={{ borderColor: "rgba(255,45,149,0.5)" }}>
+              <h3 style={{ color: "#ff2d95", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
+                ⏳ Pending Approval ({pending.length})
+              </h3>
+              <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+                These players have joined but can't do anything until you approve them.
+              </p>
+              <div style={{ display: "grid", gap: 6 }}>
+                {pending.map((p) => (
+                  <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0d0618", borderRadius: 6, padding: "8px 12px" }}>
+                    <span style={{ fontSize: 13, color: "#f5f0ff" }}>{p.display_name}</span>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <Btn small onClick={() => approvePlayer(p)}>Approve</Btn>
+                      <Btn small variant="ghost" onClick={() => rejectPlayer(p)}>Remove</Btn>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </Card>
+            </Card>
+          )}
+
+          <Card>
+            <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🛠 Player Names</h3>
+            <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+              Renaming here updates the name everywhere. One real limitation worth knowing: anything already recorded under the OLD
+              name (a vote already cast, a nomination) keeps referencing the old name. Renaming before a round starts, or between
+              rounds, avoids that entirely.
+            </p>
+            <div style={{ display: "grid", gap: 6 }}>
+              {players.filter((p) => p.approved).map((p) => (
+                <div key={p.id} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <input
+                    value={nameFor(p)}
+                    onChange={(e) => setNames({ ...names, [p.id]: e.target.value })}
+                    style={{ flex: 1, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 10px", color: "#f5f0ff", fontSize: 13 }}
+                  />
+                  {p.alias && <span style={{ fontSize: 11, color: "#a68fd6", whiteSpace: "nowrap" }} title="Their alias — only you see both">🏛 {p.alias}</span>}
+                  <Btn small onClick={() => saveName(p)} disabled={saving[p.id] || nameFor(p) === p.display_name}>
+                    {saving[p.id] ? "Saving..." : "Save"}
+                  </Btn>
+                  {p.alive ? (
+                    <Btn small variant="ghost" onClick={() => removeApprovedPlayer(p)}>Remove</Btn>
+                  ) : (
+                    <>
+                      <span style={{ fontSize: 11, color: "#6b4f99" }}>({p.elimination_type === "quit" ? "left" : "exiled"})</span>
+                      <Btn small variant="ghost" onClick={() => restorePlayer(p)}>Restore</Btn>
+                    </>
+                  )}
+                </div>
+              ))}
+              {players.length === 0 && <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No players have joined yet.</p>}
+            </div>
+          </Card>
+
+          <Card style={{ borderColor: "rgba(255,45,149,0.3)" }}>
+            <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
+              ♻️ Reset Round {round?.round || ""}
+            </h3>
+            {roundResetStatus && (
+              <p style={{ fontSize: 12, color: roundResetStatus.startsWith("Can't") ? "#ff3860" : "#00ff9d", margin: "0 0 10px" }}>{roundResetStatus}</p>
+            )}
+            <p style={{ fontSize: 12, color: "#a68fd6", margin: "0 0 8px" }}>
+              Puts this round's Challenge, Fates Ceremony, and Exile Vote back to "hasn't happened yet" — for when nobody actually
+              got to compete. Earlier rounds and everyone's current alive/exiled status are untouched. Only available before this
+              round's Exile Vote has been revealed.
+            </p>
+            {roundResetBlockedReason ? (
+              <p style={{ fontSize: 12, color: "#6b4f99", fontStyle: "italic", margin: 0 }}>{roundResetBlockedReason}</p>
+            ) : confirmRoundReset ? (
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <span style={{ color: "#ff3860", fontSize: 12, fontWeight: 700 }}>Really reset Round {round.round}?</span>
+                <Btn small variant="danger" onClick={resetCurrentRound} disabled={roundResetBusy}>
+                  {roundResetBusy ? "Resetting..." : "Yes, reset this round"}
+                </Btn>
+                <Btn small variant="ghost" onClick={() => setConfirmRoundReset(false)}>Cancel</Btn>
+              </div>
+            ) : (
+              <Btn small variant="danger" onClick={() => setConfirmRoundReset(true)}>Reset This Round</Btn>
+            )}
+          </Card>
+
+          <Card style={{ borderColor: "rgba(255,56,96,0.3)" }}>
+            <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>♻️ Reset Season</h3>
+            {status && <p style={{ fontSize: 12, color: "#00ff9d", margin: "0 0 10px" }}>{status}</p>}
+            <p style={{ fontSize: 12, color: "#ff3860", margin: "0 0 8px", fontWeight: 600 }}>
+              Wipes every challenge, nomination, vote, exile, and re-entry attempt, and brings everyone back to alive at Round 1. This
+              cannot be undone. The roster (who's signed up) and any renames survive.
+            </p>
+            {confirmReset ? (
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <span style={{ color: "#ff3860", fontSize: 12, fontWeight: 700 }}>Really reset the whole season?</span>
+                <Btn small variant="danger" onClick={resetSeason} disabled={busy}>Yes, reset everything</Btn>
+                <Btn small variant="ghost" onClick={() => setConfirmReset(false)}>Cancel</Btn>
+              </div>
+            ) : (
+              <Btn small variant="danger" onClick={() => setConfirmReset(true)}>Reset Entire Season</Btn>
+            )}
+          </Card>
+        </>
       )}
 
-      <Card>
-        <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>⏱ Round Lengths</h3>
-        <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
-          Default timer for each phase. The Challenge phase's duration can still be overridden per-round when the host starts that
-          round's challenge. When a phase's timer runs out, the game automatically moves to the next phase and posts an update
-          in-app — as long as the host has finished entering whatever that phase needed (results, nominations, etc.).
-        </p>
-        <div style={{ display: "grid", gap: 10 }}>
-          {[
-            { key: "challengeDurationSec", label: "Challenge" },
-            { key: "fatesDurationSec", label: "Fates Ceremony" },
-            { key: "voteDurationSec", label: "Exile Vote (discussion + voting)" },
-          ].map((row) => (
-            <div key={row.key} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ width: 190, fontSize: 12.5, color: "#f5f0ff", flexShrink: 0 }}>{row.label}</span>
-              <DurationInput valueSec={settings[row.key]} onChange={(sec) => saveSettings({ [row.key]: sec })} />
+      {adminSubTab === "setup" && (
+        <>
+          <Card>
+            <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>⏱ Round Lengths</h3>
+            <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+              Default timer for each phase. The Challenge phase's duration can still be overridden per-round when the host starts that
+              round's challenge. When a phase's timer runs out, the game automatically moves to the next phase and posts an update
+              in-app — as long as the host has finished entering whatever that phase needed (results, nominations, etc.).
+            </p>
+            <div style={{ display: "grid", gap: 10 }}>
+              {[
+                { key: "challengeDurationSec", label: "Challenge" },
+                { key: "fatesDurationSec", label: "Fates Ceremony" },
+                { key: "voteDurationSec", label: "Exile Vote (discussion + voting)" },
+              ].map((row) => (
+                <div key={row.key} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={{ width: 190, fontSize: 12.5, color: "#f5f0ff", flexShrink: 0 }}>{row.label}</span>
+                  <DurationInput valueSec={settings[row.key]} onChange={(sec) => saveSettings({ [row.key]: sec })} />
+                </div>
+              ))}
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#a68fd6", cursor: "pointer" }}>
+                <input type="checkbox" checked={settings.autoAdvance} onChange={(e) => saveSettings({ autoAdvance: e.target.checked })} />
+                Automatically move on once a phase's timer runs out, OR the moment everyone's actually finished (every competitor done with
+                the challenge, all 3 Fates nominations in, every eligible vote cast) — whichever comes first. This is the setting that makes
+                async play work with nobody needing to be watching. Voting itself always closes automatically once everyone's voted
+                regardless of this setting — turning it off only means the round then WAITS for your "Finalize Exile & Continue" click
+                instead of finishing on its own, which is worth doing if you'd rather run a live, unhurried reveal ceremony for the Exile
+                Vote or Finale.
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#ff2d95", cursor: "pointer", fontWeight: 700 }}>
+                <input type="checkbox" checked={settings.infiniteTime} onChange={(e) => saveSettings({ infiniteTime: e.target.checked })} />
+                ∞ Infinite time — no phase gets an automatic timer at all; every Challenge/Fates Ceremony/Exile Vote/Finale runs until the host ends it
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#a68fd6", cursor: "pointer" }}>
+                <input type="checkbox" checked={settings.chatEnabled} onChange={(e) => saveSettings({ chatEnabled: e.target.checked })} />
+                💬 Chat — adds a Chat tab for players (group chat + DMs with each other) and one for you. Off by default so it doesn't
+                suddenly show up mid-season for a game already underway; you can safely leave it off for an existing season and only turn
+                it on for a fresh one. DMs are readable by you, same as confessionals — players see a note saying so.
+              </label>
+              <label style={{
+                display: "flex", alignItems: "center", gap: 6, fontSize: 12.5,
+                color: seasonStarted ? "#3d1f5c" : "#a68fd6", cursor: seasonStarted ? "not-allowed" : "pointer",
+              }}>
+                <input
+                  type="checkbox" checked={settings.aliasEnabled} disabled={seasonStarted}
+                  onChange={(e) => saveSettings({ aliasEnabled: e.target.checked })}
+                />
+                🏛 Alias mode — players pick a mythological codename (14 options) alongside their color, and it completely replaces
+                their real name everywhere in the game for everyone but you — leaderboards, votes, chat, all of it. You always see real
+                names; players see aliases. Real identities are automatically revealed to everyone once the game ends.{" "}
+                <strong>{seasonStarted ? "Locked — can only be changed before Round 1 starts." : "Only changeable now, before Round 1 starts."}</strong>
+              </label>
+              {savingSettings && <span style={{ fontSize: 11, color: "#00ff9d" }}>Saved.</span>}
             </div>
-          ))}
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#a68fd6", cursor: "pointer" }}>
-            <input type="checkbox" checked={settings.autoAdvance} onChange={(e) => saveSettings({ autoAdvance: e.target.checked })} />
-            Automatically move on once a phase's timer runs out, OR the moment everyone's actually finished (every competitor done with
-            the challenge, all 3 Fates nominations in, every eligible vote cast) — whichever comes first. This is the setting that makes
-            async play work with nobody needing to be watching. Voting itself always closes automatically once everyone's voted
-            regardless of this setting — turning it off only means the round then WAITS for your "Finalize Exile & Continue" click
-            instead of finishing on its own, which is worth doing if you'd rather run a live, unhurried reveal ceremony for the Exile
-            Vote or Finale.
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#ff2d95", cursor: "pointer", fontWeight: 700 }}>
-            <input type="checkbox" checked={settings.infiniteTime} onChange={(e) => saveSettings({ infiniteTime: e.target.checked })} />
-            ∞ Infinite time — no phase gets an automatic timer at all; every Challenge/Fates Ceremony/Exile Vote/Finale runs until the host ends it
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#a68fd6", cursor: "pointer" }}>
-            <input type="checkbox" checked={settings.chatEnabled} onChange={(e) => saveSettings({ chatEnabled: e.target.checked })} />
-            💬 Chat — adds a Chat tab for players (group chat + DMs with each other) and one for you. Off by default so it doesn't
-            suddenly show up mid-season for a game already underway; you can safely leave it off for an existing season and only turn
-            it on for a fresh one. DMs are readable by you, same as confessionals — players see a note saying so.
-          </label>
-          <label style={{
-            display: "flex", alignItems: "center", gap: 6, fontSize: 12.5,
-            color: seasonStarted ? "#3d1f5c" : "#a68fd6", cursor: seasonStarted ? "not-allowed" : "pointer",
-          }}>
-            <input
-              type="checkbox" checked={settings.aliasEnabled} disabled={seasonStarted}
-              onChange={(e) => saveSettings({ aliasEnabled: e.target.checked })}
-            />
-            🏛 Alias mode — players pick a mythological codename (14 options) alongside their color, and it completely replaces
-            their real name everywhere in the game for everyone but you — leaderboards, votes, chat, all of it. You always see real
-            names; players see aliases. Real identities are automatically revealed to everyone once the game ends.{" "}
-            <strong>{seasonStarted ? "Locked — can only be changed before Round 1 starts." : "Only changeable now, before Round 1 starts."}</strong>
-          </label>
-          {savingSettings && <span style={{ fontSize: 11, color: "#00ff9d" }}>Saved.</span>}
-        </div>
-      </Card>
+          </Card>
 
-      <Card>
-        <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🛠 Player Names</h3>
-        <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
-          Renaming here updates the name everywhere. One real limitation worth knowing: anything already recorded under the OLD
-          name (a vote already cast, a nomination) keeps referencing the old name. Renaming before a round starts, or between
-          rounds, avoids that entirely.
-        </p>
-        <div style={{ display: "grid", gap: 6 }}>
-          {players.filter((p) => p.approved).map((p) => (
-            <div key={p.id} style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <input
-                value={nameFor(p)}
-                onChange={(e) => setNames({ ...names, [p.id]: e.target.value })}
-                style={{ flex: 1, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 10px", color: "#f5f0ff", fontSize: 13 }}
-              />
-              {p.alias && <span style={{ fontSize: 11, color: "#a68fd6", whiteSpace: "nowrap" }} title="Their alias — only you see both">🏛 {p.alias}</span>}
-              <Btn small onClick={() => saveName(p)} disabled={saving[p.id] || nameFor(p) === p.display_name}>
-                {saving[p.id] ? "Saving..." : "Save"}
-              </Btn>
-              {p.alive ? (
-                <Btn small variant="ghost" onClick={() => removeApprovedPlayer(p)}>Remove</Btn>
-              ) : (
-                <>
-                  <span style={{ fontSize: 11, color: "#6b4f99" }}>({p.elimination_type === "quit" ? "left" : "exiled"})</span>
-                  <Btn small variant="ghost" onClick={() => restorePlayer(p)}>Restore</Btn>
-                </>
-              )}
+          <Card>
+            <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🖼 Avatars</h3>
+            <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+              Changeable any time, unlike Alias mode above — switching this mid-season is safe. Shows up on the MemoryWall vote
+              tiles and in Chat; nowhere else, to keep the rest of the UI uncluttered.
+            </p>
+            <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
+              {[
+                { value: "none", label: "None", blurb: "Just the color swatch, like today." },
+                { value: "player_upload", label: "Player uploads their own", blurb: "Each player sets their own photo from the Game tab, any time." },
+                { value: "host_upload", label: "You upload for each player", blurb: "Set a photo for each player yourself, below." },
+                {
+                  value: "collection", label: "Pick from a theme", blurb: "Every player's avatar is set at once from a pre-built collection, keyed to their alias.",
+                  disabled: !settings.aliasEnabled, disabledNote: "Requires Alias mode to be on — a theme is keyed to alias names.",
+                },
+              ].map((opt) => (
+                <label
+                  key={opt.value}
+                  style={{
+                    display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12.5,
+                    color: opt.disabled ? "#3d1f5c" : "#a68fd6", cursor: opt.disabled ? "not-allowed" : "pointer",
+                  }}
+                >
+                  <input
+                    type="radio" name="avatarMode" checked={settings.avatarMode === opt.value} disabled={opt.disabled}
+                    onChange={() => saveSettings({ avatarMode: opt.value })}
+                    style={{ marginTop: 2 }}
+                  />
+                  <span>
+                    <strong style={{ color: opt.disabled ? "#3d1f5c" : "#f5f0ff" }}>{opt.label}</strong> — {opt.blurb}
+                    {opt.disabled && <span style={{ display: "block", fontStyle: "italic" }}>{opt.disabledNote}</span>}
+                  </span>
+                </label>
+              ))}
             </div>
-          ))}
-          {players.length === 0 && <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No players have joined yet.</p>}
-        </div>
-      </Card>
 
-      <Card style={{ borderColor: "rgba(255,45,149,0.3)" }}>
-        <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
-          ♻️ Reset Round {round?.round || ""}
-        </h3>
-        {roundResetStatus && (
-          <p style={{ fontSize: 12, color: roundResetStatus.startsWith("Can't") ? "#ff3860" : "#00ff9d", margin: "0 0 10px" }}>{roundResetStatus}</p>
-        )}
-        <p style={{ fontSize: 12, color: "#a68fd6", margin: "0 0 8px" }}>
-          Puts this round's Challenge, Fates Ceremony, and Exile Vote back to "hasn't happened yet" — for when nobody actually
-          got to compete. Earlier rounds and everyone's current alive/exiled status are untouched. Only available before this
-          round's Exile Vote has been revealed.
-        </p>
-        {roundResetBlockedReason ? (
-          <p style={{ fontSize: 12, color: "#6b4f99", fontStyle: "italic", margin: 0 }}>{roundResetBlockedReason}</p>
-        ) : confirmRoundReset ? (
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <span style={{ color: "#ff3860", fontSize: 12, fontWeight: 700 }}>Really reset Round {round.round}?</span>
-            <Btn small variant="danger" onClick={resetCurrentRound} disabled={roundResetBusy}>
-              {roundResetBusy ? "Resetting..." : "Yes, reset this round"}
-            </Btn>
-            <Btn small variant="ghost" onClick={() => setConfirmRoundReset(false)}>Cancel</Btn>
-          </div>
-        ) : (
-          <Btn small variant="danger" onClick={() => setConfirmRoundReset(true)}>Reset This Round</Btn>
-        )}
-      </Card>
+            {settings.avatarMode === "collection" && (
+              <div style={{ marginBottom: 14 }}>
+                {AVATAR_COLLECTIONS.length === 0 ? (
+                  <p style={{ fontSize: 12, color: "#6b4f99", fontStyle: "italic" }}>
+                    No theme collections built yet — hand off images (see lib/avatarCollections.js) to add one.
+                  </p>
+                ) : (
+                  <select
+                    value={settings.avatarCollectionId || ""}
+                    onChange={(e) => saveSettings({ avatarCollectionId: e.target.value || null })}
+                    style={{ background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 10px", color: "#f5f0ff", fontSize: 13 }}
+                  >
+                    <option value="">— choose a theme —</option>
+                    {AVATAR_COLLECTIONS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                  </select>
+                )}
+              </div>
+            )}
 
-      <Card style={{ borderColor: "rgba(255,56,96,0.3)" }}>
-        <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>♻️ Reset Season</h3>
-        {status && <p style={{ fontSize: 12, color: "#00ff9d", margin: "0 0 10px" }}>{status}</p>}
-        <p style={{ fontSize: 12, color: "#ff3860", margin: "0 0 8px", fontWeight: 600 }}>
-          Wipes every challenge, nomination, vote, exile, and re-entry attempt, and brings everyone back to alive at Round 1. This
-          cannot be undone. The roster (who's signed up) and any renames survive.
-        </p>
-        {confirmReset ? (
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <span style={{ color: "#ff3860", fontSize: 12, fontWeight: 700 }}>Really reset the whole season?</span>
-            <Btn small variant="danger" onClick={resetSeason} disabled={busy}>Yes, reset everything</Btn>
-            <Btn small variant="ghost" onClick={() => setConfirmReset(false)}>Cancel</Btn>
-          </div>
-        ) : (
-          <Btn small variant="danger" onClick={() => setConfirmReset(true)}>Reset Entire Season</Btn>
-        )}
-      </Card>
+            {avatarError && <p style={{ fontSize: 11.5, color: "#ff3860", margin: "0 0 10px" }}>{avatarError}</p>}
+
+            {(settings.avatarMode === "player_upload" || settings.avatarMode === "host_upload") && (
+              <div>
+                <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+                  Uploaded photos {settings.avatarMode === "host_upload" ? "— set one for anyone below" : "— moderation"}
+                </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                  {players.filter((p) => p.approved).map((p) => (
+                    <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#0d0618", borderRadius: 6, padding: "6px 10px" }}>
+                      {p.avatar_url ? (
+                        <img src={p.avatar_url} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                      ) : (
+                        <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1a0a2e", border: "1px dashed #3d1f5c", flexShrink: 0 }} />
+                      )}
+                      <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff" }}>{p.display_name}</span>
+                      {settings.avatarMode === "host_upload" && (
+                        <>
+                          <input
+                            type="file" accept="image/*" style={{ display: "none" }}
+                            ref={(el) => { if (el) hostUploadFileInputs.current[p.id] = el; }}
+                            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) hostUploadAvatar(p.id, f); }}
+                          />
+                          <Btn small onClick={() => hostUploadFileInputs.current[p.id]?.click()} disabled={avatarBusyId === p.id}>
+                            {avatarBusyId === p.id ? "..." : p.avatar_url ? "Change" : "Upload"}
+                          </Btn>
+                        </>
+                      )}
+                      {p.avatar_url && (
+                        <Btn small variant="ghost" onClick={() => hostRemoveAvatar(p.id, p.display_name)} disabled={avatarBusyId === p.id}>
+                          Remove
+                        </Btn>
+                      )}
+                    </div>
+                  ))}
+                  {players.filter((p) => p.approved).length === 0 && (
+                    <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No approved players yet.</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </Card>
+        </>
+      )}
     </div>
   );
 }

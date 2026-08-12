@@ -10,6 +10,8 @@ import Match3Player from "./games/Match3Player";
 import FroggerPlayer from "./games/FroggerPlayer";
 import WordScramblePlayer from "./games/WordScramblePlayer";
 import Maze2DPlayer from "./games/Maze2DPlayer";
+import MazeInvisiblePlayer from "./games/MazeInvisiblePlayer";
+import MazeTriviaPlayer from "./games/MazeTriviaPlayer";
 import FarklePlayer from "./games/FarklePlayer";
 import TriviaPlayer from "./games/TriviaPlayer";
 import BreakoutPlayer from "./games/BreakoutPlayer";
@@ -23,6 +25,8 @@ const GAME_COMPONENTS = {
   frogger: FroggerPlayer,
   wordscramble: WordScramblePlayer,
   maze2d: Maze2DPlayer,
+  mazeinvisible: MazeInvisiblePlayer,
+  mazetrivia: MazeTriviaPlayer,
   farkle: FarklePlayer,
   trivia: TriviaPlayer,
   breakout: BreakoutPlayer,
@@ -31,7 +35,7 @@ const GAME_COMPONENTS = {
   whackmole: WhackMolePlayer,
 };
 
-export default function ChallengePlayer({ gameId, player, round, readOnly = false }) {
+export default function ChallengePlayer({ gameId, player, players, round, readOnly = false }) {
   const [challenge, setChallenge] = useState(null);
   const [scores, setScores] = useState({});
   const [reentry, setReentry] = useState([]);
@@ -218,7 +222,7 @@ export default function ChallengePlayer({ gameId, player, round, readOnly = fals
       }
       return (
         <>
-          <GameComponent gameId={gameId} round={round} challenge={challenge} player={player} />
+          <GameComponent gameId={gameId} round={round} challenge={challenge} player={player} players={players} />
           <div style={{ textAlign: "center", marginTop: 10 }}>
             <Btn small variant="ghost" onClick={forfeitDigital} disabled={forfeiting}>
               {forfeiting ? "Forfeiting..." : "🏳️ Forfeit Challenge"}

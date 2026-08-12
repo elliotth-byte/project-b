@@ -14,18 +14,27 @@ function UnreadDot() {
   return <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: "#ff3860", marginLeft: 5 }} />;
 }
 
-function MessageBubble({ mine, name, body, time }) {
+function MessageBubble({ mine, name, avatarUrl, body, time }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start", marginBottom: 8 }}>
-      {!mine && <div style={{ fontSize: 10, color: "#a68fd6", marginBottom: 2, marginLeft: 4 }}>{name}</div>}
-      <div style={{
-        maxWidth: "80%", background: mine ? "linear-gradient(135deg, #ff2d95, #b829ff)" : "#0d0618",
-        border: mine ? "none" : "1px solid #3d1f5c", color: mine ? "#05010f" : "#f5f0ff",
-        borderRadius: 14, padding: "8px 12px", fontSize: 13, wordBreak: "break-word",
-      }}>
-        {body}
+    <div style={{ display: "flex", flexDirection: mine ? "row-reverse" : "row", alignItems: "flex-end", gap: 6, marginBottom: 8 }}>
+      {!mine && (
+        avatarUrl ? (
+          <img src={avatarUrl} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0, marginBottom: 2 }} />
+        ) : (
+          <div style={{ width: 22, height: 22, flexShrink: 0 }} />
+        )
+      )}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start", maxWidth: "78%" }}>
+        {!mine && <div style={{ fontSize: 10, color: "#a68fd6", marginBottom: 2, marginLeft: 4 }}>{name}</div>}
+        <div style={{
+          background: mine ? "linear-gradient(135deg, #ff2d95, #b829ff)" : "#0d0618",
+          border: mine ? "none" : "1px solid #3d1f5c", color: mine ? "#05010f" : "#f5f0ff",
+          borderRadius: 14, padding: "8px 12px", fontSize: 13, wordBreak: "break-word",
+        }}>
+          {body}
+        </div>
+        <div style={{ fontSize: 9, color: "#6b4f99", marginTop: 2 }}>{fmtTime(time)}</div>
       </div>
-      <div style={{ fontSize: 9, color: "#6b4f99", marginTop: 2 }}>{fmtTime(time)}</div>
     </div>
   );
 }
@@ -71,7 +80,7 @@ function Composer({ onSend, placeholder }) {
   );
 }
 
-function GroupChatView({ gameId, player, realName, onRead }) {
+function GroupChatView({ gameId, player, players, realName, onRead }) {
   const [messages, setMessages] = useState([]);
   const listRef = useRef(null);
 
@@ -90,7 +99,7 @@ function GroupChatView({ gameId, player, realName, onRead }) {
 
   const rows = messages.map((m) => ({
     id: m.id,
-    node: <MessageBubble mine={m.senderId === player.id} name={m.senderName} body={m.body} time={m.createdAt} />,
+    node: <MessageBubble mine={m.senderId === player.id} name={m.senderName} avatarUrl={(players || []).find((p) => p.id === m.senderId)?.effectiveAvatarUrl} body={m.body} time={m.createdAt} />,
   }));
 
   return (
@@ -107,7 +116,7 @@ function threadLabel(thread, player, byId) {
   return others.map((id) => byId[id] || "?").join(", ") || "?";
 }
 
-function ThreadView({ thread, player, byId, onBack, onRead }) {
+function ThreadView({ thread, player, players, byId, onBack, onRead }) {
   const [messages, setMessages] = useState([]);
   const listRef = useRef(null);
   const label = threadLabel(thread, player, byId);
@@ -125,7 +134,7 @@ function ThreadView({ thread, player, byId, onBack, onRead }) {
 
   const rows = messages.map((m) => ({
     id: m.id,
-    node: <MessageBubble mine={m.sender_id === player.id} name={byId[m.sender_id] || "?"} body={m.body} time={m.created_at} />,
+    node: <MessageBubble mine={m.sender_id === player.id} name={byId[m.sender_id] || "?"} avatarUrl={(players || []).find((p) => p.id === m.sender_id)?.effectiveAvatarUrl} body={m.body} time={m.created_at} />,
   }));
 
   return (
@@ -161,7 +170,7 @@ function ExileRoomView({ gameId, player, players, byId, onRead }) {
   if (!thread) {
     return <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No one's been exiled yet — this room opens up the moment someone is.</p>;
   }
-  return <ThreadView thread={thread} player={player} byId={byId} onBack={() => {}} onRead={onRead} />;
+  return <ThreadView thread={thread} player={player} players={players} byId={byId} onBack={() => {}} onRead={onRead} />;
 }
 
 function MessagesView({ gameId, player, players, byId, openThread, setOpenThread, reads, onRead }) {
@@ -196,7 +205,7 @@ function MessagesView({ gameId, player, players, byId, openThread, setOpenThread
   };
 
   if (openThread) {
-    return <ThreadView thread={openThread} player={player} byId={byId} onBack={() => { setOpenThread(null); reload(); }} onRead={onRead} />;
+    return <ThreadView thread={openThread} player={player} players={players} byId={byId} onBack={() => { setOpenThread(null); reload(); }} onRead={onRead} />;
   }
 
   const others = players.filter((p) => p.id !== player.id && p.approved);
@@ -355,7 +364,7 @@ export default function ChatPanel({ gameId, player, players, realName, isExiled 
       </div>
 
       <Card>
-        {mode === "group" && <GroupChatView gameId={gameId} player={player} realName={realName} onRead={markGroupReadNow} />}
+        {mode === "group" && <GroupChatView gameId={gameId} player={player} players={players} realName={realName} onRead={markGroupReadNow} />}
         {mode === "exile" && isExiled && <ExileRoomView gameId={gameId} player={player} players={players} byId={byId} onRead={markThreadReadNow} />}
         {mode === "messages" && (
           <MessagesView

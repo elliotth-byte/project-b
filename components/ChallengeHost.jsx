@@ -4,13 +4,16 @@ import { storageSet, storageUpdate, subscribeGameState } from "../lib/gameStorag
 import { KEY_CHALLENGE, KEY_ROUND } from "../lib/gameState";
 import { placementsComplete } from "../lib/challengeLogic";
 import { GAME_REGISTRY, gameConfigWithDefaults } from "../lib/challengeGames";
-import { subscribeScores, scoresToPlacements } from "../lib/challengeScores";
+import { subscribeScores, scoresToPlacements, resetPlayerAttempt } from "../lib/challengeScores";
 import { subscribeReentry, getReentry } from "../lib/reentryData";
 import { REENTRY_STATUS } from "../lib/reentryLogic";
 import { DEFAULT_PARTICIPATION, computeParticipants } from "../lib/challengeParticipants";
+import { initPlinkoBracket, subscribePlinkoBracket } from "../lib/games/plinkoBracketData";
 import ParticipantPicker from "./ParticipantPicker";
 import CopyMessage from "./CopyMessage";
 import { requestAdvance } from "../lib/advanceNow";
+
+const MAZE_TYPES = ["maze2d", "mazeinvisible", "mazetrivia"]; // all three share the same host-configurable size control
 
 // ─── Challenge: Host Control ───
 // Setup (pick a game + who's competing + duration) -> either the host
@@ -27,6 +30,16 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   const [durationSec, setDurationSec] = useState(settings?.challengeDurationSec || 900);
   const [mazeSize, setMazeSize] = useState(GAME_REGISTRY.maze2d.config.size);
   const [busy, setBusy] = useState(false);
+  const [plinkoBracket, setPlinkoBracket] = useState(null);
+  const [resettingId, setResettingId] = useState(null);
+
+  const resetAttempt = async (playerId, playerName) => {
+    if (!confirm(`Reset ${playerName}'s attempt at this challenge? Their score and any in-progress clock are cleared — they get a completely fresh run next time they open this challenge. Takes effect the next time their screen reloads, not necessarily instantly if they're mid-game right now.`)) return;
+    setResettingId(playerId);
+    const res = await resetPlayerAttempt(gameId, round.round, playerId);
+    setResettingId(null);
+    if (!res.ok) alert("Couldn't reset that attempt — try again.");
+  };
 
   useEffect(() => {
     const unsubscribe = subscribeGameState(gameId, KEY_CHALLENGE, setChallenge);
@@ -36,6 +49,12 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   useEffect(() => {
     if (!round?.round) return;
     const unsubscribe = subscribeScores(gameId, round.round, setScores);
+    return unsubscribe;
+  }, [gameId, round?.round]);
+
+  useEffect(() => {
+    if (!round?.round) return;
+    const unsubscribe = subscribePlinkoBracket(gameId, round.round, setPlinkoBracket);
     return unsubscribe;
   }, [gameId, round?.round]);
 
@@ -57,6 +76,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   const pickGameType = (type) => {
     setGameType(type);
     setDurationSec(GAME_REGISTRY[type].defaultDurationSec);
+    if (MAZE_TYPES.includes(type)) setMazeSize(GAME_REGISTRY[type].config.size);
   };
 
   const startChallenge = async () => {
@@ -74,12 +94,15 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     const reentryEligibleIds = freshReentry.filter((r) => r.status === REENTRY_STATUS.PENDING).map((r) => r.playerId);
     const now = Date.now();
     const endsAt = settings?.infiniteTime ? null : now + durationSec * 1000;
-    const configOverrides = gameType === "maze2d" ? { size: mazeSize } : undefined;
+    const configOverrides = MAZE_TYPES.includes(gameType) ? { size: mazeSize } : undefined;
     await storageSet(gameId, KEY_CHALLENGE, {
       round: round.round, active: true, startedAt: now, endsAt,
       participantIds, reentryEligibleIds, reentryDecisions: {}, reentryAttemptIds: [], placements: [], finalized: false,
       gameType, gameConfig: gameConfigWithDefaults(gameType, configOverrides),
     });
+    if (gameType === "plinko") {
+      await initPlinkoBracket(gameId, round.round, participants, now);
+    }
     await storageUpdate(gameId, KEY_ROUND, (fresh) => ({ ...(fresh || {}), phaseStartedAt: now, phaseEndsAt: endsAt }));
     setBusy(false);
   };
@@ -153,7 +176,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
         </div>
         <p style={{ fontSize: 11.5, color: "#6b4f99", margin: "0 0 14px", fontStyle: "italic" }}>{GAME_REGISTRY[gameType].blurb}</p>
 
-        {gameType === "maze2d" && (
+        {MAZE_TYPES.includes(gameType) && (
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
             <label style={{ fontSize: 12, color: "#a68fd6" }}>Maze size:</label>
             <input type="number" min={5} max={31} step={2} value={mazeSize}
@@ -274,6 +297,21 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
         );
       })()}
 
+      {challenge?.gameType === "plinko" && challenge.active && plinkoBracket && (
+        <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+            🔴 Duel Bracket — {plinkoBracket.eliminationCount} eliminated, {plinkoBracket.pool.length} waiting
+          </div>
+          <p style={{ fontSize: 12, color: "#f5f0ff", margin: 0 }}>
+            {plinkoBracket.current
+              ? `Dueling now: ${players.find((p) => p.id === plinkoBracket.current[0])?.display_name || "?"} vs ${players.find((p) => p.id === plinkoBracket.current[1])?.display_name || "?"}`
+              : plinkoBracket.champion
+                ? `${players.find((p) => p.id === plinkoBracket.champion)?.display_name || "?"} is picking their next challenger...`
+                : "Setting up..."}
+          </p>
+        </div>
+      )}
+
       {isDigital ? (
         <div style={{ display: "grid", gap: 10, marginBottom: 12 }}>
           {finishedRanking.length > 0 && (
@@ -291,6 +329,13 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
                         {r.name}{isReentrant && <span style={{ color: "#ff3860", fontSize: 11 }}> (re-entry attempt)</span>}
                       </span>
                       <span style={{ fontSize: 12, color: "#a68fd6" }}>{scoreLabel(scores[r.playerId])} ✓</span>
+                      <button
+                        onClick={() => resetAttempt(r.playerId, r.name)}
+                        disabled={resettingId === r.playerId}
+                        style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, color: "#a68fd6", fontSize: 10, padding: "3px 8px", cursor: "pointer" }}
+                      >
+                        {resettingId === r.playerId ? "..." : "↺ Reset"}
+                      </button>
                     </div>
                   );
                 })}
@@ -312,6 +357,13 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
                         {p.display_name}{isReentrant && <span style={{ color: "#ff3860", fontSize: 11 }}> (re-entry attempt)</span>}
                       </span>
                       <span style={{ fontSize: 12, color: "#a68fd6" }}>{scoreLabel(scores[p.id])} — playing...</span>
+                      <button
+                        onClick={() => resetAttempt(p.id, p.display_name)}
+                        disabled={resettingId === p.id}
+                        style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, color: "#a68fd6", fontSize: 10, padding: "3px 8px", cursor: "pointer" }}
+                      >
+                        {resettingId === p.id ? "..." : "↺ Reset"}
+                      </button>
                     </div>
                   );
                 })}
@@ -334,6 +386,13 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
                         {p.display_name}{isReentrant && <span style={{ color: "#ff3860", fontSize: 11 }}> (re-entry attempt)</span>}
                       </span>
                       <span style={{ fontSize: 12, color: "#ff3860" }}>🏳️ Forfeited</span>
+                      <button
+                        onClick={() => resetAttempt(p.id, p.display_name)}
+                        disabled={resettingId === p.id}
+                        style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, color: "#a68fd6", fontSize: 10, padding: "3px 8px", cursor: "pointer" }}
+                      >
+                        {resettingId === p.id ? "..." : "↺ Reset"}
+                      </button>
                     </div>
                   );
                 })}
