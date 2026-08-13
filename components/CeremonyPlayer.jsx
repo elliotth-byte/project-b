@@ -218,7 +218,7 @@ export default function CeremonyPlayer({ gameId, players, round }) {
       )}
 
       {nothingYet && (
-        <Card><p style={{ color: "#6b4f99", fontStyle: "italic", margin: 0 }}>No ceremonies yet — they'll show up here once Round 1's Challenge wraps up.</p></Card>
+        <Card><p style={{ color: "#6b4f99", fontStyle: "italic", margin: 0 }}>No ceremonies yet — they'll show up here once Round 1's Battle wraps up.</p></Card>
       )}
     </div>
   );

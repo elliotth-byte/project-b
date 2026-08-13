@@ -141,7 +141,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   };
 
   if (round?.phase !== "challenge") {
-    return <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>Not in the Challenge phase right now.</p></Card>;
+    return <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>Not in the Battle phase right now.</p></Card>;
   }
 
   const participants = challenge?.participantIds
@@ -155,7 +155,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   if (!challenge?.active) {
     return (
       <Card>
-        <h3 style={{ color: "#f5f0ff", margin: "0 0 8px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>⚔️ Challenge — Setup</h3>
+        <h3 style={{ color: "#f5f0ff", margin: "0 0 8px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>⚔️ Battle — Setup</h3>
         <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
           Pick a challenge. Digital ones play out live on each player's own screen and score themselves; Manual / In-Person just tracks who's competing and how long they have while you run the challenge yourselves.
         </p>
@@ -210,7 +210,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
         )}
 
         {settings?.infiniteTime ? (
-          <p style={{ color: "#ff2d95", fontSize: 12, margin: "0 0 12px" }}>∞ Infinite time is on — this challenge runs until you end it. (Change this in Admin → Round Lengths.)</p>
+          <p style={{ color: "#ff2d95", fontSize: 12, margin: "0 0 12px" }}>∞ Infinite time is on — this battle runs until you end it. (Change this in Admin → Round Lengths.)</p>
         ) : (
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
             <label style={{ fontSize: 12, color: "#a68fd6" }}>Duration:</label>
@@ -218,7 +218,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
           </div>
         )}
 
-        <Btn onClick={startChallenge} disabled={busy}>{busy ? "Starting..." : "Start Challenge"}</Btn>
+        <Btn onClick={startChallenge} disabled={busy}>{busy ? "Starting..." : "Start Battle"}</Btn>
       </Card>
     );
   }
@@ -424,11 +424,11 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
         {!isDigital && <Btn small variant="ghost" onClick={clearResults}>Clear Results</Btn>}
-        <Btn small onClick={finishNow} disabled={!complete || busy}>{busy ? "Working..." : "Finish Challenge Now"}</Btn>
+        <Btn small onClick={finishNow} disabled={!complete || busy}>{busy ? "Working..." : "Finish Battle Now"}</Btn>
       </div>
       {!isDigital && !complete && <p style={{ color: "#6b4f99", fontSize: 11, fontStyle: "italic", margin: "0 0 12px" }}>Every competitor needs a distinct place (1, 2, 3, ...) before this can finish.</p>}
 
-      <CopyMessage icon={registryEntry?.icon || "⚔️"} label="Challenge Announcement"
+      <CopyMessage icon={registryEntry?.icon || "⚔️"} label="Battle Announcement"
         text={`${registryEntry?.icon || "⚔️"} ${registryEntry?.label} underway! ${participants.length} competing. 1st place wins immunity${round.finalFour ? " — this is the FINAL FOUR, everyone else is automatically nominated." : "."}`} />
     </Card>
   );

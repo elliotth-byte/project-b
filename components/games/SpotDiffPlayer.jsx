@@ -114,7 +114,7 @@ export default function SpotDiffPlayer({ gameId, round, challenge, player }) {
         style={{
           width: "100%", maxWidth: W, height: "auto", background: "#0d0618", borderRadius: 8,
           border: `2px solid ${flash ? "#ff3860" : "#3d1f5c"}`, cursor: "crosshair", display: "block", margin: "0 auto",
-          transition: "border-color 0.15s",
+          transition: "border-color 0.15s", touchAction: "manipulation",
         }}
       />
     </Card>

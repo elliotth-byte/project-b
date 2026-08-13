@@ -103,7 +103,7 @@ export default function ChallengePlayer({ gameId, player, players, round, readOn
             One shot at re-entry
           </p>
           <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>
-            {reentryDecision === "out" ? "Opted to sit this challenge out." : "Hasn't decided whether to compete yet."}
+            {reentryDecision === "out" ? "Opted to sit this battle out." : "Hasn't decided whether to compete yet."}
           </p>
         </Card>
       );
@@ -123,7 +123,7 @@ export default function ChallengePlayer({ gameId, player, players, round, readOn
           One shot at re-entry
         </p>
         <p style={{ color: "#a68fd6", fontSize: 13, margin: "0 0 14px" }}>
-          Compete in THIS challenge for a chance to return? Finish 1st and you're back in the game. Anything else, and this was
+          Compete in THIS battle for a chance to return? Finish 1st and you're back in the game. Anything else, and this was
           your one shot. Not deciding by the time everyone else finishes counts as sitting this one out — that costs you nothing,
           and you'll get to decide again next challenge.
         </p>
@@ -148,7 +148,7 @@ export default function ChallengePlayer({ gameId, player, players, round, readOn
   // forfeit there just flags the player's row for the host (who still
   // enters everyone's finishing order by hand).
   const forfeitManual = async () => {
-    if (!confirm("Forfeit this challenge? This can't be undone once the challenge is over.")) return;
+    if (!confirm("Forfeit this battle? This can't be undone once the battle is over.")) return;
     setForfeiting(true);
     await storageUpdate(gameId, KEY_CHALLENGE, (fresh) => {
       if (!fresh) return fresh;
@@ -160,7 +160,7 @@ export default function ChallengePlayer({ gameId, player, players, round, readOn
   };
 
   const forfeitDigital = async () => {
-    if (!confirm("Forfeit this challenge? This can't be undone, and you'll be ranked last.")) return;
+    if (!confirm("Forfeit this battle? This can't be undone, and you'll be ranked last.")) return;
     setForfeiting(true);
     await forfeitChallenge(gameId, round.round, player.id, player.name);
     setForfeiting(false);
@@ -175,11 +175,11 @@ export default function ChallengePlayer({ gameId, player, players, round, readOn
         return (
           <Card style={{ marginBottom: 20, textAlign: "center" }}>
             <div style={{ fontSize: 28, marginBottom: 6 }}>🏳️</div>
-            <p style={{ color: "#a68fd6", fontSize: 14, margin: 0 }}>You forfeited this challenge.</p>
+            <p style={{ color: "#a68fd6", fontSize: 14, margin: 0 }}>You forfeited this battle.</p>
           </Card>
         );
       }
-      return <GameResultCard icon={registryEntry?.icon || "🎮"} title={`${registryEntry?.label || "Challenge"} Complete`} valueLabel={String(myScore.value)} />;
+      return <GameResultCard icon={registryEntry?.icon || "🎮"} title={`${registryEntry?.label || "Battle"} Complete`} valueLabel={String(myScore.value)} />;
     }
 
     const GameComponent = GAME_COMPONENTS[challenge.gameType];
@@ -192,7 +192,7 @@ export default function ChallengePlayer({ gameId, player, players, round, readOn
         return (
           <Card style={{ marginBottom: 20, textAlign: "center" }}>
             <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#ff2d95", marginBottom: 6 }}>
-              {registryEntry?.icon || "⚔️"} {registryEntry?.label || "Challenge"}
+              {registryEntry?.icon || "⚔️"} {registryEntry?.label || "Battle"}
             </div>
             <p style={{ color: "#f5f0ff", fontSize: 14, margin: 0 }}>
               {myScore ? "Currently playing — check the Current Round tab for their live score." : "Hasn't started playing yet."}
@@ -209,7 +209,7 @@ export default function ChallengePlayer({ gameId, player, players, round, readOn
         return (
           <Card style={{ marginBottom: 20, textAlign: "center" }}>
             <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#ff2d95", marginBottom: 6 }}>
-              {registryEntry?.icon || "⚔️"} {registryEntry?.label || "Challenge"}
+              {registryEntry?.icon || "⚔️"} {registryEntry?.label || "Battle"}
             </div>
             <h3 style={{ color: "#f5f0ff", margin: "0 0 8px", fontSize: 16, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>How to play</h3>
             <p style={{ color: "#a68fd6", fontSize: 13, margin: "0 0 18px", lineHeight: 1.5 }}>{registryEntry?.blurb}</p>
@@ -225,7 +225,7 @@ export default function ChallengePlayer({ gameId, player, players, round, readOn
           <GameComponent gameId={gameId} round={round} challenge={challenge} player={player} players={players} />
           <div style={{ textAlign: "center", marginTop: 10 }}>
             <Btn small variant="ghost" onClick={forfeitDigital} disabled={forfeiting}>
-              {forfeiting ? "Forfeiting..." : "🏳️ Forfeit Challenge"}
+              {forfeiting ? "Forfeiting..." : "🏳️ Forfeit Battle"}
             </Btn>
           </div>
         </>
@@ -236,11 +236,11 @@ export default function ChallengePlayer({ gameId, player, players, round, readOn
   return (
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
       <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#ff2d95", marginBottom: 6 }}>
-        {registryEntry?.icon || "⚔️"} {registryEntry?.label || "Challenge"}
+        {registryEntry?.icon || "⚔️"} {registryEntry?.label || "Battle"}
       </div>
       {amCompeting ? (
         manuallyForfeited ? (
-          <p style={{ color: "#a68fd6", fontSize: 14, margin: 0 }}>🏳️ You've forfeited this challenge.</p>
+          <p style={{ color: "#a68fd6", fontSize: 14, margin: 0 }}>🏳️ You've forfeited this battle.</p>
         ) : (
           <>
             <p style={{ color: "#f5f0ff", fontSize: 15, margin: "0 0 6px" }}>You're competing!</p>
@@ -248,17 +248,17 @@ export default function ChallengePlayer({ gameId, player, players, round, readOn
             {!readOnly && (
               <div style={{ marginTop: 12 }}>
                 <Btn small variant="ghost" onClick={forfeitManual} disabled={forfeiting}>
-                  {forfeiting ? "Forfeiting..." : "🏳️ Forfeit Challenge"}
+                  {forfeiting ? "Forfeiting..." : "🏳️ Forfeit Battle"}
                 </Btn>
               </div>
             )}
           </>
         )
       ) : (
-        <p style={{ color: "#a68fd6", fontSize: 14, margin: 0 }}>Sitting this challenge out — cheer everyone on!</p>
+        <p style={{ color: "#a68fd6", fontSize: 14, margin: 0 }}>Sitting this battle out — cheer everyone on!</p>
       )}
       <p style={{ color: "#6b4f99", fontSize: 12, marginTop: 10, fontStyle: "italic" }}>
-        The host will record results once the challenge wraps up.
+        The host will record results once the battle wraps up.
       </p>
     </Card>
   );

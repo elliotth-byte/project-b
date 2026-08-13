@@ -16,7 +16,7 @@ export default function Home() {
           Project B
         </h1>
         <p style={{ color: "#a68fd6", fontSize: 14, marginBottom: 28, fontStyle: "italic" }}>
-          Dominate the challenges. Manipulate the vote. Build your own mythology.
+          Dominate the battles. Manipulate the vote. Build your own mythology.
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <Link href={withGame("/signup")} style={linkBtn}>👤 New player — Create account</Link>

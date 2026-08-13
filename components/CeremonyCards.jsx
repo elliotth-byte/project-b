@@ -64,7 +64,7 @@ export function ChallengeResultsCard({ entry: c }) {
     <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
-          ⚔️ Round {c.round} Challenge{registryEntry && ` — ${registryEntry.icon} ${registryEntry.label}`}
+          ⚔️ Round {c.round} Battle{registryEntry && ` — ${registryEntry.icon} ${registryEntry.label}`}
         </h3>
         {c.finalFour && <Badge color="#ff3860">Final Four</Badge>}
       </div>
@@ -109,7 +109,7 @@ export function RoundCeremonyCard({ entry: e, challenge, rows, byId, showComment
       {challenge && (
         <Card>
           <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
-            ⚔️ Challenge{registryEntry && ` — ${registryEntry.icon} ${registryEntry.label}`}
+            ⚔️ Battle{registryEntry && ` — ${registryEntry.icon} ${registryEntry.label}`}
           </div>
           <ChallengePlacementsList placements={challenge.placements} gameType={challenge.gameType} rankDirection={rankDirection} />
         </Card>
@@ -136,7 +136,7 @@ export function RoundCeremonyCard({ entry: e, challenge, rows, byId, showComment
           </div>
         ) : (
           <p style={{ fontSize: 12, color: "#6b4f99", fontStyle: "italic", margin: 0 }}>
-            Final Four — everyone besides the Challenge winner was automatically nominated.
+            Final Four — everyone besides the Battle winner was automatically nominated.
           </p>
         )}
       </Card>
@@ -152,7 +152,7 @@ export function RoundCeremonyCard({ entry: e, challenge, rows, byId, showComment
         {e.chaosHolderId && (
           <div style={{ margin: "0 0 4px" }}>
             <p style={{ fontSize: 11, color: "#a68fd6", fontStyle: "italic", margin: 0 }}>
-              🃏 Power of Chaos held by {byId[e.chaosHolderId] || "?"}
+              🃏 Power of Khaos held by {byId[e.chaosHolderId] || "?"}
               {e.nullifiedId && <> — nullified <strong>{byId[e.nullifiedId] || "?"}</strong>'s votes</>}
             </p>
             {showComments && e.nullifiedReason && (
@@ -185,7 +185,7 @@ export function FinaleCard({ finale, rows, byId, showComments }) {
       {finale.chaosHolderId && (
         <div style={{ margin: "0 0 4px" }}>
           <p style={{ fontSize: 11, color: "#a68fd6", fontStyle: "italic", margin: 0 }}>
-            🃏 Power of Chaos held by {byId[finale.chaosHolderId] || "?"}
+            🃏 Power of Khaos held by {byId[finale.chaosHolderId] || "?"}
             {finale.nullifiedFinalistId && <> — nullified <strong>{byId[finale.nullifiedFinalistId] || "?"}</strong>, who couldn't win</>}
           </p>
           {showComments && finale.nullifiedReason && (

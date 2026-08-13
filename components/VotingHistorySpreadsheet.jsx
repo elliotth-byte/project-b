@@ -29,7 +29,7 @@ function HeaderRow({ label, byColumn, columns, color = "#a68fd6" }) {
 // sheet stacks HOH/Nominations/Veto above its player grid) show that
 // round's Challenge Winner, Fates Winners (the top 3 who earned a
 // nomination), Nominees, that round's vote count, who won (and used) the
-// Power of Chaos, then who was Exiled. Each player's own row is tagged
+// Power of Khaos, then who was Exiled. Each player's own row is tagged
 // with a status badge — Winner, Exiled (with which round), or
 // Left/Removed — so it's clear at a glance what happened to them, not
 // just that their votes stop appearing.
@@ -56,7 +56,7 @@ export default function VotingHistorySpreadsheet({ exileHistory, finaleState, pl
         <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🗳 Voting History</h3>
         <Btn small onClick={download}>⬇ Download CSV</Btn>
       </div>
-      <div style={{ fontSize: 10, color: "#6b4f99", marginBottom: 10 }}><s style={{ textDecorationColor: "#ff3860" }}>Struck-through</s> votes were nullified by the Power of Chaos.</div>
+      <div style={{ fontSize: 10, color: "#6b4f99", marginBottom: 10 }}><s style={{ textDecorationColor: "#ff3860" }}>Struck-through</s> votes were nullified by the Power of Khaos.</div>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <thead>
@@ -70,11 +70,11 @@ export default function VotingHistorySpreadsheet({ exileHistory, finaleState, pl
                 </th>
               ))}
             </tr>
-            <HeaderRow label="Challenge Winner" byColumn={grid.winnerByColumn} columns={grid.columns} color="#00ff9d" />
+            <HeaderRow label="Battle Winner" byColumn={grid.winnerByColumn} columns={grid.columns} color="#00ff9d" />
             <HeaderRow label="Fates Winners" byColumn={grid.fatesWinnersByColumn} columns={grid.columns} />
             <HeaderRow label="Nominees" byColumn={grid.nomineesByColumn} columns={grid.columns} />
             <HeaderRow label="Vote Count" byColumn={grid.voteCountByColumn} columns={grid.columns} />
-            <HeaderRow label="🃏 Power of Chaos" byColumn={grid.chaosByColumn} columns={grid.columns} />
+            <HeaderRow label="🃏 Power of Khaos" byColumn={grid.chaosByColumn} columns={grid.columns} />
             <HeaderRow label="Exiled" byColumn={grid.exiledByColumn} columns={grid.columns} color="#ff3860" />
           </thead>
           <tbody>
@@ -89,7 +89,7 @@ export default function VotingHistorySpreadsheet({ exileHistory, finaleState, pl
                     {cell ? (
                       <span
                         style={cell.nullified ? { textDecoration: "line-through", textDecorationColor: "#ff3860", textDecorationThickness: 2, color: "#6b4f99" } : undefined}
-                        title={cell.nullified ? "Nullified by the Power of Chaos" : undefined}
+                        title={cell.nullified ? "Nullified by the Power of Khaos" : undefined}
                       >
                         {cell.target}
                       </span>

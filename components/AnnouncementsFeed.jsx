@@ -24,8 +24,15 @@ export default function AnnouncementsFeed({ gameId }) {
       </h3>
       <div style={{ display: "grid", gap: 8, maxHeight: 280, overflowY: "auto" }}>
         {[...items].reverse().map((a, i) => (
-          <div key={i} style={{ background: "#0d0618", borderRadius: 6, padding: "8px 10px" }}>
-            <div style={{ fontSize: 10, color: "#6b4f99", marginBottom: 3 }}>{new Date(a.at).toLocaleString()}</div>
+          <div key={i} style={{
+            background: a.from === "host" ? "rgba(255,45,149,0.1)" : "#0d0618",
+            border: a.from === "host" ? "1px solid rgba(255,45,149,0.35)" : "none",
+            borderRadius: 6, padding: "8px 10px",
+          }}>
+            <div style={{ fontSize: 10, color: a.from === "host" ? "#ff2d95" : "#6b4f99", marginBottom: 3 }}>
+              {a.from === "host" ? "📣 Host" : new Date(a.at).toLocaleString()}
+              {a.from === "host" && <span style={{ color: "#6b4f99" }}> · {new Date(a.at).toLocaleString()}</span>}
+            </div>
             <div style={{ fontSize: 12, color: "#f5f0ff", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{a.text}</div>
           </div>
         ))}

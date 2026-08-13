@@ -98,7 +98,7 @@ export function Badge({ children, color = "#ff2d95" }) {
   );
 }
 
-// A per-player Power of Chaos draw-status indicator for the host's voter
+// A per-player Power of Khaos draw-status indicator for the host's voter
 // list rows (see ExileVoteHost.jsx / FinaleHost.jsx). Deliberately NOT
 // just a colored emoji — most browsers render emoji with their own
 // built-in color and ignore any CSS `color` set on them, so a colored 🃏
@@ -109,7 +109,7 @@ export function ChaosStatusBadge({ holderId, playerId, drawPicks }) {
   const isHolder = holderId === playerId;
   const hasPicked = drawPicks?.[playerId] !== undefined;
   const color = isHolder ? "#00ff9d" : hasPicked ? "#ff3860" : "#3d1f5c";
-  const title = isHolder ? "Won the Power of Chaos" : hasPicked ? "Picked, but didn't win it" : "Hasn't made their Power of Chaos pick yet";
+  const title = isHolder ? "Won the Power of Khaos" : hasPicked ? "Picked, but didn't win it" : "Hasn't made their Power of Khaos pick yet";
   return (
     <span
       title={title}
@@ -158,7 +158,7 @@ export function DurationInput({ valueSec, onChange, min = 60 }) {
   );
 }
 
-// A playing card face — used by the Power of Chaos card-fan flavor moment.
+// A playing card face — used by the Power of Khaos card-fan flavor moment.
 export function CardFace({ c }) {
   return (
     <span style={{
@@ -172,7 +172,7 @@ export function CardFace({ c }) {
 
 // The generic "not started yet" card a challenge setup screen can show
 // before clicking start.
-export function ChallengeSetupCard({ icon, title, blurb, children, onStart, startLabel = "Start Challenge", disabled }) {
+export function ChallengeSetupCard({ icon, title, blurb, children, onStart, startLabel = "Start Battle", disabled }) {
   return (
     <Card>
       <h3 style={{ color: "#f5f0ff", margin: "0 0 8px", fontSize: 14, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 1 }}>{icon} {title} — Setup</h3>

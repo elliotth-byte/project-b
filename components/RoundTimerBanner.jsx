@@ -3,7 +3,7 @@ import { Card, Badge } from "./ui";
 
 const PHASE_LABEL = {
   lobby: "Waiting to Begin",
-  challenge: "⚔️ Challenge",
+  challenge: "⚔️ Battle",
   fates: "⚖️ Fates Ceremony",
   exile: "🃏 Exile Vote",
   finale: "🔥 Finale",

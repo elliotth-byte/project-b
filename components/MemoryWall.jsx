@@ -1,10 +1,12 @@
 import { colorFor } from "../lib/playerColors";
 
 // A grid of big, chunky tiles — one per candidate — used for every "pick
-// a player" moment (nominations, exile votes, finale votes). Shows an
-// avatar image when the season has one set for that player (see
-// lib/avatarIdentity.js's effectiveAvatarUrl), falling back to their
-// color swatch otherwise — the original, always-available default.
+// a player" moment (nominations, exile votes, finale votes). When the
+// season has an avatar set for a player (see lib/avatarIdentity.js's
+// effectiveAvatarUrl), it fills the WHOLE tile like a trading card, with
+// the name overlaid at the bottom — not a small circle, so the actual
+// artwork actually reads at this size. Falls back to the original
+// centered color-swatch-plus-name layout when there's no avatar.
 // candidates: [{ playerId, name }]. players: full roster (for color/
 // avatar lookup).
 export default function MemoryWall({ candidates, players, selectedId, onSelect, disabledIds = [] }) {
@@ -15,6 +17,43 @@ export default function MemoryWall({ candidates, players, selectedId, onSelect, 
         const avatarUrl = (players || []).find((p) => p.id === c.playerId)?.effectiveAvatarUrl;
         const selected = selectedId === c.playerId;
         const disabled = disabledIds.includes(c.playerId);
+
+        if (avatarUrl) {
+          return (
+            <button
+              key={c.playerId}
+              disabled={disabled}
+              onClick={() => onSelect(c.playerId)}
+              style={{
+                aspectRatio: "1", borderRadius: 14, cursor: disabled ? "not-allowed" : "pointer",
+                border: `4px solid ${selected ? color : "#3d1f5c"}`,
+                boxShadow: selected ? `0 0 24px ${color}bb` : "none",
+                opacity: disabled ? 0.35 : 1,
+                transition: "box-shadow 0.15s",
+                position: "relative", overflow: "hidden", padding: 0, background: "#0d0618",
+              }}
+            >
+              <img
+                src={avatarUrl} alt=""
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+              />
+              <div style={{
+                position: "absolute", left: 0, right: 0, bottom: 0,
+                background: "linear-gradient(to top, rgba(5,1,15,0.92), rgba(5,1,15,0.55) 60%, transparent)",
+                padding: "18px 8px 8px",
+              }}>
+                <span style={{
+                  display: "block", fontSize: 15, fontWeight: 900, color: selected ? color : "#f5f0ff",
+                  textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center",
+                  textShadow: selected ? `0 0 10px ${color}` : "0 1px 3px rgba(0,0,0,0.8)",
+                }}>
+                  {c.name}
+                </span>
+              </div>
+            </button>
+          );
+        }
+
         return (
           <button
             key={c.playerId}
@@ -31,20 +70,10 @@ export default function MemoryWall({ candidates, players, selectedId, onSelect, 
               padding: 8,
             }}
           >
-            {avatarUrl ? (
-              <img
-                src={avatarUrl} alt=""
-                style={{
-                  width: 64, height: 64, borderRadius: "50%", objectFit: "cover",
-                  boxShadow: `0 0 14px ${color}cc`, border: "2px solid rgba(255,255,255,0.5)",
-                }}
-              />
-            ) : (
-              <div style={{
-                width: 40, height: 40, borderRadius: "50%", background: color,
-                boxShadow: `0 0 14px ${color}cc`, border: "2px solid rgba(255,255,255,0.5)",
-              }} />
-            )}
+            <div style={{
+              width: 40, height: 40, borderRadius: "50%", background: color,
+              boxShadow: `0 0 14px ${color}cc`, border: "2px solid rgba(255,255,255,0.5)",
+            }} />
             <span style={{
               fontSize: 15, fontWeight: 900, color: selected ? color : "#f5f0ff",
               textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center",

@@ -109,7 +109,7 @@ export default function ExileVotePlayer({ gameId, player, round, players, readOn
   // saying exactly this.
   const chaosBanner = chaosHolderName && exile.chaosHolderId !== player?.id && (
     <p style={{ textAlign: "center", color: "#a68fd6", fontSize: 12, fontStyle: "italic", margin: "0 0 16px" }}>
-      🃏 <strong style={{ color: "#ff3860" }}>{chaosHolderName}</strong> holds the Power of Chaos this round — their pick stays secret until the reveal.
+      🃏 <strong style={{ color: "#ff3860" }}>{chaosHolderName}</strong> holds the Power of Khaos this round — their pick stays secret until the reveal.
     </p>
   );
 

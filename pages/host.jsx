@@ -212,7 +212,7 @@ export default function HostPage() {
 
   const deleteSeason = async (g) => {
     const confirmed = window.confirm(
-      `Permanently delete "${g.name}"? This removes every player, vote, confessional, and challenge result from this season. This can't be undone.`
+      `Permanently delete "${g.name}"? This removes every player, vote, confessional, and battle result from this season. This can't be undone.`
     );
     if (!confirmed) return;
     const { error: err } = await supabase.from("games").delete().eq("id", g.id);

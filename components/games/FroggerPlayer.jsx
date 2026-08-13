@@ -26,9 +26,9 @@ export default function FroggerPlayer({ gameId, round, challenge, player }) {
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(cfg.lives || 3);
   const [homesFilled, setHomesFilled] = useState(0);
+  const [boardsCleared, setBoardsCleared] = useState(0);
   const [carrying, setCarrying] = useState(false);
   const [done, setDone] = useState(false);
-  const [won, setWon] = useState(false);
   const doneRef = useRef(false);
   const reportedRef = useRef(false);
   const scoreRef = useRef(0); // mirrors `score` for the rAF loop below, which closes over stale state otherwise
@@ -107,10 +107,17 @@ export default function FroggerPlayer({ gameId, round, challenge, player }) {
       setScore((s) => s + gained);
 
       if (filledCount >= 5) {
+        // Clearing all 5 homes used to end the whole game outright — now
+        // it just resets the board (fresh homes, frog back at start) and
+        // keeps going, exactly like the arcade original moving to the
+        // next level. The game now only ends from running out of lives
+        // or the clock actually hitting zero, per POINTS.levelComplete
+        // being earned every time a board clears, not just once.
         setScore((s) => s + POINTS.levelComplete);
-        doneRef.current = true;
-        setWon(true);
-        setDone(true);
+        setBoardsCleared((b) => b + 1);
+        st.homes = Array(5).fill(false);
+        setHomesFilled(0);
+        resetFrog(false);
         return;
       }
       resetFrog(false);
@@ -222,7 +229,7 @@ export default function FroggerPlayer({ gameId, round, challenge, player }) {
   }, [timeUp, done]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (timeUp || done) {
-    return <GameResultCard icon="🐸" title={won ? "Board Cleared!" : "Game Over"} valueLabel={`${score} pts`} />;
+    return <GameResultCard icon="🐸" title="Game Over" valueLabel={`${score} pts — ${boardsCleared} board${boardsCleared === 1 ? "" : "s"} cleared`} />;
   }
 
   return (
@@ -232,7 +239,7 @@ export default function FroggerPlayer({ gameId, round, challenge, player }) {
         <Badge>{"❤️".repeat(lives)} · {score} pts</Badge>
       </div>
       <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 8px" }}>
-        🏠 {homesFilled}/5 home{carrying && " · 🤍 carrying the lady frog"}
+        🏠 {homesFilled}/5 home{boardsCleared > 0 && ` · ${boardsCleared} board${boardsCleared === 1 ? "" : "s"} cleared`}{carrying && " · 🤍 carrying the lady frog"}
       </p>
       <canvas
         ref={canvasRef} width={W} height={H}

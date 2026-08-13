@@ -193,7 +193,7 @@ export default function AdminHost({ gameId, players, round }) {
 
     setRoundResetBusy(false);
     setConfirmRoundReset(false);
-    setRoundResetStatus(`Round ${roundNum} reset. Start the challenge again whenever you're ready.`);
+    setRoundResetStatus(`Round ${roundNum} reset. Start the battle again whenever you're ready.`);
   };
 
   // Full restart: every challenge/fates/exile/finale/reentry state, every
@@ -305,7 +305,7 @@ export default function AdminHost({ gameId, players, round }) {
               <p style={{ fontSize: 12, color: roundResetStatus.startsWith("Can't") ? "#ff3860" : "#00ff9d", margin: "0 0 10px" }}>{roundResetStatus}</p>
             )}
             <p style={{ fontSize: 12, color: "#a68fd6", margin: "0 0 8px" }}>
-              Puts this round's Challenge, Fates Ceremony, and Exile Vote back to "hasn't happened yet" — for when nobody actually
+              Puts this round's Battle, Fates Ceremony, and Exile Vote back to "hasn't happened yet" — for when nobody actually
               got to compete. Earlier rounds and everyone's current alive/exiled status are untouched. Only available before this
               round's Exile Vote has been revealed.
             </p>
@@ -349,13 +349,13 @@ export default function AdminHost({ gameId, players, round }) {
           <Card>
             <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>⏱ Round Lengths</h3>
             <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
-              Default timer for each phase. The Challenge phase's duration can still be overridden per-round when the host starts that
+              Default timer for each phase. The Battle phase's duration can still be overridden per-round when the host starts that
               round's challenge. When a phase's timer runs out, the game automatically moves to the next phase and posts an update
               in-app — as long as the host has finished entering whatever that phase needed (results, nominations, etc.).
             </p>
             <div style={{ display: "grid", gap: 10 }}>
               {[
-                { key: "challengeDurationSec", label: "Challenge" },
+                { key: "challengeDurationSec", label: "Battle" },
                 { key: "fatesDurationSec", label: "Fates Ceremony" },
                 { key: "voteDurationSec", label: "Exile Vote (discussion + voting)" },
               ].map((row) => (
@@ -375,7 +375,7 @@ export default function AdminHost({ gameId, players, round }) {
               </label>
               <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#ff2d95", cursor: "pointer", fontWeight: 700 }}>
                 <input type="checkbox" checked={settings.infiniteTime} onChange={(e) => saveSettings({ infiniteTime: e.target.checked })} />
-                ∞ Infinite time — no phase gets an automatic timer at all; every Challenge/Fates Ceremony/Exile Vote/Finale runs until the host ends it
+                ∞ Infinite time — no phase gets an automatic timer at all; every Battle/Fates Ceremony/Exile Vote/Finale runs until the host ends it
               </label>
               <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#a68fd6", cursor: "pointer" }}>
                 <input type="checkbox" checked={settings.chatEnabled} onChange={(e) => saveSettings({ chatEnabled: e.target.checked })} />

@@ -173,14 +173,24 @@ function ExileRoomView({ gameId, player, players, byId, onRead }) {
   return <ThreadView thread={thread} player={player} players={players} byId={byId} onBack={() => {}} onRead={onRead} />;
 }
 
-function MessagesView({ gameId, player, players, byId, openThread, setOpenThread, reads, onRead }) {
+function MessagesView({ gameId, player, players, byId, openThread, setOpenThread, reads, onRead, isExiled }) {
   const [threads, setThreads] = useState([]);
   const [picking, setPicking] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [groupName, setGroupName] = useState("");
   const [creating, setCreating] = useState(false);
 
-  const reload = async () => setThreads(await fetchMyThreads(gameId, player.id));
+  // Once exiled, a player can only reach — or be reached by, as far as
+  // their own view shows — other players who are ALSO out of the game.
+  // isPlayerOut checks the roster's alive flag directly rather than
+  // relying on anything thread-specific, so it stays correct even for a
+  // thread that predates someone's exile.
+  const isPlayerOut = (id) => players.find((p) => p.id === id)?.alive === false;
+
+  const reload = async () => {
+    const all = await fetchMyThreads(gameId, player.id);
+    setThreads(isExiled ? all.filter((t) => (t.memberIds || []).every((id) => id === player.id || isPlayerOut(id))) : all);
+  };
   useEffect(() => { reload(); }, [gameId, player.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleSelect = (id) => setSelectedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
@@ -199,7 +209,7 @@ function MessagesView({ gameId, player, players, byId, openThread, setOpenThread
     setGroupName("");
     await reload();
     const fresh = await fetchMyThreads(gameId, player.id);
-    setThreads(fresh);
+    setThreads(isExiled ? fresh.filter((t) => (t.memberIds || []).every((id) => id === player.id || isPlayerOut(id))) : fresh);
     const found = fresh.find((t) => t.id === threadId);
     setOpenThread(found || { id: threadId, memberIds: [player.id, ...selectedIds], otherMemberIds: selectedIds });
   };
@@ -208,10 +218,18 @@ function MessagesView({ gameId, player, players, byId, openThread, setOpenThread
     return <ThreadView thread={openThread} player={player} players={players} byId={byId} onBack={() => { setOpenThread(null); reload(); }} onRead={onRead} />;
   }
 
-  const others = players.filter((p) => p.id !== player.id && p.approved);
+  // Same restriction applies to who shows up when starting a brand new
+  // conversation — an exiled player can only pick from other players
+  // who are also out of the game.
+  const others = players.filter((p) => p.id !== player.id && p.approved && (!isExiled || p.alive === false));
 
   return (
     <div>
+      {isExiled && (
+        <p style={{ fontSize: 11, color: "#6b4f99", fontStyle: "italic", margin: "0 0 10px" }}>
+          You can only message other players who are also out of the game.
+        </p>
+      )}
       {threads.length > 0 && (
         <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
           {threads.map((t) => {
@@ -291,7 +309,7 @@ function MessagesView({ gameId, player, players, byId, openThread, setOpenThread
 // sql/add-group-chat.sql). Only shown at all when the host has turned
 // chat on for this season (settings.chatEnabled).
 export default function ChatPanel({ gameId, player, players, realName, isExiled }) {
-  const [mode, setMode] = useState("group"); // "group" | "exile" | "messages"
+  const [mode, setMode] = useState(isExiled ? "exile" : "group"); // "group" | "exile" | "messages"
   const [openThread, setOpenThread] = useState(null);
   const [groupReadAt, setGroupReadAt] = useState(null);
   const [groupLatestAt, setGroupLatestAt] = useState(null);
@@ -322,18 +340,26 @@ export default function ChatPanel({ gameId, player, players, realName, isExiled 
     return () => { active = false; unsubscribe(); };
   }, [player.id]);
 
+  // Once exiled, DM/group threads that still include someone in the game
+  // aren't shown at all — same restriction as MessagesView applies to
+  // the actual thread list, applied here too so the unread badge doesn't
+  // count activity in a conversation the player can't even open.
+  const isPlayerOut = (id) => (players || []).find((p) => p.id === id)?.alive === false;
+
   useEffect(() => {
     let active = true;
     const load = () => {
       fetchMyThreads(gameId, player.id).then((threads) => {
-        if (!active || threads.length === 0) return;
-        fetchLatestMessageTimestamps(threads.map((t) => t.id)).then((latest) => { if (active) setThreadLatest(latest); });
+        if (!active) return;
+        const visible = isExiled ? threads.filter((t) => (t.memberIds || []).every((id) => id === player.id || isPlayerOut(id))) : threads;
+        if (visible.length === 0) { setThreadLatest({}); return; }
+        fetchLatestMessageTimestamps(visible.map((t) => t.id)).then((latest) => { if (active) setThreadLatest(latest); });
       });
     };
     load();
     const unsubscribe = subscribeAnyThreadActivity(gameId, load);
     return () => { active = false; unsubscribe(); };
-  }, [gameId, player.id]);
+  }, [gameId, player.id, isExiled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const groupUnread = groupLatestAt && (!groupReadAt || groupLatestAt > groupReadAt);
   const anyThreadUnread = Object.keys(threadLatest).some((id) => unreadForThread({ id }, threadReads, threadLatest[id]));
@@ -341,8 +367,12 @@ export default function ChatPanel({ gameId, player, players, realName, isExiled 
   const markGroupReadNow = () => markGroupChatRead(gameId, player.id);
   const markThreadReadNow = (threadId) => markThreadRead(threadId, player.id);
 
+  // Once exiled, the main Group chat disappears entirely — not just a
+  // new Exile tab added alongside it. "They should only see the exiled
+  // chat / be able to DM players out of the game" means Group is gone,
+  // not just de-emphasized.
   const tabs = [
-    { key: "group", label: "💬 Group", unread: groupUnread },
+    ...(isExiled ? [] : [{ key: "group", label: "💬 Group", unread: groupUnread }]),
     ...(isExiled ? [{ key: "exile", label: "🔥 Exile" }] : []),
     { key: "messages", label: "✉️ Messages", unread: anyThreadUnread },
   ];
@@ -364,7 +394,7 @@ export default function ChatPanel({ gameId, player, players, realName, isExiled 
       </div>
 
       <Card>
-        {mode === "group" && <GroupChatView gameId={gameId} player={player} players={players} realName={realName} onRead={markGroupReadNow} />}
+        {mode === "group" && !isExiled && <GroupChatView gameId={gameId} player={player} players={players} realName={realName} onRead={markGroupReadNow} />}
         {mode === "exile" && isExiled && <ExileRoomView gameId={gameId} player={player} players={players} byId={byId} onRead={markThreadReadNow} />}
         {mode === "messages" && (
           <MessagesView
@@ -372,6 +402,7 @@ export default function ChatPanel({ gameId, player, players, realName, isExiled 
             openThread={openThread} setOpenThread={setOpenThread}
             reads={{ thread: threadReads, latest: threadLatest }}
             onRead={markThreadReadNow}
+            isExiled={isExiled}
           />
         )}
       </Card>

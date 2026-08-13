@@ -90,7 +90,7 @@ export default function RoundRevealGate({ gameId, player, players, entry }) {
           <>
             <div style={{ fontSize: 28, marginBottom: 10 }}>🃏</div>
             <p style={{ color: "#f5f0ff", fontSize: 15, margin: "0 0 6px" }}>
-              <strong style={{ color: "#ff2d95" }}>{chaosHolderName}</strong> held the Power of Chaos
+              <strong style={{ color: "#ff2d95" }}>{chaosHolderName}</strong> held the Power of Khaos
             </p>
             {entry.nullifiedId ? (
               <p style={{ color: "#a68fd6", fontSize: 14, margin: 0 }}>

@@ -381,7 +381,7 @@ export default function PlayPage() {
                   </Card>
                 )}
                 {round?.phase === PHASES.CHALLENGE && (
-                  <ChallengeErrorBoundary label="Challenge"><ChallengePlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} /></ChallengeErrorBoundary>
+                  <ChallengeErrorBoundary label="Battle"><ChallengePlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} /></ChallengeErrorBoundary>
                 )}
                 {round?.phase === PHASES.FATES && (
                   <ChallengeErrorBoundary label="Fates Ceremony"><FatesPlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} /></ChallengeErrorBoundary>

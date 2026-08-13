@@ -40,14 +40,14 @@ export default function FinalePlayer({ gameId, player, round, players, readOnly 
 
   // Public knowledge from the moment the Finale starts — only their pick
   // stays secret until the reveal. Worth showing to finalists too: the
-  // Power of Chaos is drawn from the exiled, never a finalist, so a
+  // Power of Khaos is drawn from the exiled, never a finalist, so a
   // finalist can't hold it themselves — but knowing who can nullify them
   // is exactly the kind of thing they'd want to know. Skipped for the
   // holder themselves since ChaosPowerPlayer.jsx already shows them a
   // much bigger card saying exactly this.
   const chaosBanner = chaosHolderName && finale.chaosHolderId !== player?.id && (
     <p style={{ textAlign: "center", color: "#a68fd6", fontSize: 12, fontStyle: "italic", margin: "10px 0 0" }}>
-      🃏 <strong style={{ color: "#ff3860" }}>{chaosHolderName}</strong> holds the Power of Chaos this round — their pick stays secret until the reveal.
+      🃏 <strong style={{ color: "#ff3860" }}>{chaosHolderName}</strong> holds the Power of Khaos this round — their pick stays secret until the reveal.
     </p>
   );
 

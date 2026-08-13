@@ -7,7 +7,7 @@ import { exileContext, FINALE_CONTEXT, setChaosNullify, subscribeChaosSecret } f
 import { exileDrawContext, FINALE_DRAW_CONTEXT, submitChaosDrawPick, chaosPicksKey } from "../lib/chaosDraw";
 import MemoryWall from "./MemoryWall";
 
-// ─── The Power of Chaos ───
+// ─── The Power of Khaos ───
 // Two stages. First, every eligible player (alive players during the
 // Exile Vote; exiled players during the Finale) sees a row of N mystery
 // buttons — N being however many players are actually in the draw that
@@ -93,7 +93,7 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
       if (!drawOpen && !hasPicked && !holderName) return null;
       return (
         <Card style={{ marginBottom: 20, textAlign: "center" }}>
-          <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#ff2d95", marginBottom: 6 }}>🃏 Power of Chaos</div>
+          <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#ff2d95", marginBottom: 6 }}>🃏 Power of Khaos</div>
           <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>
             {holderName ? `${holderName} claimed it this round.` : hasPicked ? "Already made their pick." : drawOpen ? "Hasn't picked yet." : "The draw has closed."}
           </p>
@@ -107,7 +107,7 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
         <Card style={{ marginBottom: 20, textAlign: "center" }}>
           <div style={{ fontSize: 22, marginBottom: 4 }}>🃏</div>
           <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>
-            <strong style={{ color: "#ff3860" }}>{holderName}</strong> claimed the Power of Chaos this round.
+            <strong style={{ color: "#ff3860" }}>{holderName}</strong> claimed the Power of Khaos this round.
           </p>
         </Card>
       );
@@ -133,9 +133,9 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
     return (
       <Card style={{ marginBottom: 20, textAlign: "center" }}>
         <div style={{ fontSize: 28, marginBottom: 6 }}>🃏</div>
-        <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 16, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>The Power of Chaos</h3>
+        <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 16, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>The Power of Khaos</h3>
         <p style={{ color: "#a68fd6", fontSize: 13, margin: "0 0 18px" }}>
-          {poolSize} cards, one Power of Chaos. Pick one — you get one shot.
+          {poolSize} cards, one Power of Khaos. Pick one — you get one shot.
           {triedIndices.size > 0 && ` Already tried (and wrong): ${[...triedIndices].sort((a, b) => a - b).map((i) => i + 1).join(", ")}.`}
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(64px, 1fr))", gap: 10 }}>
@@ -167,7 +167,7 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 32, marginBottom: 4 }}>🃏</div>
           <h3 style={{ color: "#ff2d95", margin: "0 0 4px", fontSize: 16, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
-            Holds the Power of Chaos
+            Holds the Power of Khaos
           </h3>
           <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>Their pick is kept secret until the reveal — even from this viewer.</p>
         </div>
@@ -224,7 +224,7 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
       <div style={{ textAlign: "center", marginBottom: 14 }}>
         <div style={{ fontSize: 32, marginBottom: 4 }}>🃏</div>
         <h3 style={{ color: "#ff2d95", margin: "0 0 4px", fontSize: 16, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
-          You hold the Power of Chaos
+          You hold the Power of Khaos
         </h3>
         <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>
           {isExile

@@ -124,7 +124,7 @@ export default function FinaleHost({ gameId, players, round }) {
 
   const buildFinaleSummary = () => {
     const lines = voteRows.map((r) => `${players.find((p) => p.id === r.voterId)?.display_name || "?"} → ${byId[r.targetId] || "?"}${r.reason ? ` ("${r.reason}")` : ""}`);
-    const chaosLine = nullifiedId ? `🃏 ${chaosHolder?.display_name || "The Power of Chaos"} nullified ${byId[nullifiedId] || "?"} — they can't win.${chaosSecret?.reason ? ` ("${chaosSecret.reason}")` : ""}` : "";
+    const chaosLine = nullifiedId ? `🃏 ${chaosHolder?.display_name || "The Power of Khaos"} nullified ${byId[nullifiedId] || "?"} — they can't win.${chaosSecret?.reason ? ` ("${chaosSecret.reason}")` : ""}` : "";
     return `🔥 Finale votes — ${finale.finalists.map((f) => f.name).join(", ")}\n\n${lines.join("\n")}\n\n${chaosLine}`.trim();
   };
 
@@ -150,7 +150,7 @@ export default function FinaleHost({ gameId, players, round }) {
 
       <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12, marginTop: 12 }}>
         <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
-          🃏 Power of Chaos (drawn from the exiled)
+          🃏 Power of Khaos (drawn from the exiled)
         </div>
         {chaosHolder ? (
           <p style={{ fontSize: 12, color: nullifiedId ? "#00ff9d" : "#a68fd6", margin: 0 }}>
@@ -163,7 +163,7 @@ export default function FinaleHost({ gameId, players, round }) {
           </p>
         ) : (
           <p style={{ fontSize: 12, color: "#a68fd6", margin: 0 }}>
-            Every exiled player got one shot at a mystery-card draw on their own screen ({exiledPlayers.length} cards, one Power of Chaos) — {Object.keys(drawPicks).length}/{exiledPlayers.length} have picked so far.
+            Every exiled player got one shot at a mystery-card draw on their own screen ({exiledPlayers.length} cards, one Power of Khaos) — {Object.keys(drawPicks).length}/{exiledPlayers.length} have picked so far.
             {finale.votingOpen ? " Still up for grabs." : " Voting's closed with nobody claiming it — no one holds it this round."}
           </p>
         )}
@@ -182,7 +182,7 @@ export default function FinaleHost({ gameId, players, round }) {
         <div style={{ fontSize: 12, fontWeight: 700, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>
           Exiled players voting: {voteRows.length}/{exiledPlayers.length} in
         </div>
-        <div style={{ fontSize: 10, color: "#6b4f99", marginBottom: 8 }}>🃏 next to a name shows their Power of Chaos draw status — green = won it, red = picked but didn't win, gray = hasn't picked yet.</div>
+        <div style={{ fontSize: 10, color: "#6b4f99", marginBottom: 8 }}>🃏 next to a name shows their Power of Khaos draw status — green = won it, red = picked but didn't win, gray = hasn't picked yet.</div>
         <div style={{ display: "grid", gap: 6 }}>
           {exiledPlayers.map((voter) => (
             <div key={voter.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -213,7 +213,7 @@ export default function FinaleHost({ gameId, players, round }) {
             </p>
           ) : (
             <p style={{ color: "#ff3860", fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>
-              🃏 It's tied — waiting on {chaosHolder?.display_name || "the Power of Chaos holder"} to choose the winner from their own screen.
+              🃏 It's tied — waiting on {chaosHolder?.display_name || "the Power of Khaos holder"} to choose the winner from their own screen.
             </p>
           )}
           <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 8px", fontStyle: "italic" }}>Host fallback, if needed:</p>

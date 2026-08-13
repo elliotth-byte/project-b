@@ -14,6 +14,7 @@ import ChatHostPanel from "./ChatHostPanel";
 import AdminHost from "./AdminHost";
 import HistoryTab from "./HistoryTab";
 import RoundTimerBanner from "./RoundTimerBanner";
+import HostAnnouncementBox from "./HostAnnouncementBox";
 import PlayerViewer from "./PlayerViewer";
 
 const BASE_TABS = [
@@ -131,8 +132,9 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
           ) : (
             <>
               <RoundTimerBanner round={round} />
+              <HostAnnouncementBox gameId={gameId} />
               {round.phase === PHASES.CHALLENGE && (
-                <ChallengeErrorBoundary label="Challenge"><ChallengeHost gameId={gameId} players={hostApprovedRoster} round={round} settings={settings} /></ChallengeErrorBoundary>
+                <ChallengeErrorBoundary label="Battle"><ChallengeHost gameId={gameId} players={hostApprovedRoster} round={round} settings={settings} /></ChallengeErrorBoundary>
               )}
               {round.phase === PHASES.FATES && (
                 <ChallengeErrorBoundary label="Fates Ceremony"><FatesHost gameId={gameId} players={hostApprovedRoster} round={round} /></ChallengeErrorBoundary>

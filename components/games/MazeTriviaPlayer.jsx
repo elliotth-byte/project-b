@@ -4,7 +4,7 @@ import GameResultCard from "./GameResultCard";
 import { reportScore } from "../../lib/challengeScores";
 import { usePersistedStart } from "./usePersistedStart";
 import { generateMazeWithGems, straightLinePath } from "../../lib/games/mazeGemsData";
-import { pickTriviaCategories } from "../../lib/games/triviaData";
+import { pickMazeTriviaQuestions } from "../../lib/games/mazeTriviaQuestions";
 import { useSwipeControls } from "../../lib/games/useSwipeControls";
 
 const DEFAULT_SIZE = 15;
@@ -37,7 +37,11 @@ export default function MazeTriviaPlayer({ gameId, round, challenge, player }) {
   }, [challenge?.gameConfig?.size]);
   const seed = (challenge?.startedAt || 1) + (player?.id ? player.id.split("-")[0].length : 0);
   const [{ grid, start, gems }] = useState(() => generateMazeWithGems(seed || 1, SIZE));
-  const [gateQuestions] = useState(() => pickTriviaCategories(seed || 1, 5).map((c) => c.medium));
+  // See the matching comment in MazeInvisiblePlayer.jsx — bounds/wall
+  // checks are derived from the grid's own dimensions, not the SIZE
+  // memo, so a late-arriving challenge prop can never desync them.
+  const GRID_SIZE = grid.length;
+  const [gateQuestions] = useState(() => pickMazeTriviaQuestions(seed || 1, 5));
   const [pos, setPos] = useState(start);
   const [visited, setVisited] = useState(() => new Set([`${start.r},${start.c}`]));
   const [gemIndex, setGemIndex] = useState(0);
@@ -74,7 +78,7 @@ export default function MazeTriviaPlayer({ gameId, round, challenge, player }) {
     if (finishMs || gateState === "answering") return;
     setPos((prev) => {
       const nr = prev.r + dr, nc = prev.c + dc;
-      if (nr < 0 || nc < 0 || nr >= SIZE || nc >= SIZE) return prev;
+      if (nr < 0 || nc < 0 || nr >= GRID_SIZE || nc >= GRID_SIZE) return prev;
 
       // Walking into the (still-locked, not-yet-attempted) gate triggers
       // the question instead of just blocking movement.
@@ -89,7 +93,7 @@ export default function MazeTriviaPlayer({ gameId, round, challenge, player }) {
       if (t && nr === t.r && nc === t.c) setGemIndex((i) => i + 1);
       return { r: nr, c: nc };
     });
-  }, [finishMs, gateState, shortcut, isWalkable, SIZE, gems, gemIndex]);
+  }, [finishMs, gateState, shortcut, isWalkable, GRID_SIZE, gems, gemIndex]);
 
   const answerGate = (choiceIdx) => {
     if (gateState !== "answering") return;
@@ -132,7 +136,7 @@ export default function MazeTriviaPlayer({ gameId, round, challenge, player }) {
     return <Card style={{ marginBottom: 20, textAlign: "center" }}><p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic" }}>Loading...</p></Card>;
   }
 
-  const cell = SIZE <= 15 ? 20 : SIZE <= 21 ? 16 : 12;
+  const cell = GRID_SIZE <= 15 ? 20 : GRID_SIZE <= 21 ? 16 : 12;
 
   if (gateState === "answering" && gateQuestion) {
     return (
@@ -167,7 +171,7 @@ export default function MazeTriviaPlayer({ gameId, round, challenge, player }) {
       <div
         onTouchStart={swipeHandlers.onTouchStart} onTouchEnd={swipeHandlers.onTouchEnd}
         style={{
-          display: "grid", gridTemplateColumns: `repeat(${SIZE}, ${cell}px)`, gridTemplateRows: `repeat(${SIZE}, ${cell}px)`,
+          display: "grid", gridTemplateColumns: `repeat(${GRID_SIZE}, ${cell}px)`, gridTemplateRows: `repeat(${GRID_SIZE}, ${cell}px)`,
         margin: "0 auto 12px", border: "2px solid #3d1f5c", width: "fit-content", background: "#05010f",
         touchAction: swipeEnabled ? "none" : "auto",
       }}>

@@ -40,6 +40,11 @@ export default function Maze2DPlayer({ gameId, round, challenge, player }) {
   }, [challenge?.gameConfig?.size]);
   const seed = (challenge?.startedAt || 1) + (player?.id ? player.id.split("-")[0].length : 0);
   const [maze] = useState(() => generateMaze(seed || 1, SIZE));
+  // See the matching comment in MazeInvisiblePlayer.jsx — bounds/wall
+  // checks and the goal position are derived from the maze's own
+  // dimensions, not the SIZE memo, so a late-arriving challenge prop can
+  // never desync them.
+  const GRID_SIZE = maze.length;
   const [pos, setPos] = useState({ r: 1, c: 1 });
   // Fog of war: only cells the player has physically stood on are visible
   // (plus the goal, always). Everywhere else — wall or open path — is
@@ -50,14 +55,14 @@ export default function Maze2DPlayer({ gameId, round, challenge, player }) {
   // round, not just time since their most recent remount.
   const startTime = usePersistedStart(gameId, round.round, player.id);
   const [finishMs, setFinishMs] = useState(null);
-  const goal = { r: SIZE - 2, c: SIZE - 2 };
+  const goal = { r: GRID_SIZE - 2, c: GRID_SIZE - 2 };
   const reported = useRef(false);
 
   const move = useCallback((dr, dc) => {
     setPos((prev) => {
       if (finishMs) return prev;
       const nr = prev.r + dr, nc = prev.c + dc;
-      if (nr < 0 || nc < 0 || nr >= SIZE || nc >= SIZE || maze[nr][nc] === 1) return prev;
+      if (nr < 0 || nc < 0 || nr >= GRID_SIZE || nc >= GRID_SIZE || maze[nr][nc] === 1) return prev;
       setVisited((v) => {
         const key = `${nr},${nc}`;
         if (v.has(key)) return v;
@@ -67,7 +72,7 @@ export default function Maze2DPlayer({ gameId, round, challenge, player }) {
       });
       return { r: nr, c: nc };
     });
-  }, [maze, finishMs, SIZE]);
+  }, [maze, finishMs, GRID_SIZE]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -106,7 +111,7 @@ export default function Maze2DPlayer({ gameId, round, challenge, player }) {
   }
 
   // Bigger mazes get smaller cells so the whole thing still fits comfortably.
-  const cell = SIZE <= 11 ? 24 : SIZE <= 17 ? 18 : SIZE <= 23 ? 14 : 11;
+  const cell = GRID_SIZE <= 11 ? 24 : GRID_SIZE <= 17 ? 18 : GRID_SIZE <= 23 ? 14 : 11;
 
   return (
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
@@ -115,7 +120,7 @@ export default function Maze2DPlayer({ gameId, round, challenge, player }) {
       <div
         onTouchStart={swipeHandlers.onTouchStart} onTouchEnd={swipeHandlers.onTouchEnd}
         style={{
-          display: "grid", gridTemplateColumns: `repeat(${SIZE}, ${cell}px)`, gridTemplateRows: `repeat(${SIZE}, ${cell}px)`,
+          display: "grid", gridTemplateColumns: `repeat(${GRID_SIZE}, ${cell}px)`, gridTemplateRows: `repeat(${GRID_SIZE}, ${cell}px)`,
           margin: "0 auto 12px", border: "2px solid #3d1f5c", width: "fit-content", background: "#05010f",
           touchAction: swipeEnabled ? "none" : "auto",
         }}

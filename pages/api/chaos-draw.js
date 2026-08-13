@@ -3,7 +3,7 @@ import { makeDb } from "../../lib/dbAdapter";
 import { KEY_ROUND, KEY_EXILE, KEY_FINALE } from "../../lib/gameState";
 
 // ============================================================
-// The Power of Chaos "draw" — replaces the old host-side Fan of Cards
+// The Power of Khaos "draw" — replaces the old host-side Fan of Cards
 // flavor button. When the Exile Vote (or Finale) begins, the game lays
 // out N mystery buttons on every eligible player's screen — N being
 // however many players are actually in the draw that round (alive
@@ -17,7 +17,7 @@ import { KEY_ROUND, KEY_EXILE, KEY_FINALE } from "../../lib/gameState";
 // pick via this endpoint's response.
 //
 // Every eligible player gets one shot: pick one button, any button. Hit
-// the right one and you win the Power of Chaos this round — recorded
+// the right one and you win the Power of Khaos this round — recorded
 // immediately as this round's public chaosHolderId, same as before.
 // Everyone else's pick is just recorded (so the UI can show which
 // buttons have already been tried and are safely known-wrong) with no
@@ -77,7 +77,7 @@ export default async function handler(req, res) {
   if (buttonIndex >= poolSize) return res.status(400).json({ error: "That button doesn't exist." });
 
   const state = await db.get(gameId, stateKey);
-  if (!state || !state.votingOpen) return res.status(400).json({ error: "The Power of Chaos draw isn't open right now." });
+  if (!state || !state.votingOpen) return res.status(400).json({ error: "The Power of Khaos draw isn't open right now." });
 
   const picksKey = `pb:chaos-picks:${context}`;
   const picks = (await db.get(gameId, picksKey)) || {};

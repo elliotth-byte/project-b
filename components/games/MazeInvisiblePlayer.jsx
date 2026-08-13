@@ -25,6 +25,20 @@ export default function MazeInvisiblePlayer({ gameId, round, challenge, player }
   }, [challenge?.gameConfig?.size]);
   const seed = (challenge?.startedAt || 1) + (player?.id ? player.id.split("-")[0].length : 0);
   const [{ grid, start, gems }] = useState(() => generateMazeWithGems(seed || 1, SIZE));
+  // Bounds/wall-checking below is deliberately derived from the grid
+  // itself, not the SIZE memo above — SIZE is only ever the INPUT to
+  // generation. If challenge hadn't fully loaded yet on this component's
+  // very first render (a real possibility — challenge?.gameConfig?.size
+  // could still be undefined at that moment), SIZE's memo could later
+  // recompute to a different value once challenge actually arrives,
+  // while the grid — generated once, already — stays whatever size it
+  // was first built at. Using SIZE for bounds checks in that situation
+  // meant every move could get checked against the WRONG grid
+  // dimensions, which is exactly the kind of thing that would make
+  // movement look like it's hitting walls that aren't really there.
+  // Deriving it from grid.length instead makes that mismatch structurally
+  // impossible.
+  const GRID_SIZE = grid.length;
   const [pos, setPos] = useState(start);
   const [visited, setVisited] = useState(() => new Set([`${start.r},${start.c}`]));
   const [gemIndex, setGemIndex] = useState(0); // which gem (0-4) is the current target
@@ -42,7 +56,7 @@ export default function MazeInvisiblePlayer({ gameId, round, challenge, player }
     if (mode !== "move" || finishMs) return;
     setPos((prev) => {
       const nr = prev.r + dr, nc = prev.c + dc;
-      if (nr < 0 || nc < 0 || nr >= SIZE || nc >= SIZE || grid[nr][nc] === 1) {
+      if (nr < 0 || nc < 0 || nr >= GRID_SIZE || nc >= GRID_SIZE || grid[nr][nc] === 1) {
         setPenaltyMs((p) => p + WALL_BUMP_PENALTY_MS);
         setBumpFlash(true);
         window.setTimeout(() => setBumpFlash(false), 200);
@@ -54,7 +68,7 @@ export default function MazeInvisiblePlayer({ gameId, round, challenge, player }
       if (t && nr === t.r && nc === t.c) setGemIndex((i) => i + 1);
       return { r: nr, c: nc };
     });
-  }, [mode, finishMs, grid, SIZE, gems, gemIndex]);
+  }, [mode, finishMs, grid, GRID_SIZE, gems, gemIndex]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -94,7 +108,7 @@ export default function MazeInvisiblePlayer({ gameId, round, challenge, player }
     return <Card style={{ marginBottom: 20, textAlign: "center" }}><p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic" }}>Loading...</p></Card>;
   }
 
-  const cell = SIZE <= 15 ? 20 : SIZE <= 21 ? 16 : 12;
+  const cell = GRID_SIZE <= 15 ? 20 : GRID_SIZE <= 21 ? 16 : 12;
 
   return (
     <Card style={{ marginBottom: 20, textAlign: "center", borderColor: bumpFlash ? "#ff3860" : undefined }}>
@@ -121,7 +135,7 @@ export default function MazeInvisiblePlayer({ gameId, round, challenge, player }
       <div
         onTouchStart={swipeHandlers.onTouchStart} onTouchEnd={swipeHandlers.onTouchEnd}
         style={{
-          display: "grid", gridTemplateColumns: `repeat(${SIZE}, ${cell}px)`, gridTemplateRows: `repeat(${SIZE}, ${cell}px)`,
+          display: "grid", gridTemplateColumns: `repeat(${GRID_SIZE}, ${cell}px)`, gridTemplateRows: `repeat(${GRID_SIZE}, ${cell}px)`,
           margin: "0 auto 12px", border: "2px solid #3d1f5c", width: "fit-content", background: "#05010f",
           touchAction: swipeEnabled ? "none" : "auto",
         }}
