@@ -202,7 +202,7 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
         ? computeSaveOutcome(voteRows, myPickId, nomineeIds)
         : computeEliminateOutcome(voteRows, myPickId, nomineeIds);
     } else {
-      outcome = computeFinaleOutcome(voteRows, myPickId, nomineeIds);
+      outcome = computeFinaleOutcome(voteRows, myPickId, nomineeIds, state.tieBreakChoiceId);
     }
   }
   const needsTieBreak = outcome?.needsTieBreak && !state.tieBreakChoiceId;

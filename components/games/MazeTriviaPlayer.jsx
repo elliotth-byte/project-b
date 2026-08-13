@@ -5,6 +5,7 @@ import { reportScore } from "../../lib/challengeScores";
 import { usePersistedStart } from "./usePersistedStart";
 import { generateMazeWithGems, straightLinePath } from "../../lib/games/mazeGemsData";
 import { pickTriviaCategories } from "../../lib/games/triviaData";
+import { useSwipeControls } from "../../lib/games/useSwipeControls";
 
 const DEFAULT_SIZE = 15;
 
@@ -108,6 +109,14 @@ export default function MazeTriviaPlayer({ gameId, round, challenge, player }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [move]);
 
+  const swipeEnabled = !!player?.gamePrefs?.swipeControls;
+  const swipeHandlers = useSwipeControls((dir) => {
+    if (dir === "up") move(-1, 0);
+    else if (dir === "down") move(1, 0);
+    else if (dir === "left") move(0, -1);
+    else move(0, 1);
+  }, swipeEnabled);
+
   useEffect(() => {
     if (!startTime || !allGemsDone || reported.current) return;
     reported.current = true;
@@ -155,9 +164,12 @@ export default function MazeTriviaPlayer({ gameId, round, challenge, player }) {
       </p>
       {gateState === "failed" && <p style={{ color: "#ff3860", fontSize: 11, margin: "0 0 8px", fontWeight: 700 }}>Shortcut's shut — find the long way to this gem.</p>}
 
-      <div style={{
-        display: "grid", gridTemplateColumns: `repeat(${SIZE}, ${cell}px)`, gridTemplateRows: `repeat(${SIZE}, ${cell}px)`,
+      <div
+        onTouchStart={swipeHandlers.onTouchStart} onTouchEnd={swipeHandlers.onTouchEnd}
+        style={{
+          display: "grid", gridTemplateColumns: `repeat(${SIZE}, ${cell}px)`, gridTemplateRows: `repeat(${SIZE}, ${cell}px)`,
         margin: "0 auto 12px", border: "2px solid #3d1f5c", width: "fit-content", background: "#05010f",
+        touchAction: swipeEnabled ? "none" : "auto",
       }}>
         {grid.map((row, r) => row.map((wall, c) => {
           const key = `${r},${c}`;
@@ -201,7 +213,9 @@ export default function MazeTriviaPlayer({ gameId, round, challenge, player }) {
         <button onClick={() => move(1, 0)} style={arrowStyle}>↓</button>
         <div />
       </div>
-      <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 8, fontStyle: "italic" }}>Arrow keys work too.</p>
+      <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 8, fontStyle: "italic" }}>
+        Arrow keys work too.{swipeEnabled && " Or swipe on the board."}
+      </p>
     </Card>
   );
 }

@@ -3,6 +3,7 @@ import { Card, Badge } from "../ui";
 import GameResultCard from "./GameResultCard";
 import { useCountdown } from "./useCountdown";
 import { reportScore } from "../../lib/challengeScores";
+import { useSwipeControls } from "../../lib/games/useSwipeControls";
 
 // 9-wide grid so 5 home slots can sit with real gaps between them, the
 // way the original arcade game's 5 lily pads work — landing in a gap (or
@@ -127,6 +128,14 @@ export default function FroggerPlayer({ gameId, round, challenge, player }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [move]);
 
+  const swipeEnabled = !!player?.gamePrefs?.swipeControls;
+  const swipeHandlers = useSwipeControls((dir) => {
+    if (dir === "up") move(0, -1);
+    else if (dir === "down") move(0, 1);
+    else if (dir === "left") move(-1, 0);
+    else move(1, 0);
+  }, swipeEnabled);
+
   useEffect(() => {
     if (timeUp || doneRef.current) return;
     let raf;
@@ -225,14 +234,20 @@ export default function FroggerPlayer({ gameId, round, challenge, player }) {
       <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 8px" }}>
         🏠 {homesFilled}/5 home{carrying && " · 🤍 carrying the lady frog"}
       </p>
-      <canvas ref={canvasRef} width={W} height={H} style={{ background: "#0d0618", borderRadius: 10, border: "1px solid #3d1f5c" }} />
+      <canvas
+        ref={canvasRef} width={W} height={H}
+        onTouchStart={swipeHandlers.onTouchStart} onTouchEnd={swipeHandlers.onTouchEnd}
+        style={{ background: "#0d0618", borderRadius: 10, border: "1px solid #3d1f5c", touchAction: swipeEnabled ? "none" : "auto" }}
+      />
       <div style={{ display: "grid", gridTemplateColumns: "44px 44px 44px", gridTemplateRows: "40px 40px", gap: 4, margin: "10px auto 0", width: "fit-content" }}>
         <div /><button onClick={() => move(0, -1)} style={arrowStyle}>↑</button><div />
         <button onClick={() => move(-1, 0)} style={arrowStyle}>←</button>
         <button onClick={() => move(0, 1)} style={arrowStyle}>↓</button>
         <button onClick={() => move(1, 0)} style={arrowStyle}>→</button>
       </div>
-      <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 8, fontStyle: "italic" }}>Arrow keys work too.</p>
+      <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 8, fontStyle: "italic" }}>
+        Arrow keys work too.{swipeEnabled && " Or swipe on the board."}
+      </p>
     </Card>
   );
 }

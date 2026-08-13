@@ -26,6 +26,7 @@ import { subscribeGameState } from "../lib/gameStorage";
 import { subscribeRevealAck } from "../lib/revealAck";
 import { resolveIdentities, identityComplete } from "../lib/playerIdentity";
 import { resolveAvatars } from "../lib/avatarIdentity";
+import { DEFAULT_GAME_PREFS } from "../lib/gamePrefs";
 import { useHasUnreadChat } from "../lib/useChatUnread";
 import { useRoundWatcher } from "../lib/useRoundWatcher";
 
@@ -154,13 +155,13 @@ export default function PlayPage() {
     (async () => {
       const { data: existing } = await supabase
         .from("players")
-        .select("id, display_name, alive, elimination_type, approved, color, alias, avatar_url")
+        .select("id, display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs")
         .eq("game_id", gameId)
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (existing) {
-        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, approved: existing.approved, color: existing.color, alias: existing.alias, avatarUrl: existing.avatar_url });
+        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, approved: existing.approved, color: existing.color, alias: existing.alias, avatarUrl: existing.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(existing.game_prefs || {}) } });
         setJoined(true);
         return;
       }
@@ -191,12 +192,12 @@ export default function PlayPage() {
       const { data: created, error } = await supabase
         .from("players")
         .insert({ game_id: gameId, user_id: session.user.id, display_name: displayNameFromUser(user), approved: false })
-        .select("id, display_name, alive, elimination_type, approved, color, alias, avatar_url")
+        .select("id, display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs")
         .single();
       if (error) {
         setJoinError(`Couldn't join this game: ${error.message}${error.code ? ` [code=${error.code}]` : ""}${error.details ? ` — ${error.details}` : ""} (user_id=${session.user.id})`);
       } else {
-        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, approved: created.approved, color: created.color, alias: created.alias, avatarUrl: created.avatar_url });
+        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, approved: created.approved, color: created.color, alias: created.alias, avatarUrl: created.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(created.game_prefs || {}) } });
         setJoined(true);
       }
     })();
@@ -207,8 +208,8 @@ export default function PlayPage() {
   useEffect(() => {
     if (!myPlayer?.id) return;
     const load = async () => {
-      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, approved, color, alias, avatar_url").eq("id", myPlayer.id).maybeSingle();
-      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, approved: data.approved, color: data.color, alias: data.alias, avatarUrl: data.avatar_url }));
+      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs").eq("id", myPlayer.id).maybeSingle();
+      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, approved: data.approved, color: data.color, alias: data.alias, avatarUrl: data.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(data.game_prefs || {}) } }));
     };
     const channel = supabase
       .channel(`self-player-${myPlayer.id}`)
@@ -237,7 +238,7 @@ export default function PlayPage() {
   // including to themselves, right down to what shows up in "Playing
   // as..." up top and what name their own chat/confessional posts carry.
   const effectivePlayerName = settings?.aliasEnabled && myPlayer?.alias && round?.phase !== PHASES.ENDED ? myPlayer.alias : playerName;
-  const player = myPlayer ? { id: myPlayer.id, name: effectivePlayerName } : null;
+  const player = myPlayer ? { id: myPlayer.id, name: effectivePlayerName, gamePrefs: myPlayer.gamePrefs || DEFAULT_GAME_PREFS } : null;
   const exiled = joined && myPlayer && myPlayer.alive === false;
   const quitByChoice = exiled && myPlayer.eliminationType === "quit";
   const approved = joined && !!myPlayer?.approved;
@@ -424,7 +425,12 @@ export default function PlayPage() {
               </ChallengeErrorBoundary>
             )}
 
-            {tab === "help" && <HelpPanel />}
+            {tab === "help" && (
+              <HelpPanel
+                player={player}
+                onPrefsChanged={(gamePrefs) => setMyPlayer((p) => p && ({ ...p, gamePrefs }))}
+              />
+            )}
           </>
         )}
       </div>

@@ -4,6 +4,7 @@ import GameResultCard from "./GameResultCard";
 import { reportScore } from "../../lib/challengeScores";
 import { usePersistedStart } from "./usePersistedStart";
 import { generateMazeWithGems } from "../../lib/games/mazeGemsData";
+import { useSwipeControls } from "../../lib/games/useSwipeControls";
 
 const DEFAULT_SIZE = 15;
 const WALL_BUMP_PENALTY_MS = 1500;
@@ -66,6 +67,18 @@ export default function MazeInvisiblePlayer({ gameId, round, challenge, player }
     return () => window.removeEventListener("keydown", onKey);
   }, [move]);
 
+  // Swipe alternative to the arrow buttons/keys — only active when the
+  // player has swipeControls on (see lib/gamePrefs.js). Called
+  // unconditionally (Rules of Hooks) — `enabled` gates its behavior
+  // internally instead of this being called conditionally.
+  const swipeEnabled = !!player?.gamePrefs?.swipeControls;
+  const swipeHandlers = useSwipeControls((dir) => {
+    if (dir === "up") move(-1, 0);
+    else if (dir === "down") move(1, 0);
+    else if (dir === "left") move(0, -1);
+    else move(0, 1);
+  }, swipeEnabled);
+
   useEffect(() => {
     if (!startTime || !allGemsDone || reported.current) return;
     reported.current = true;
@@ -105,10 +118,14 @@ export default function MazeInvisiblePlayer({ gameId, round, challenge, player }
         >🏃 Move</button>
       </div>
 
-      <div style={{
-        display: "grid", gridTemplateColumns: `repeat(${SIZE}, ${cell}px)`, gridTemplateRows: `repeat(${SIZE}, ${cell}px)`,
-        margin: "0 auto 12px", border: "2px solid #3d1f5c", width: "fit-content", background: "#05010f",
-      }}>
+      <div
+        onTouchStart={swipeHandlers.onTouchStart} onTouchEnd={swipeHandlers.onTouchEnd}
+        style={{
+          display: "grid", gridTemplateColumns: `repeat(${SIZE}, ${cell}px)`, gridTemplateRows: `repeat(${SIZE}, ${cell}px)`,
+          margin: "0 auto 12px", border: "2px solid #3d1f5c", width: "fit-content", background: "#05010f",
+          touchAction: swipeEnabled ? "none" : "auto",
+        }}
+      >
         {grid.map((row, r) => row.map((wall, c) => {
           const isPlayer = pos.r === r && pos.c === c;
           const isTarget = target && target.r === r && target.c === c;
@@ -157,7 +174,9 @@ export default function MazeInvisiblePlayer({ gameId, round, challenge, player }
         <button onClick={() => move(1, 0)} disabled={mode !== "move"} style={arrowStyle}>↓</button>
         <div />
       </div>
-      <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 8, fontStyle: "italic" }}>Arrow keys work in Move mode too.</p>
+      <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 8, fontStyle: "italic" }}>
+        Arrow keys work in Move mode too.{swipeEnabled && " Or swipe on the board."}
+      </p>
     </Card>
   );
 }

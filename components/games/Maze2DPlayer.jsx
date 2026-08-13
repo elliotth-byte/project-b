@@ -3,6 +3,7 @@ import { Card } from "../ui";
 import GameResultCard from "./GameResultCard";
 import { reportScore } from "../../lib/challengeScores";
 import { usePersistedStart } from "./usePersistedStart";
+import { useSwipeControls } from "../../lib/games/useSwipeControls";
 
 const DEFAULT_SIZE = 11;
 
@@ -79,6 +80,14 @@ export default function Maze2DPlayer({ gameId, round, challenge, player }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [move]);
 
+  const swipeEnabled = !!player?.gamePrefs?.swipeControls;
+  const swipeHandlers = useSwipeControls((dir) => {
+    if (dir === "up") move(-1, 0);
+    else if (dir === "down") move(1, 0);
+    else if (dir === "left") move(0, -1);
+    else move(0, 1);
+  }, swipeEnabled);
+
   useEffect(() => {
     if (!startTime) return;
     if (pos.r === goal.r && pos.c === goal.c && !reported.current) {
@@ -103,10 +112,14 @@ export default function Maze2DPlayer({ gameId, round, challenge, player }) {
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
       <h3 style={{ color: "#ff2d95", margin: "0 0 8px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🧩 2D Maze</h3>
       <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 8px", fontStyle: "italic" }}>Fog of war — only where you've walked is visible.</p>
-      <div style={{
-        display: "grid", gridTemplateColumns: `repeat(${SIZE}, ${cell}px)`, gridTemplateRows: `repeat(${SIZE}, ${cell}px)`,
-        margin: "0 auto 12px", border: "2px solid #3d1f5c", width: "fit-content", background: "#05010f",
-      }}>
+      <div
+        onTouchStart={swipeHandlers.onTouchStart} onTouchEnd={swipeHandlers.onTouchEnd}
+        style={{
+          display: "grid", gridTemplateColumns: `repeat(${SIZE}, ${cell}px)`, gridTemplateRows: `repeat(${SIZE}, ${cell}px)`,
+          margin: "0 auto 12px", border: "2px solid #3d1f5c", width: "fit-content", background: "#05010f",
+          touchAction: swipeEnabled ? "none" : "auto",
+        }}
+      >
         {maze.map((row, r) => row.map((wall, c) => {
           const isPlayer = pos.r === r && pos.c === c;
           const isGoal = goal.r === r && goal.c === c;
@@ -135,7 +148,9 @@ export default function Maze2DPlayer({ gameId, round, challenge, player }) {
         <button onClick={() => move(1, 0)} style={arrowStyle}>↓</button>
         <div />
       </div>
-      <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 8, fontStyle: "italic" }}>Arrow keys work too.</p>
+      <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 8, fontStyle: "italic" }}>
+        Arrow keys work too.{swipeEnabled && " Or swipe on the board."}
+      </p>
     </Card>
   );
 }

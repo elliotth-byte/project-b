@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { Btn, Card, Badge, ChaosStatusBadge } from "./ui";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
-import { KEY_FINALE } from "../lib/gameState";
+import { KEY_FINALE, KEY_ROUND, DEFAULT_SETTINGS, getSettings } from "../lib/gameState";
 import { computeFinaleOutcome } from "../lib/exileLogic";
 import { FINALE_CONTEXT, subscribeChaosSecret } from "../lib/chaosSecrets";
 import { FINALE_DRAW_CONTEXT, chaosPicksKey } from "../lib/chaosDraw";
+import { subscribeFinaleQa, isJuryEligible } from "../lib/finaleQaData";
+import FinaleQaPanel from "./FinaleQaPanel";
 import CopyMessage from "./CopyMessage";
 import { requestAdvance } from "../lib/advanceNow";
 
@@ -15,7 +17,9 @@ export default function FinaleHost({ gameId, players, round }) {
   const [votes, setVotes] = useState({});
   const [chaosSecret, setChaosSecret] = useState(null); // { nomineeId, reason } | null
   const [drawPicks, setDrawPicks] = useState({});
+  const [qa, setQa] = useState({ statements: {}, questions: [] });
   const [busy, setBusy] = useState(false);
+  const [openingVoting, setOpeningVoting] = useState(false);
   const dirtyRef = useRef(new Set());
 
   useEffect(() => {
@@ -38,6 +42,11 @@ export default function FinaleHost({ gameId, players, round }) {
     return unsubscribe;
   }, [gameId]);
 
+  useEffect(() => {
+    const unsubscribe = subscribeFinaleQa(gameId, setQa);
+    return unsubscribe;
+  }, [gameId]);
+
   if (round?.phase !== "finale") {
     return <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>Not in the Finale yet.</p></Card>;
   }
@@ -50,7 +59,7 @@ export default function FinaleHost({ gameId, players, round }) {
   finale.finalists.forEach((f) => (byId[f.playerId] = f.name));
   const voteRows = Object.entries(votes).map(([voterId, v]) => ({ voterId, targetId: v.targetId, reason: v.reason }));
   const finalistIds = finale.finalists.map((f) => f.playerId);
-  const outcome = computeFinaleOutcome(voteRows, nullifiedId, finalistIds);
+  const outcome = computeFinaleOutcome(voteRows, nullifiedId, finalistIds, finale.tieBreakChoiceId);
   // Same fix as ExileVoteHost.jsx: outcome.needsTieBreak is a pure function
   // of the vote tally and never flips back to false on its own, so the
   // action buttons below need to check whether a tie-break choice has
@@ -80,6 +89,22 @@ export default function FinaleHost({ gameId, players, round }) {
     });
   };
 
+  // The transition out of the Q&A period — sets a fresh voting countdown
+  // (the Q&A period itself is host-paced with no timer) and flips the
+  // Finale into "voting", which is what the round-advance gate actually
+  // checks (see lib/roundEngine.js) rather than votingOpen alone, since
+  // votingOpen is false during Q&A too.
+  const openVoting = async () => {
+    setOpeningVoting(true);
+    const settings = await getSettings(gameId);
+    const now = Date.now();
+    await storageUpdate(gameId, KEY_FINALE, (fresh) => (fresh ? { ...fresh, phase: "voting", votingOpen: true } : fresh));
+    await storageUpdate(gameId, KEY_ROUND, (fresh) => (fresh ? {
+      ...fresh, phaseStartedAt: now, phaseEndsAt: settings.infiniteTime ? null : now + settings.voteDurationSec * 1000,
+    } : fresh));
+    setOpeningVoting(false);
+  };
+
   // Fallback only — the expected path is the chaos holder breaking the
   // tie themselves from their own screen (see ChaosPowerPlayer.jsx).
   const setTieBreak = async (finalistId) => {
@@ -107,10 +132,23 @@ export default function FinaleHost({ gameId, players, round }) {
     <Card style={{ borderColor: "rgba(255,45,149,0.4)" }}>
       <h3 style={{ color: "#ff2d95", margin: "0 0 4px", fontSize: 16, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🔥 Finale</h3>
       <p style={{ color: "#6b4f99", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
-        Finalists: {finale.finalists.map((f) => f.name).join(", ")}. Every exiled player votes FOR a winner. The nullified finalist can never win; whoever has the most votes between the other two wins.
+        Finalists: {finale.finalists.map((f) => f.name).join(", ")}. Every exiled player votes FOR a winner. The nullified finalist can never win and automatically finishes 3rd; whoever has the most votes between the other two wins.
       </p>
 
-      <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+      {finale.phase === "qa" && (
+        <Card style={{ borderColor: "rgba(255,45,149,0.5)", marginBottom: 12 }}>
+          <p style={{ color: "#f5f0ff", fontSize: 13, margin: "0 0 10px" }}>
+            🎤 Q&amp;A period — finalists are writing their statements and answering jury questions below, at whatever pace you want.
+            Open voting whenever you're ready to move on; nobody can submit anything new to the Q&amp;A after that, though everything
+            already there stays visible.
+          </p>
+          <Btn onClick={openVoting} disabled={openingVoting}>{openingVoting ? "Opening..." : "🗳 Open Voting"}</Btn>
+        </Card>
+      )}
+
+      <FinaleQaPanel gameId={gameId} finale={finale} qa={qa} players={players} readOnly />
+
+      <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12, marginTop: 12 }}>
         <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
           🃏 Power of Chaos (drawn from the exiled)
         </div>
