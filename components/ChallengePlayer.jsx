@@ -23,6 +23,8 @@ import BogglePlayer from "./games/BogglePlayer";
 import DealOrNoDealPlayer from "./games/DealOrNoDealPlayer";
 import MetronomePlayer from "./games/MetronomePlayer";
 import PitPlayer from "./games/PitPlayer";
+import WhoSaidItPlayer from "./games/WhoSaidItPlayer";
+import MasqueradePlayer from "./games/MasqueradePlayer";
 import GameResultCard from "./games/GameResultCard";
 
 const GAME_COMPONENTS = {
@@ -43,6 +45,8 @@ const GAME_COMPONENTS = {
   dealornodeal: DealOrNoDealPlayer,
   metronome: MetronomePlayer,
   pit: PitPlayer,
+  whosaidit: WhoSaidItPlayer,
+  masquerade: MasqueradePlayer,
 };
 
 export default function ChallengePlayer({ gameId, player, players, round, readOnly = false }) {

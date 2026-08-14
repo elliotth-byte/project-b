@@ -10,6 +10,7 @@ import { REENTRY_STATUS } from "../lib/reentryLogic";
 import { DEFAULT_PARTICIPATION, computeParticipants } from "../lib/challengeParticipants";
 import { initPlinkoBracket, subscribePlinkoBracket } from "../lib/games/plinkoBracketData";
 import { initPit } from "../lib/games/pitData";
+import { initMasquerade } from "../lib/games/masqueradeData";
 import ParticipantPicker from "./ParticipantPicker";
 import CopyMessage from "./CopyMessage";
 import { requestAdvance } from "../lib/advanceNow";
@@ -106,6 +107,9 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     }
     if (gameType === "pit") {
       await initPit(gameId, round.round, participants, now);
+    }
+    if (gameType === "masquerade") {
+      await initMasquerade(gameId, round.round, participants, now);
     }
     await storageUpdate(gameId, KEY_ROUND, (fresh) => ({ ...(fresh || {}), phaseStartedAt: now, phaseEndsAt: endsAt }));
     setBusy(false);
