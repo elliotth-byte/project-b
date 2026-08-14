@@ -19,7 +19,6 @@ export default function StroopPlayer({ gameId, challenge, round, player }) {
   // on the clock. Everyone's "elapsed" is relative to the same moment.
   const startedAt = challenge?.startedAt || null;
   const [cleared, setCleared] = useState(new Set());
-  const [selectedIdx, setSelectedIdx] = useState(null);
   const [penaltyMs, setPenaltyMs] = useState(0);
   const [flash, setFlash] = useState(null); // { idx, correct } | null
   const [done, setDone] = useState(false);
@@ -27,28 +26,31 @@ export default function StroopPlayer({ gameId, challenge, round, player }) {
   const reportedRef = useRef(false);
   const [, forceTick] = useState(0);
 
+  // The current target is always just "the next uncleared tile in
+  // left-to-right, top-to-bottom order" — the wall renders in exactly
+  // that order already (a plain 4-column grid over the array), so array
+  // index IS reading order. No separate tap-to-select step: answering
+  // always applies to this tile, and clearing it naturally advances to
+  // whichever tile is now first in the remaining order.
+  const currentIdx = wall.findIndex((_, i) => !cleared.has(i));
+
   useEffect(() => {
     if (!startedAt || done) return;
     const interval = window.setInterval(() => forceTick((t) => t + 1), 250);
     return () => window.clearInterval(interval);
   }, [startedAt, done]);
 
-  const selectTile = (idx) => {
-    if (done || cleared.has(idx)) return;
-    setSelectedIdx(idx);
-  };
-
   const answerColor = (colorName) => {
-    if (selectedIdx == null || done) return;
-    const tile = wall[selectedIdx];
+    if (currentIdx === -1 || done) return;
+    const tile = wall[currentIdx];
     const correct = tile.ink === colorName;
-    setFlash({ idx: selectedIdx, correct });
+    setFlash({ idx: currentIdx, correct });
     window.setTimeout(() => setFlash(null), 250);
 
     if (correct) {
       setCleared((c) => {
         const next = new Set(c);
-        next.add(selectedIdx);
+        next.add(currentIdx);
         if (next.size >= WALL_SIZE) {
           const elapsed = Date.now() - startedAt + penaltyMs;
           setFinalMs(elapsed);
@@ -56,7 +58,6 @@ export default function StroopPlayer({ gameId, challenge, round, player }) {
         }
         return next;
       });
-      setSelectedIdx(null);
     } else {
       setPenaltyMs((p) => p + MISTAKE_PENALTY_MS);
     }
@@ -90,49 +91,43 @@ export default function StroopPlayer({ gameId, challenge, round, player }) {
         <Badge>{elapsedDisplay}s · {cleared.size}/{WALL_SIZE}</Badge>
       </div>
       <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 10px", fontStyle: "italic" }}>
-        Tap a word, then tap the color it's actually PRINTED in — not what it says. Wrong answer costs {MISTAKE_PENALTY_MS / 1000}s.
+        Working left to right, top to bottom — tap the color each word is actually PRINTED in, not what it says. Wrong answer costs {MISTAKE_PENALTY_MS / 1000}s.
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 14 }}>
         {wall.map((tile, i) => {
           const isCleared = cleared.has(i);
-          const isSelected = selectedIdx === i;
+          const isCurrent = i === currentIdx;
           const isFlashing = flash?.idx === i;
           return (
-            <button
+            <div
               key={i}
-              onClick={() => selectTile(i)}
-              disabled={isCleared}
               style={{
                 padding: "10px 4px", borderRadius: 8, fontSize: 13, fontWeight: 900,
-                cursor: isCleared ? "default" : "pointer",
-                background: isCleared ? "#0d0618" : isFlashing ? (flash.correct ? "rgba(0,255,157,0.2)" : "rgba(255,56,96,0.2)") : isSelected ? "rgba(255,45,149,0.15)" : "#150a28",
-                border: `2px solid ${isCleared ? "#3d1f5c" : isSelected ? "#ff2d95" : "#3d1f5c"}`,
+                background: isCleared ? "#0d0618" : isFlashing ? (flash.correct ? "rgba(0,255,157,0.2)" : "rgba(255,56,96,0.2)") : isCurrent ? "rgba(255,45,149,0.15)" : "#150a28",
+                border: `2px solid ${isCleared ? "#3d1f5c" : isCurrent ? "#ff2d95" : "#3d1f5c"}`,
                 color: isCleared ? "#3d1f5c" : tile.inkHex,
                 opacity: isCleared ? 0.4 : 1,
                 fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
+                boxShadow: isCurrent ? "0 0 12px rgba(255,45,149,0.5)" : "none",
               }}
             >
               {isCleared ? "✓" : tile.word}
-            </button>
+            </div>
           );
         })}
       </div>
 
-      <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 8px" }}>
-        {selectedIdx == null ? "Tap a word above first." : "What color is it printed in?"}
-      </p>
+      <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 8px" }}>What color is the highlighted word printed in?</p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
         {COLORS.map((c) => (
           <button
             key={c.name}
             onClick={() => answerColor(c.name)}
-            disabled={selectedIdx == null}
             style={{
-              padding: "12px 8px", borderRadius: 8, cursor: selectedIdx == null ? "default" : "pointer",
+              padding: "12px 8px", borderRadius: 8, cursor: "pointer",
               background: `${c.hex}22`, border: `2px solid ${c.hex}`, color: c.hex,
               fontSize: 13, fontWeight: 900, fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
-              opacity: selectedIdx == null ? 0.4 : 1,
             }}
           >
             {c.name}
