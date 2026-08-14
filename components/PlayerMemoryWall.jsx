@@ -1,0 +1,96 @@
+import { colorFor } from "../lib/playerColors";
+
+// ─── Player Memory Wall ───
+// The classic reality-show "wall of houseguest photos, turned black-and-
+// white once someone's out" — same tile size/style as the interactive
+// MemoryWall.jsx used for actual votes (deliberately, so it visually
+// reads as the same wall, just non-interactive and showing EVERYONE, not
+// just this moment's candidates), but this one is a pure gallery: no
+// selection, no click handlers, alive and eliminated players alike.
+// players: full roster, already alias/avatar-resolved same as everywhere
+// else (see lib/avatarIdentity.js / lib/playerIdentity.js).
+export default function PlayerMemoryWall({ players }) {
+  const roster = [...(players || [])].sort((a, b) => {
+    if (a.alive !== b.alive) return a.alive ? -1 : 1; // alive players first
+    return (a.display_name || "").localeCompare(b.display_name || "");
+  });
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+      {roster.map((p) => {
+        const color = colorFor(players, p.id);
+        const avatarUrl = p.effectiveAvatarUrl;
+        const eliminated = !p.alive;
+        const grayscale = eliminated ? "grayscale(1) brightness(0.6)" : "none";
+
+        if (avatarUrl) {
+          return (
+            <div
+              key={p.id}
+              style={{
+                aspectRatio: "1", borderRadius: 14,
+                border: `4px solid ${eliminated ? "#3d1f5c" : color}`,
+                opacity: eliminated ? 0.75 : 1,
+                position: "relative", overflow: "hidden", background: "#0d0618",
+              }}
+            >
+              <img
+                src={avatarUrl} alt=""
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: grayscale }}
+              />
+              <div style={{
+                position: "absolute", left: 0, right: 0, bottom: 0,
+                background: "linear-gradient(to top, rgba(5,1,15,0.92), rgba(5,1,15,0.55) 60%, transparent)",
+                padding: "18px 8px 8px",
+              }}>
+                <span style={{
+                  display: "block", fontSize: 15, fontWeight: 900, color: eliminated ? "#6b4f99" : "#f5f0ff",
+                  textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center",
+                  textDecoration: eliminated ? "line-through" : "none",
+                  textShadow: "0 1px 3px rgba(0,0,0,0.8)",
+                }}>
+                  {p.display_name}
+                </span>
+              </div>
+              {eliminated && (
+                <div style={{
+                  position: "absolute", top: 6, right: 6, background: "rgba(5,1,15,0.85)",
+                  borderRadius: 6, padding: "2px 6px", fontSize: 9, color: "#a68fd6", fontWeight: 700,
+                }}>
+                  OUT
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        return (
+          <div
+            key={p.id}
+            style={{
+              aspectRatio: "1", borderRadius: 14,
+              background: "#0d0618",
+              border: `4px solid ${eliminated ? "#3d1f5c" : color}`,
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8,
+              opacity: eliminated ? 0.55 : 1,
+              padding: 8,
+            }}
+          >
+            <div style={{
+              width: 40, height: 40, borderRadius: "50%", background: color,
+              boxShadow: eliminated ? "none" : `0 0 14px ${color}cc`, border: "2px solid rgba(255,255,255,0.5)",
+              filter: grayscale,
+            }} />
+            <span style={{
+              fontSize: 15, fontWeight: 900, color: eliminated ? "#6b4f99" : "#f5f0ff",
+              textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center",
+              textDecoration: eliminated ? "line-through" : "none",
+            }}>
+              {p.display_name}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

@@ -17,6 +17,7 @@ import RoundTimerBanner from "./RoundTimerBanner";
 import HostAnnouncementBox from "./HostAnnouncementBox";
 import { postSystemAnnouncement } from "../lib/announcements";
 import PlayerViewer from "./PlayerViewer";
+import PlayerMemoryWall from "./PlayerMemoryWall";
 
 const BASE_TABS = [
   { key: "round", label: "🎲 Current Round" },
@@ -29,6 +30,7 @@ const BASE_TABS = [
 
 export default function HostPanels({ gameId, players, gameName, adminExtra }) {
   const [tab, setTab] = useState("round");
+  const [showMemoryWall, setShowMemoryWall] = useState(false);
   const [round, setRound] = useState(null);
   const [settings, setSettingsState] = useState(null);
   const [unreadConfessionals, setUnreadConfessionals] = useState(0);
@@ -137,6 +139,24 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
           ) : (
             <>
               <RoundTimerBanner round={round} />
+              <div style={{ marginBottom: 12 }}>
+                <button
+                  onClick={() => setShowMemoryWall(!showMemoryWall)}
+                  style={{
+                    background: showMemoryWall ? "rgba(255,45,149,0.13)" : "transparent",
+                    border: `1px solid ${showMemoryWall ? "#ff2d95" : "#3d1f5c"}`,
+                    color: showMemoryWall ? "#ff2d95" : "#a68fd6", fontSize: 12, cursor: "pointer",
+                    borderRadius: 20, padding: "6px 14px", fontWeight: 600,
+                  }}
+                >
+                  🖼 {showMemoryWall ? "Hide" : "Show"} memory wall
+                </button>
+                {showMemoryWall && (
+                  <div style={{ marginTop: 12 }}>
+                    <PlayerMemoryWall players={hostApprovedRoster} />
+                  </div>
+                )}
+              </div>
               <HostAnnouncementBox gameId={gameId} />
               {round.phase === PHASES.CHALLENGE && (
                 <ChallengeErrorBoundary label="Battle"><ChallengeHost gameId={gameId} players={hostApprovedRoster} round={round} settings={settings} /></ChallengeErrorBoundary>

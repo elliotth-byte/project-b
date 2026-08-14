@@ -119,8 +119,11 @@ export default function MetronomePlayer({ gameId, round, challenge, player }) {
     return (
       <Card style={{ marginBottom: 20, textAlign: "center" }}>
         <h3 style={{ color: "#ff2d95", margin: "0 0 8px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🥁 Metronome</h3>
-        <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 14px" }}>
+        <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 10px" }}>
           You'll hear an odd little rhythm 3 times. Then you tap it back — closer to on-rhythm wins.
+        </p>
+        <p style={{ color: "#ff3860", fontSize: 12, fontWeight: 700, margin: "0 0 14px" }}>
+          🔊 This uses sound — if your phone is in silent mode, you won't hear it.
         </p>
         <button onClick={start} style={{
           padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 700,

@@ -15,7 +15,8 @@ const PADS = [
 ];
 const FLASH_MS = 400;
 const GAP_MS = 200;
-const MAX_ROUND_MS_FLOOR = 350; // playback never gets faster than this, however long the sequence gets
+const FLASH_RATIO = FLASH_MS / (FLASH_MS + GAP_MS); // kept constant as the pace speeds up, so flash duration always stays a fixed fraction of the step — see the note in playbackSequence for why that matters
+const MIN_STEP_MS = 220; // playback never gets faster than this, however long the sequence gets — stays comfortably tappable even at its fastest
 
 function playTone(freq, durationMs) {
   try {
@@ -62,13 +63,24 @@ export default function SimonPlayer({ gameId, round, challenge, player }) {
 
   const playbackSequence = useCallback((seq) => {
     clearTimeouts();
-    const stepMs = Math.max(MAX_ROUND_MS_FLOOR, FLASH_MS + GAP_MS - seq.length * 15);
+    // Speeds up noticeably as the sequence grows — down to 40% of the
+    // starting pace by round ~13, then holds there. flashMs is always
+    // derived as a fixed FRACTION of stepMs (not shrunk independently),
+    // which is what guarantees flashMs < stepMs at every speed: the old
+    // version used a fixed 400ms flash even as the step shrank past it,
+    // so at higher rounds a pad's "turn off" timer could fire AFTER the
+    // next pad had already started lighting up — turning that next
+    // flash off early, since it just blanks activePad unconditionally
+    // rather than checking which pad it was for.
+    const speedFactor = Math.max(0.4, 1 - (seq.length - 1) * 0.045);
+    const stepMs = Math.max(MIN_STEP_MS, Math.round((FLASH_MS + GAP_MS) * speedFactor));
+    const flashMs = Math.round(stepMs * FLASH_RATIO);
     seq.forEach((padIdx, i) => {
       const t1 = window.setTimeout(() => {
         setActivePad(padIdx);
-        playTone(PADS[padIdx].freq, FLASH_MS);
+        playTone(PADS[padIdx].freq, flashMs);
       }, i * stepMs);
-      const t2 = window.setTimeout(() => setActivePad(null), i * stepMs + FLASH_MS);
+      const t2 = window.setTimeout(() => setActivePad(null), i * stepMs + flashMs);
       timeoutsRef.current.push(t1, t2);
     });
     const doneT = window.setTimeout(() => setPhase("input"), seq.length * stepMs + 200);
@@ -121,7 +133,10 @@ export default function SimonPlayer({ gameId, round, challenge, player }) {
     return (
       <Card style={{ marginBottom: 20, textAlign: "center" }}>
         <h3 style={{ color: "#ff2d95", margin: "0 0 8px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🔴 Simon</h3>
-        <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 14px" }}>Watch the sequence, then repeat it. Each round adds one more step — how far can you go?</p>
+        <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 10px" }}>Watch the sequence, then repeat it. Each round adds one more step — how far can you go?</p>
+        <p style={{ color: "#ff3860", fontSize: 12, fontWeight: 700, margin: "0 0 14px" }}>
+          🔊 This uses sound — if your phone is in silent mode, you won't hear it.
+        </p>
         <button onClick={startGame} style={{
           padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 700,
           background: "linear-gradient(135deg, #ff2d95, #b829ff)", border: "none", color: "#05010f",

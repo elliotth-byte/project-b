@@ -15,6 +15,7 @@ import MusicPlayer from "../components/MusicPlayer";
 import HelpPanel from "../components/HelpPanel";
 import ChatPanel from "../components/ChatPanel";
 import PlayerAvatarUpload from "../components/PlayerAvatarUpload";
+import PlayerMemoryWall from "../components/PlayerMemoryWall";
 import RoundRevealGate from "../components/RoundRevealGate";
 import HomeLink from "../components/HomeLink";
 import LogoutButton from "../components/LogoutButton";
@@ -48,6 +49,7 @@ export default function PlayPage() {
   const [joinError, setJoinError] = useState("");
   const [round, setRound] = useState(null);
   const [tab, setTab] = useState("game");
+  const [showMemoryWall, setShowMemoryWall] = useState(false);
   const [gameInfo, setGameInfo] = useState(null);
   const [quitBusy, setQuitBusy] = useState(false);
   const [exileHistory, setExileHistory] = useState([]);
@@ -373,6 +375,24 @@ export default function PlayPage() {
                   />
                 )}
                 <div style={{ marginBottom: 16 }}><RoundTimerBanner round={round} /></div>
+                <div style={{ marginBottom: 16 }}>
+                  <button
+                    onClick={() => setShowMemoryWall(!showMemoryWall)}
+                    style={{
+                      background: showMemoryWall ? "rgba(255,45,149,0.13)" : "transparent",
+                      border: `1px solid ${showMemoryWall ? "#ff2d95" : "#3d1f5c"}`,
+                      color: showMemoryWall ? "#ff2d95" : "#a68fd6", fontSize: 12, cursor: "pointer",
+                      borderRadius: 20, padding: "6px 14px", fontWeight: 600,
+                    }}
+                  >
+                    🖼 {showMemoryWall ? "Hide" : "Show"} memory wall
+                  </button>
+                  {showMemoryWall && (
+                    <div style={{ marginTop: 12 }}>
+                      <PlayerMemoryWall players={identityAllPlayers.filter((p) => p.approved)} />
+                    </div>
+                  )}
+                </div>
                 {(!round || round.phase === PHASES.LOBBY) && (
                   <Card style={{ marginBottom: 20, textAlign: "center" }}>
                     <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: 0 }}>
