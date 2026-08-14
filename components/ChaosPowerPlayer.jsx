@@ -18,13 +18,14 @@ import MemoryWall from "./MemoryWall";
 // button. Whoever hits the right one becomes this round's holder —
 // publicly, same as before. Second, once someone's won it, THEY get the
 // familiar nullify-picker below (unchanged from before this rework).
-export default function ChaosPowerPlayer({ gameId, round, player, players, readOnly = false }) {
+export default function ChaosPowerPlayer({ gameId, round, player, players, readOnly = false, settings }) {
   const isExile = round?.phase === "exile";
   const isFinale = round?.phase === "finale";
   const key = isExile ? KEY_EXILE : isFinale ? KEY_FINALE : null;
   const votesKey = isExile ? `pb:exile-votes:${round.round}` : isFinale ? "pb:finale-votes" : null;
   const context = isExile ? exileContext(round?.round) : isFinale ? FINALE_CONTEXT : null;
   const drawContext = isExile ? exileDrawContext(round?.round) : isFinale ? FINALE_DRAW_CONTEXT : null;
+  const hideAvatarNameLabels = settings?.avatarMode === "collection" && settings?.avatarCollectionId === "default-gods";
 
   const [state, setState] = useState(null);
   const [votes, setVotes] = useState({});
@@ -257,7 +258,7 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
       {needsTieBreak ? (
         <div>
           <p style={{ color: "#ff3860", fontSize: 13, fontWeight: 700, textAlign: "center", margin: "0 0 10px" }}>🃏 It's tied — you have to break it.</p>
-          <MemoryWall candidates={tied.map((id) => ({ playerId: id, name: byId[id] }))} players={players} selectedId={state.tieBreakChoiceId} onSelect={breakTie} />
+          <MemoryWall candidates={tied.map((id) => ({ playerId: id, name: byId[id] }))} players={players} selectedId={state.tieBreakChoiceId} onSelect={breakTie} hideNameLabels={hideAvatarNameLabels} />
         </div>
       ) : state.tieBreakChoiceId ? (
         <p style={{ color: "#00ff9d", fontSize: 13, textAlign: "center", margin: 0 }}>✓ Tie broken — {byId[state.tieBreakChoiceId]}.</p>
@@ -285,13 +286,13 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
           </Card>
           {state.votingOpen && (
             <div style={{ marginTop: 12 }}>
-              <MemoryWall candidates={candidates} players={players} selectedId={myPickId} onSelect={changePick} />
+              <MemoryWall candidates={candidates} players={players} selectedId={myPickId} onSelect={changePick} hideNameLabels={hideAvatarNameLabels} />
             </div>
           )}
         </div>
       ) : (
         <div>
-          <MemoryWall candidates={candidates} players={players} selectedId={pendingPick} onSelect={setPendingPick} />
+          <MemoryWall candidates={candidates} players={players} selectedId={pendingPick} onSelect={setPendingPick} hideNameLabels={hideAvatarNameLabels} />
           {pendingPick && (
             <Card style={{ marginTop: 12, textAlign: "left" }}>
               <label style={{ display: "block", fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>

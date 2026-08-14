@@ -153,7 +153,7 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
                 </button>
                 {showMemoryWall && (
                   <div style={{ marginTop: 12 }}>
-                    <PlayerMemoryWall players={hostApprovedRoster} />
+                    <PlayerMemoryWall players={hostApprovedRoster} hideNameLabels={settings?.avatarMode === "collection" && settings?.avatarCollectionId === "default-gods"} />
                   </div>
                 )}
               </div>

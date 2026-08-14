@@ -8,7 +8,7 @@ import FinaleQaPanel from "./FinaleQaPanel";
 
 const VOTES_KEY = "pb:finale-votes";
 
-export default function FinalePlayer({ gameId, player, round, players, readOnly = false }) {
+export default function FinalePlayer({ gameId, player, round, players, readOnly = false, settings }) {
   const [finale, setFinale] = useState(null);
   const [qa, setQa] = useState({ statements: {}, questions: [] });
   const [choice, setChoice] = useState("");
@@ -123,7 +123,7 @@ export default function FinalePlayer({ gameId, player, round, players, readOnly 
           {chaosBanner}
         </div>
         <Card style={{ marginBottom: 14 }}>
-          <MemoryWall candidates={finale.finalists} players={players} selectedId={choice} onSelect={setChoice} />
+          <MemoryWall candidates={finale.finalists} players={players} selectedId={choice} onSelect={setChoice} hideNameLabels={settings?.avatarMode === "collection" && settings?.avatarCollectionId === "default-gods"} />
         </Card>
         <Card style={{ marginBottom: 18 }}>
           <label style={{ display: "block", fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>

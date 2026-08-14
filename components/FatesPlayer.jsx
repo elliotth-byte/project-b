@@ -39,7 +39,7 @@ function NominatorStatusList({ nominatorOrder, nominations, nominationReasons, b
   );
 }
 
-export default function FatesPlayer({ gameId, player, players, round, readOnly = false }) {
+export default function FatesPlayer({ gameId, player, players, round, readOnly = false, settings }) {
   const [fates, setFates] = useState(null);
   const [challenge, setChallenge] = useState(null);
   const [choice, setChoice] = useState("");
@@ -147,6 +147,7 @@ export default function FatesPlayer({ gameId, player, players, round, readOnly =
           players={players}
           selectedId={choice}
           onSelect={setChoice}
+          hideNameLabels={settings?.avatarMode === "collection" && settings?.avatarCollectionId === "default-gods"}
           disabledIds={others.filter((p) => !isValidNomination(player.id, p.id, winnerId, taken).ok).map((p) => p.id)}
         />
       </Card>

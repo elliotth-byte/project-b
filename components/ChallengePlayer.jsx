@@ -28,6 +28,7 @@ import MasqueradePlayer from "./games/MasqueradePlayer";
 import CloseToTwentyPlayer from "./games/CloseToTwentyPlayer";
 import SnakePlayer from "./games/SnakePlayer";
 import MinesweeperPlayer from "./games/MinesweeperPlayer";
+import StroopPlayer from "./games/StroopPlayer";
 import GameResultCard from "./games/GameResultCard";
 
 const GAME_COMPONENTS = {
@@ -53,6 +54,7 @@ const GAME_COMPONENTS = {
   closeto20: CloseToTwentyPlayer,
   snake: SnakePlayer,
   minesweeper: MinesweeperPlayer,
+  stroop: StroopPlayer,
 };
 
 export default function ChallengePlayer({ gameId, player, players, round, readOnly = false }) {

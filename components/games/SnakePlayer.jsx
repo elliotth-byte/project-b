@@ -4,6 +4,7 @@ import GameResultCard from "./GameResultCard";
 import { useCountdown } from "./useCountdown";
 import { useSwipeControls } from "../../lib/games/useSwipeControls";
 import { reportScore } from "../../lib/challengeScores";
+import DPad from "./DPad";
 
 const COLS = 16, ROWS = 16, CELL = 18;
 const W = COLS * CELL, H = ROWS * CELL;
@@ -150,11 +151,8 @@ export default function SnakePlayer({ gameId, round, challenge, player }) {
         onTouchStart={swipeHandlers.onTouchStart} onTouchEnd={swipeHandlers.onTouchEnd}
         style={{ width: "100%", maxWidth: W, height: "auto", background: "#0d0618", borderRadius: 10, border: "1px solid #3d1f5c", touchAction: swipeEnabled ? "none" : "auto", display: "block", margin: "0 auto" }}
       />
-      <div style={{ display: "grid", gridTemplateColumns: "44px 44px 44px", gridTemplateRows: "40px 40px", gap: 4, margin: "10px auto 0", width: "fit-content" }}>
-        <div /><button onClick={() => setDirection(0, -1)} style={arrowStyle}>↑</button><div />
-        <button onClick={() => setDirection(-1, 0)} style={arrowStyle}>←</button>
-        <button onClick={() => setDirection(0, 1)} style={arrowStyle}>↓</button>
-        <button onClick={() => setDirection(1, 0)} style={arrowStyle}>→</button>
+      <div style={{ marginTop: 10 }}>
+        <DPad onUp={() => setDirection(0, -1)} onDown={() => setDirection(0, 1)} onLeft={() => setDirection(-1, 0)} onRight={() => setDirection(1, 0)} />
       </div>
       <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 8, fontStyle: "italic" }}>
         Arrow keys work too.{swipeEnabled && " Or swipe on the board."}
@@ -162,5 +160,3 @@ export default function SnakePlayer({ gameId, round, challenge, player }) {
     </Card>
   );
 }
-
-const arrowStyle = { width: 44, height: 40, borderRadius: 8, background: "#0d0618", border: "1px solid #3d1f5c", color: "#f5f0ff", fontSize: 16, cursor: "pointer" };

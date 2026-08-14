@@ -438,7 +438,7 @@ export default function PlayPage() {
                   </button>
                   {showMemoryWall && (
                     <div style={{ marginTop: 12 }}>
-                      <PlayerMemoryWall players={identityAllPlayers.filter((p) => p.approved)} />
+                      <PlayerMemoryWall players={identityAllPlayers.filter((p) => p.approved)} hideNameLabels={settings?.avatarMode === "collection" && settings?.avatarCollectionId === "default-gods"} />
                     </div>
                   )}
                 </div>
@@ -453,18 +453,18 @@ export default function PlayPage() {
                   <ChallengeErrorBoundary label="Battle"><ChallengePlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} /></ChallengeErrorBoundary>
                 )}
                 {round?.phase === PHASES.FATES && (
-                  <ChallengeErrorBoundary label="Fates Ceremony"><FatesPlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} /></ChallengeErrorBoundary>
+                  <ChallengeErrorBoundary label="Fates Ceremony"><FatesPlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} settings={settings} /></ChallengeErrorBoundary>
                 )}
                 {round?.phase === PHASES.EXILE && !exiled && (
                   <ChallengeErrorBoundary label="Exile Vote">
-                    <ChaosPowerPlayer gameId={gameId} round={round} player={player} players={identityAllPlayers} />
-                    <ExileVotePlayer gameId={gameId} player={player} round={round} players={identityAllPlayers} />
+                    <ChaosPowerPlayer gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
+                    <ExileVotePlayer gameId={gameId} player={player} round={round} players={identityAllPlayers} settings={settings} />
                   </ChallengeErrorBoundary>
                 )}
                 {round?.phase === PHASES.FINALE && (
                   <ChallengeErrorBoundary label="Finale">
-                    <ChaosPowerPlayer gameId={gameId} round={round} player={player} players={identityAllPlayers} />
-                    <FinalePlayer gameId={gameId} player={player} round={round} players={identityAllPlayers} />
+                    <ChaosPowerPlayer gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
+                    <FinalePlayer gameId={gameId} player={player} round={round} players={identityAllPlayers} settings={settings} />
                   </ChallengeErrorBoundary>
                 )}
               </>

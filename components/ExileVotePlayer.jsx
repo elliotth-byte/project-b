@@ -56,7 +56,7 @@ function NominationsRecap({ nominatorOrder, nominations, nominationReasons, byId
   );
 }
 
-export default function ExileVotePlayer({ gameId, player, round, players, readOnly = false }) {
+export default function ExileVotePlayer({ gameId, player, round, players, readOnly = false, settings }) {
   const [exile, setExile] = useState(null);
   const [choice, setChoice] = useState("");
   const [reason, setReason] = useState("");
@@ -208,7 +208,7 @@ export default function ExileVotePlayer({ gameId, player, round, players, readOn
       <Card style={{ marginBottom: 14 }}>
         {/* Nominees never include the voter themselves — a player can't
             vote to eliminate/save themselves. */}
-        <MemoryWall candidates={exile.nominees.filter((n) => n.playerId !== player?.id)} players={players} selectedId={choice} onSelect={setChoice} />
+        <MemoryWall candidates={exile.nominees.filter((n) => n.playerId !== player?.id)} players={players} selectedId={choice} onSelect={setChoice} hideNameLabels={settings?.avatarMode === "collection" && settings?.avatarCollectionId === "default-gods"} />
       </Card>
       <Card style={{ marginBottom: 18 }}>
         <label style={{ display: "block", fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>

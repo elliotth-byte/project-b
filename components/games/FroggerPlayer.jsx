@@ -4,6 +4,7 @@ import GameResultCard from "./GameResultCard";
 import { useCountdown } from "./useCountdown";
 import { reportScore } from "../../lib/challengeScores";
 import { useSwipeControls } from "../../lib/games/useSwipeControls";
+import DPad from "./DPad";
 
 // 9-wide grid so 5 home slots can sit with real gaps between them, the
 // way the original arcade game's 5 lily pads work — landing in a gap (or
@@ -246,12 +247,7 @@ export default function FroggerPlayer({ gameId, round, challenge, player }) {
         onTouchStart={swipeHandlers.onTouchStart} onTouchEnd={swipeHandlers.onTouchEnd}
         style={{ background: "#0d0618", borderRadius: 10, border: "1px solid #3d1f5c", touchAction: swipeEnabled ? "none" : "auto" }}
       />
-      <div style={{ display: "grid", gridTemplateColumns: "44px 44px 44px", gridTemplateRows: "40px 40px", gap: 4, margin: "10px auto 0", width: "fit-content" }}>
-        <div /><button onClick={() => move(0, -1)} style={arrowStyle}>↑</button><div />
-        <button onClick={() => move(-1, 0)} style={arrowStyle}>←</button>
-        <button onClick={() => move(0, 1)} style={arrowStyle}>↓</button>
-        <button onClick={() => move(1, 0)} style={arrowStyle}>→</button>
-      </div>
+      <DPad onUp={() => move(0, -1)} onDown={() => move(0, 1)} onLeft={() => move(-1, 0)} onRight={() => move(1, 0)} />
       <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 8, fontStyle: "italic" }}>
         Arrow keys work too.{swipeEnabled && " Or swipe on the board."}
       </p>
@@ -259,4 +255,3 @@ export default function FroggerPlayer({ gameId, round, challenge, player }) {
   );
 }
 
-const arrowStyle = { width: 44, height: 40, borderRadius: 8, background: "#0d0618", border: "1px solid #3d1f5c", color: "#f5f0ff", fontSize: 16, cursor: "pointer" };

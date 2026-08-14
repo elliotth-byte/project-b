@@ -9,7 +9,12 @@ import { colorFor } from "../lib/playerColors";
 // selection, no click handlers, alive and eliminated players alike.
 // players: full roster, already alias/avatar-resolved same as everywhere
 // else (see lib/avatarIdentity.js / lib/playerIdentity.js).
-export default function PlayerMemoryWall({ players }) {
+// hideNameLabels: see MemoryWall.jsx's matching prop — suppresses the
+// overlaid name only on avatar tiles (the Default Gods collection has
+// each name baked into the portrait itself), never on the color-swatch
+// fallback, and never the "OUT" badge, which is separate information
+// the photo doesn't carry.
+export default function PlayerMemoryWall({ players, hideNameLabels = false }) {
   const roster = [...(players || [])].sort((a, b) => {
     if (a.alive !== b.alive) return a.alive ? -1 : 1; // alive players first
     return (a.display_name || "").localeCompare(b.display_name || "");
@@ -38,20 +43,22 @@ export default function PlayerMemoryWall({ players }) {
                 src={avatarUrl} alt=""
                 style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: grayscale }}
               />
-              <div style={{
-                position: "absolute", left: 0, right: 0, bottom: 0,
-                background: "linear-gradient(to top, rgba(5,1,15,0.92), rgba(5,1,15,0.55) 60%, transparent)",
-                padding: "18px 8px 8px",
-              }}>
-                <span style={{
-                  display: "block", fontSize: 15, fontWeight: 900, color: eliminated ? "#6b4f99" : "#f5f0ff",
-                  textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center",
-                  textDecoration: eliminated ? "line-through" : "none",
-                  textShadow: "0 1px 3px rgba(0,0,0,0.8)",
+              {!hideNameLabels && (
+                <div style={{
+                  position: "absolute", left: 0, right: 0, bottom: 0,
+                  background: "linear-gradient(to top, rgba(5,1,15,0.92), rgba(5,1,15,0.55) 60%, transparent)",
+                  padding: "18px 8px 8px",
                 }}>
-                  {p.display_name}
-                </span>
-              </div>
+                  <span style={{
+                    display: "block", fontSize: 15, fontWeight: 900, color: eliminated ? "#6b4f99" : "#f5f0ff",
+                    textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center",
+                    textDecoration: eliminated ? "line-through" : "none",
+                    textShadow: "0 1px 3px rgba(0,0,0,0.8)",
+                  }}>
+                    {p.display_name}
+                  </span>
+                </div>
+              )}
               {eliminated && (
                 <div style={{
                   position: "absolute", top: 6, right: 6, background: "rgba(5,1,15,0.85)",

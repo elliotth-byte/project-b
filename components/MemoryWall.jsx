@@ -8,8 +8,15 @@ import { colorFor } from "../lib/playerColors";
 // artwork actually reads at this size. Falls back to the original
 // centered color-swatch-plus-name layout when there's no avatar.
 // candidates: [{ playerId, name }]. players: full roster (for color/
-// avatar lookup).
-export default function MemoryWall({ candidates, players, selectedId, onSelect, disabledIds = [] }) {
+// avatar lookup). hideNameLabels: true when the season's avatar
+// collection already has each character's name baked into the image
+// itself (the Default Gods set specifically — see the name banner on
+// each portrait), so overlaying our own label on top would just be
+// showing the same name twice. Only suppresses the label on tiles that
+// actually have an avatar photo — the color-swatch fallback (no avatar
+// set for that player) always keeps its label regardless, since there's
+// nothing else identifying who it is.
+export default function MemoryWall({ candidates, players, selectedId, onSelect, disabledIds = [], hideNameLabels = false }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
       {candidates.map((c) => {
@@ -37,19 +44,21 @@ export default function MemoryWall({ candidates, players, selectedId, onSelect, 
                 src={avatarUrl} alt=""
                 style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
               />
-              <div style={{
-                position: "absolute", left: 0, right: 0, bottom: 0,
-                background: "linear-gradient(to top, rgba(5,1,15,0.92), rgba(5,1,15,0.55) 60%, transparent)",
-                padding: "18px 8px 8px",
-              }}>
-                <span style={{
-                  display: "block", fontSize: 15, fontWeight: 900, color: selected ? color : "#f5f0ff",
-                  textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center",
-                  textShadow: selected ? `0 0 10px ${color}` : "0 1px 3px rgba(0,0,0,0.8)",
+              {!hideNameLabels && (
+                <div style={{
+                  position: "absolute", left: 0, right: 0, bottom: 0,
+                  background: "linear-gradient(to top, rgba(5,1,15,0.92), rgba(5,1,15,0.55) 60%, transparent)",
+                  padding: "18px 8px 8px",
                 }}>
-                  {c.name}
-                </span>
-              </div>
+                  <span style={{
+                    display: "block", fontSize: 15, fontWeight: 900, color: selected ? color : "#f5f0ff",
+                    textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center",
+                    textShadow: selected ? `0 0 10px ${color}` : "0 1px 3px rgba(0,0,0,0.8)",
+                  }}>
+                    {c.name}
+                  </span>
+                </div>
+              )}
             </button>
           );
         }

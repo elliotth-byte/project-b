@@ -5,6 +5,7 @@ import { reportScore } from "../../lib/challengeScores";
 import { usePersistedStart } from "./usePersistedStart";
 import { generateMazeWithGems } from "../../lib/games/mazeGemsData";
 import { useSwipeControls } from "../../lib/games/useSwipeControls";
+import DPad from "./DPad";
 
 const DEFAULT_SIZE = 15;
 const WALL_BUMP_PENALTY_MS = 1500;
@@ -177,17 +178,10 @@ export default function MazeInvisiblePlayer({ gameId, round, challenge, player }
         }))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "44px 44px 44px", gridTemplateRows: "44px 44px 44px", gap: 4, margin: "0 auto", width: "fit-content", opacity: mode === "move" ? 1 : 0.35 }}>
-        <div />
-        <button onClick={() => move(-1, 0)} disabled={mode !== "move"} style={arrowStyle}>↑</button>
-        <div />
-        <button onClick={() => move(0, -1)} disabled={mode !== "move"} style={arrowStyle}>←</button>
-        <div />
-        <button onClick={() => move(0, 1)} disabled={mode !== "move"} style={arrowStyle}>→</button>
-        <div />
-        <button onClick={() => move(1, 0)} disabled={mode !== "move"} style={arrowStyle}>↓</button>
-        <div />
-      </div>
+      <DPad
+        onUp={() => move(-1, 0)} onDown={() => move(1, 0)} onLeft={() => move(0, -1)} onRight={() => move(0, 1)}
+        disabled={mode !== "move"} opacity={mode === "move" ? 1 : 0.35}
+      />
       <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 8, fontStyle: "italic" }}>
         Arrow keys work in Move mode too.{swipeEnabled && " Or swipe on the board."}
       </p>
@@ -195,10 +189,6 @@ export default function MazeInvisiblePlayer({ gameId, round, challenge, player }
   );
 }
 
-const arrowStyle = {
-  width: 44, height: 44, borderRadius: 8, background: "#0d0618", border: "1px solid #3d1f5c",
-  color: "#f5f0ff", fontSize: 18, cursor: "pointer",
-};
 const toggleStyle = {
   padding: "6px 16px", borderRadius: 20, background: "#0d0618", border: "1px solid #3d1f5c",
   color: "#a68fd6", fontSize: 12, fontWeight: 700, cursor: "pointer",
