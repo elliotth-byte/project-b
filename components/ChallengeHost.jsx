@@ -429,7 +429,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
       {!isDigital && !complete && <p style={{ color: "#6b4f99", fontSize: 11, fontStyle: "italic", margin: "0 0 12px" }}>Every competitor needs a distinct place (1, 2, 3, ...) before this can finish.</p>}
 
       <CopyMessage icon={registryEntry?.icon || "⚔️"} label="Battle Announcement"
-        text={`${registryEntry?.icon || "⚔️"} ${registryEntry?.label} underway! ${participants.length} competing. 1st place wins immunity${round.finalFour ? " — this is the FINAL FOUR, everyone else is automatically nominated." : "."}`} />
+        text={`From Achilles to Odysseus, legends are forged on the battlefield. Today, you go to battle. Will you become a legend in your own right?\n\n${registryEntry?.icon || "⚔️"} ${registryEntry?.label} underway! ${participants.length} competing. 1st place wins immunity${round.finalFour ? " — this is the FINAL FOUR, everyone else is automatically nominated." : "."}`} />
     </Card>
   );
 }

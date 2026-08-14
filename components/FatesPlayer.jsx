@@ -114,13 +114,13 @@ export default function FatesPlayer({ gameId, player, players, round, readOnly =
   }
 
   const submit = async () => {
-    if (!choice) return;
+    if (!choice || !reason.trim()) return;
     await storageUpdate(gameId, KEY_FATES, (fresh) => {
       if (!fresh) return null;
       const stillTaken = takenNomineeIds(fresh.nominations, player.id);
       if (stillTaken.has(choice)) return fresh; // someone else grabbed it first — abort, let the UI re-render disabled
       fresh.nominations = { ...(fresh.nominations || {}), [player.id]: choice };
-      fresh.nominationReasons = { ...(fresh.nominationReasons || {}), [player.id]: reason.trim() || null };
+      fresh.nominationReasons = { ...(fresh.nominationReasons || {}), [player.id]: reason.trim() };
       return fresh;
     });
   };
@@ -152,7 +152,7 @@ export default function FatesPlayer({ gameId, player, players, round, readOnly =
       </Card>
       <Card style={{ marginBottom: 16 }}>
         <label style={{ display: "block", fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
-          Why? (optional)
+          Why? (required)
         </label>
         <textarea
           value={reason}
@@ -163,10 +163,10 @@ export default function FatesPlayer({ gameId, player, players, round, readOnly =
           style={{ width: "100%", background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "10px 12px", color: "#f5f0ff", fontSize: 13, fontFamily: "'Orbitron', 'Segoe UI', sans-serif", resize: "vertical", boxSizing: "border-box" }}
         />
       </Card>
-      <button onClick={submit} disabled={!choice} style={{
-        width: "100%", background: choice ? "linear-gradient(135deg, #ff2d95, #b829ff)" : "#3d1f5c",
-        color: choice ? "#05010f" : "#6b4f99", border: "none", borderRadius: 10, padding: "14px 24px",
-        fontSize: 16, fontWeight: 700, cursor: choice ? "pointer" : "not-allowed",
+      <button onClick={submit} disabled={!choice || !reason.trim()} style={{
+        width: "100%", background: (choice && reason.trim()) ? "linear-gradient(135deg, #ff2d95, #b829ff)" : "#3d1f5c",
+        color: (choice && reason.trim()) ? "#05010f" : "#6b4f99", border: "none", borderRadius: 10, padding: "14px 24px",
+        fontSize: 16, fontWeight: 700, cursor: (choice && reason.trim()) ? "pointer" : "not-allowed",
         fontFamily: "'Orbitron', 'Segoe UI', sans-serif", letterSpacing: 0.5,
       }}>Submit Nomination</button>
     </div>

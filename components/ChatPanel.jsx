@@ -6,6 +6,8 @@ import {
   markThreadRead, fetchThreadReads, subscribeThreadReads, fetchLatestMessageTimestamps, subscribeAnyThreadActivity,
 } from "../lib/chatData";
 
+import { colorFor } from "../lib/playerColors";
+
 function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
@@ -14,7 +16,7 @@ function UnreadDot() {
   return <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: "#ff3860", marginLeft: 5 }} />;
 }
 
-function MessageBubble({ mine, name, avatarUrl, body, time }) {
+function MessageBubble({ mine, name, nameColor, avatarUrl, body, time }) {
   return (
     <div style={{ display: "flex", flexDirection: mine ? "row-reverse" : "row", alignItems: "flex-end", gap: 6, marginBottom: 8 }}>
       {!mine && (
@@ -25,10 +27,10 @@ function MessageBubble({ mine, name, avatarUrl, body, time }) {
         )
       )}
       <div style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start", maxWidth: "78%" }}>
-        {!mine && <div style={{ fontSize: 10, color: "#a68fd6", marginBottom: 2, marginLeft: 4 }}>{name}</div>}
+        {!mine && <div style={{ fontSize: 10, color: nameColor || "#a68fd6", fontWeight: 700, marginBottom: 2, marginLeft: 4 }}>{name}</div>}
         <div style={{
           background: mine ? "linear-gradient(135deg, #ff2d95, #b829ff)" : "#0d0618",
-          border: mine ? "none" : "1px solid #3d1f5c", color: mine ? "#05010f" : "#f5f0ff",
+          border: mine ? "none" : `1px solid ${nameColor ? nameColor + "55" : "#3d1f5c"}`, color: mine ? "#05010f" : "#f5f0ff",
           borderRadius: 14, padding: "8px 12px", fontSize: 13, wordBreak: "break-word",
         }}>
           {body}
@@ -99,7 +101,7 @@ function GroupChatView({ gameId, player, players, realName, onRead }) {
 
   const rows = messages.map((m) => ({
     id: m.id,
-    node: <MessageBubble mine={m.senderId === player.id} name={m.senderName} avatarUrl={(players || []).find((p) => p.id === m.senderId)?.effectiveAvatarUrl} body={m.body} time={m.createdAt} />,
+    node: <MessageBubble mine={m.senderId === player.id} name={m.senderName} nameColor={colorFor(players, m.senderId)} avatarUrl={(players || []).find((p) => p.id === m.senderId)?.effectiveAvatarUrl} body={m.body} time={m.createdAt} />,
   }));
 
   return (
@@ -134,7 +136,7 @@ function ThreadView({ thread, player, players, byId, onBack, onRead }) {
 
   const rows = messages.map((m) => ({
     id: m.id,
-    node: <MessageBubble mine={m.sender_id === player.id} name={byId[m.sender_id] || "?"} avatarUrl={(players || []).find((p) => p.id === m.sender_id)?.effectiveAvatarUrl} body={m.body} time={m.created_at} />,
+    node: <MessageBubble mine={m.sender_id === player.id} name={byId[m.sender_id] || "?"} nameColor={colorFor(players, m.sender_id)} avatarUrl={(players || []).find((p) => p.id === m.sender_id)?.effectiveAvatarUrl} body={m.body} time={m.created_at} />,
   }));
 
   return (
@@ -372,7 +374,7 @@ export default function ChatPanel({ gameId, player, players, realName, isExiled 
   // chat / be able to DM players out of the game" means Group is gone,
   // not just de-emphasized.
   const tabs = [
-    ...(isExiled ? [] : [{ key: "group", label: "💬 Group", unread: groupUnread }]),
+    ...(isExiled ? [] : [{ key: "group", label: "💬 Panopticon", unread: groupUnread }]),
     ...(isExiled ? [{ key: "exile", label: "🔥 Exile" }] : []),
     { key: "messages", label: "✉️ Messages", unread: anyThreadUnread },
   ];

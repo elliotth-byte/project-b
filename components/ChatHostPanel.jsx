@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Card, Btn } from "./ui";
 import { subscribeGroupChat, sendGroupMessage, fetchAllThreads, fetchThreadMessages, subscribeAnyThreadActivity } from "../lib/chatData";
+import { colorFor } from "../lib/playerColors";
 
 function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -61,7 +62,7 @@ export default function ChatHostPanel({ gameId, players }) {
   return (
     <Card>
       <div style={{ display: "flex", gap: 4, marginBottom: 12, borderBottom: "1px solid #3d1f5c" }}>
-        {[{ key: "group", label: "💬 Group Chat" }, { key: "dm", label: `✉️ Threads (${threads.length})` }].map((t) => (
+        {[{ key: "group", label: "💬 Panopticon" }, { key: "dm", label: `✉️ Threads (${threads.length})` }].map((t) => (
           <button key={t.key} onClick={() => { setMode(t.key); setOpenThreadId(null); }} style={{
             background: mode === t.key ? "rgba(255,45,149,0.13)" : "transparent",
             color: mode === t.key ? "#ff2d95" : "#a68fd6",
@@ -80,7 +81,7 @@ export default function ChatHostPanel({ gameId, players }) {
             {messages.length === 0 && <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No messages yet.</p>}
             {messages.map((m) => (
               <div key={m.id} style={{ marginBottom: 8, fontSize: 12 }}>
-                <span style={{ color: m.senderId === "host" ? "#ff2d95" : "#f5f0ff", fontWeight: 700 }}>
+                <span style={{ color: m.senderId === "host" ? "#ff2d95" : colorFor(players, m.senderId), fontWeight: 700 }}>
                   {m.senderRealName && m.senderRealName !== m.senderName ? `${m.senderRealName} (${m.senderName})` : m.senderRealName || m.senderName}
                 </span>
                 <span style={{ color: "#6b4f99", fontSize: 10, marginLeft: 6 }}>{fmtTime(m.createdAt)}</span>
@@ -108,7 +109,7 @@ export default function ChatHostPanel({ gameId, players }) {
             {threadMessages.length === 0 && <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No messages in this thread yet.</p>}
             {threadMessages.map((m) => (
               <div key={m.id} style={{ marginBottom: 8, fontSize: 12 }}>
-                <span style={{ color: "#f5f0ff", fontWeight: 700 }}>{byId[m.sender_id] || "?"}</span>
+                <span style={{ color: colorFor(players, m.sender_id), fontWeight: 700 }}>{byId[m.sender_id] || "?"}</span>
                 <span style={{ color: "#6b4f99", fontSize: 10, marginLeft: 6 }}>{fmtTime(m.created_at)}</span>
                 <div style={{ color: "#a68fd6" }}>{m.body}</div>
               </div>

@@ -105,11 +105,11 @@ export default function FinalePlayer({ gameId, player, round, players, readOnly 
     );
   } else {
     const submit = async () => {
-      if (!choice) return;
+      if (!choice || !reason.trim()) return;
       const targetName = finale.finalists.find((f) => f.playerId === choice)?.name || "";
       const res = await storageUpdate(gameId, VOTES_KEY, (fresh) => {
         const existingMap = fresh || {};
-        existingMap[player.id] = { targetId: choice, targetName, voterName: player.name, reason: reason.trim() || null, time: new Date().toLocaleTimeString() };
+        existingMap[player.id] = { targetId: choice, targetName, voterName: player.name, reason: reason.trim(), time: new Date().toLocaleTimeString() };
         return existingMap;
       });
       if (res.ok) { setExisting(res.value[player.id]); setSubmitted(true); }
@@ -127,7 +127,7 @@ export default function FinalePlayer({ gameId, player, round, players, readOnly 
         </Card>
         <Card style={{ marginBottom: 18 }}>
           <label style={{ display: "block", fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
-            Why? (optional — shown when votes are revealed)
+            Why? (required — shown when votes are revealed)
           </label>
           <textarea
             value={reason}
@@ -138,10 +138,10 @@ export default function FinalePlayer({ gameId, player, round, players, readOnly 
             style={{ width: "100%", background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "10px 12px", color: "#f5f0ff", fontSize: 13, fontFamily: "'Orbitron', 'Segoe UI', sans-serif", resize: "vertical" }}
           />
         </Card>
-        <button onClick={submit} disabled={!choice} style={{
-          width: "100%", background: choice ? "linear-gradient(135deg, #ff2d95, #b829ff)" : "#3d1f5c",
-          color: choice ? "#05010f" : "#6b4f99", border: "none", borderRadius: 10, padding: "14px 24px",
-          fontSize: 16, fontWeight: 700, cursor: choice ? "pointer" : "not-allowed",
+        <button onClick={submit} disabled={!choice || !reason.trim()} style={{
+          width: "100%", background: (choice && reason.trim()) ? "linear-gradient(135deg, #ff2d95, #b829ff)" : "#3d1f5c",
+          color: (choice && reason.trim()) ? "#05010f" : "#6b4f99", border: "none", borderRadius: 10, padding: "14px 24px",
+          fontSize: 16, fontWeight: 700, cursor: (choice && reason.trim()) ? "pointer" : "not-allowed",
           fontFamily: "'Orbitron', 'Segoe UI', sans-serif", letterSpacing: 0.5,
         }}>Cast My Vote</button>
       </div>

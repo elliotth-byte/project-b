@@ -15,6 +15,7 @@ import AdminHost from "./AdminHost";
 import HistoryTab from "./HistoryTab";
 import RoundTimerBanner from "./RoundTimerBanner";
 import HostAnnouncementBox from "./HostAnnouncementBox";
+import { postSystemAnnouncement } from "../lib/announcements";
 import PlayerViewer from "./PlayerViewer";
 
 const BASE_TABS = [
@@ -85,7 +86,11 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
     setStartError("");
     const ok = await startSeasonState(gameId);
     setStarting(false);
-    if (!ok) setStartError("Couldn't start the round — the write to the database didn't go through. Try again, or check Supabase's logs if it keeps happening.");
+    if (!ok) { setStartError("Couldn't start the round — the write to the database didn't go through. Try again, or check Supabase's logs if it keeps happening."); return; }
+    await postSystemAnnouncement(
+      gameId,
+      "Welcome to Panopticon. Immortality, borne from immortality. Roman numerals sprung from 1s and 0s. An facsimile of an Olympus that could have been. Each of you seek glory, but only one has the cunning and skill to capture it. Who will it be?"
+    );
   };
 
   return (

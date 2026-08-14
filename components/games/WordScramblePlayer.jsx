@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Card } from "../ui";
 import GameResultCard from "./GameResultCard";
-import { WORDS_PER_SET, WORD_COLORS, WORD_FONTS, getPlayerWordSet, initFloatingLetters } from "../../lib/games/wordData";
+import { WORDS_PER_SET, wordColorsFor, WORD_FONTS, getPlayerWordSet, initFloatingLetters } from "../../lib/games/wordData";
 import { reportScore } from "../../lib/challengeScores";
 import { usePersistedStart } from "./usePersistedStart";
 
@@ -17,6 +17,7 @@ export default function WordScramblePlayer({ gameId, round, challenge, player })
   const rafRef = useRef(null);
   const lastRenderRef = useRef(0);
   const arenaW = 320, arenaH = 240;
+  const WORD_COLORS = wordColorsFor(!!player?.gamePrefs?.colorBlindMode);
 
   const seed = challenge?.startedAt || 1;
   const words = getPlayerWordSet(player.name, seed).words;

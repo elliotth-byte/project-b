@@ -5,6 +5,7 @@ import { KEY_EXILE, KEY_FINALE } from "../lib/gameState";
 import { computeEliminateOutcome, computeSaveOutcome, computeFinaleOutcome } from "../lib/exileLogic";
 import { exileContext, FINALE_CONTEXT, setChaosNullify, subscribeChaosSecret } from "../lib/chaosSecrets";
 import { exileDrawContext, FINALE_DRAW_CONTEXT, submitChaosDrawPick, chaosPicksKey } from "../lib/chaosDraw";
+import { chaosCardLabel } from "../lib/chaosCardNames";
 import MemoryWall from "./MemoryWall";
 
 // ─── The Power of Khaos ───
@@ -117,7 +118,7 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
       return (
         <Card style={{ marginBottom: 20, textAlign: "center" }}>
           <div style={{ fontSize: 28, marginBottom: 6 }}>🃏</div>
-          <p style={{ color: "#f5f0ff", fontSize: 14, margin: 0 }}>You picked #{myDrawPick + 1} — {justWon ? "🎉 you claimed it!" : "hang tight."}</p>
+          <p style={{ color: "#f5f0ff", fontSize: 14, margin: 0 }}>You picked {chaosCardLabel(myDrawPick)} — {justWon ? "🎉 you claimed it!" : "hang tight."}</p>
         </Card>
       );
     }
@@ -134,11 +135,16 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
       <Card style={{ marginBottom: 20, textAlign: "center" }}>
         <div style={{ fontSize: 28, marginBottom: 6 }}>🃏</div>
         <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 16, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>The Power of Khaos</h3>
-        <p style={{ color: "#a68fd6", fontSize: 13, margin: "0 0 18px" }}>
-          {poolSize} cards, one Power of Khaos. Pick one — you get one shot.
-          {triedIndices.size > 0 && ` Already tried (and wrong): ${[...triedIndices].sort((a, b) => a - b).map((i) => i + 1).join(", ")}.`}
+        <p style={{ color: "#a68fd6", fontSize: 12.5, fontStyle: "italic", margin: "0 0 12px", lineHeight: 1.5 }}>
+          Some are born great, some achieve greatness, and some have greatness thrust upon them. In front of you are relics from
+          mythology. Few bestowed glory — others brought disaster, but each of these iconic items promises chaos. In one of them,
+          Khaos himself and his power lies. Can you guess where?
         </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(64px, 1fr))", gap: 10 }}>
+        <p style={{ color: "#a68fd6", fontSize: 13, margin: "0 0 18px" }}>
+          {poolSize} relics, one Power of Khaos. Pick one — you get one shot.
+          {triedIndices.size > 0 && ` Already tried (and wrong): ${[...triedIndices].sort((a, b) => a - b).map((i) => chaosCardLabel(i)).join(", ")}.`}
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 10 }}>
           {Array.from({ length: poolSize }, (_, i) => i).map((i) => {
             const tried = triedIndices.has(i);
             return (
@@ -147,11 +153,11 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
                 variant={tried ? "ghost" : "primary"}
                 disabled={tried || drawSubmitting !== null}
                 onClick={() => pickDraw(i)}
-                style={{ padding: "16px 8px", fontSize: 16, borderRadius: 12, opacity: tried ? 0.35 : 1 }}
+                style={{ padding: "14px 8px", fontSize: 12, lineHeight: 1.3, borderRadius: 12, opacity: tried ? 0.35 : 1 }}
               >
                 {tried ? "✕" : "🃏"}
                 <br />
-                {i + 1}
+                {chaosCardLabel(i)}
               </Btn>
             );
           })}
@@ -180,7 +186,20 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
   const voteRows = Object.entries(votes).map(([voterId, v]) => ({ voterId, targetId: v.targetId }));
   const myPickId = myPick?.nomineeId || null;
 
-  const pick = async (nomineeId) => {
+  const [pendingPick, setPendingPick] = useState(null); // candidate selected but not yet locked in — reason is required before it actually submits
+
+  const confirmPick = async () => {
+    if (!pendingPick || !reasonDraft.trim()) return;
+    const ok = await setChaosNullify(gameId, context, pendingPick, reasonDraft);
+    if (!ok) { alert("Couldn't lock that in — try again."); return; }
+    setPendingPick(null);
+  };
+
+  // Switching an already-locked pick reuses whatever reason is currently
+  // in the box (they've already written one to get here) rather than
+  // requiring a brand new one — but still can't be blanked out entirely.
+  const changePick = async (nomineeId) => {
+    if (!reasonDraft.trim()) { alert("Add a reason before changing your pick."); return; }
     const ok = await setChaosNullify(gameId, context, nomineeId, reasonDraft);
     if (!ok) alert("Couldn't lock that in — try again.");
   };
@@ -250,7 +269,7 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
           )}
           <Card style={{ marginTop: 12, textAlign: "left" }}>
             <label style={{ display: "block", fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
-              Why? (optional — shown when votes are revealed)
+              Why? (required — shown when votes are revealed)
             </label>
             <textarea
               value={reasonDraft}
@@ -260,18 +279,36 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
               placeholder="Say your piece..."
               style={{ width: "100%", background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "10px 12px", color: "#f5f0ff", fontSize: 13, fontFamily: "'Orbitron', 'Segoe UI', sans-serif", resize: "vertical", boxSizing: "border-box", marginBottom: 8 }}
             />
-            <Btn small onClick={saveReason} disabled={savingReason || reasonDraft === (myPick?.reason || "")}>
+            <Btn small onClick={saveReason} disabled={savingReason || !reasonDraft.trim() || reasonDraft === (myPick?.reason || "")}>
               {savingReason ? "Saving..." : "Save"}
             </Btn>
           </Card>
           {state.votingOpen && (
             <div style={{ marginTop: 12 }}>
-              <MemoryWall candidates={candidates} players={players} selectedId={myPickId} onSelect={pick} />
+              <MemoryWall candidates={candidates} players={players} selectedId={myPickId} onSelect={changePick} />
             </div>
           )}
         </div>
       ) : (
-        <MemoryWall candidates={candidates} players={players} selectedId={myPickId} onSelect={pick} />
+        <div>
+          <MemoryWall candidates={candidates} players={players} selectedId={pendingPick} onSelect={setPendingPick} />
+          {pendingPick && (
+            <Card style={{ marginTop: 12, textAlign: "left" }}>
+              <label style={{ display: "block", fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+                Why? (required — shown when votes are revealed)
+              </label>
+              <textarea
+                value={reasonDraft}
+                onChange={(e) => setReasonDraft(e.target.value)}
+                maxLength={280}
+                rows={2}
+                placeholder="Say your piece..."
+                style={{ width: "100%", background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "10px 12px", color: "#f5f0ff", fontSize: 13, fontFamily: "'Orbitron', 'Segoe UI', sans-serif", resize: "vertical", boxSizing: "border-box", marginBottom: 8 }}
+              />
+              <Btn small onClick={confirmPick} disabled={!reasonDraft.trim()}>Lock It In</Btn>
+            </Card>
+          )}
+        </div>
       )}
     </Card>
   );

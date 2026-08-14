@@ -95,7 +95,7 @@ export default function FatesHost({ gameId, players, round }) {
       {!complete && <p style={{ color: "#6b4f99", fontSize: 11, fontStyle: "italic", margin: "0 0 12px" }}>Every one of the top 3 needs to submit a nomination first.</p>}
 
       <CopyMessage icon="⚖️" label="Fates Ceremony Announcement"
-        text={`⚖️ The Fates Ceremony has begun. ${fates.nominatorOrder.map((n) => n.name).join(", ")} will each nominate one player for exile.`} />
+        text={`The fates come for us all. In Greek legend, three decide your fate — one weaves, one measures, one cuts. Today, your fate lies in the hands of three of your fellow players. Whose thread will be permanently cut short?\n\n⚖️ The Fates Ceremony has begun. ${fates.nominatorOrder.map((n) => n.name).join(", ")} will each nominate one player for exile.`} />
     </Card>
   );
 }

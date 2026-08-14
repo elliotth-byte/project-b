@@ -18,6 +18,10 @@ import BreakoutPlayer from "./games/BreakoutPlayer";
 import PlinkoPlayer from "./games/PlinkoPlayer";
 import SpotDiffPlayer from "./games/SpotDiffPlayer";
 import WhackMolePlayer from "./games/WhackMolePlayer";
+import SimonPlayer from "./games/SimonPlayer";
+import BogglePlayer from "./games/BogglePlayer";
+import DealOrNoDealPlayer from "./games/DealOrNoDealPlayer";
+import MetronomePlayer from "./games/MetronomePlayer";
 import GameResultCard from "./games/GameResultCard";
 
 const GAME_COMPONENTS = {
@@ -33,6 +37,10 @@ const GAME_COMPONENTS = {
   plinko: PlinkoPlayer,
   spotdiff: SpotDiffPlayer,
   whackmole: WhackMolePlayer,
+  simon: SimonPlayer,
+  boggle: BogglePlayer,
+  dealornodeal: DealOrNoDealPlayer,
+  metronome: MetronomePlayer,
 };
 
 export default function ChallengePlayer({ gameId, player, players, round, readOnly = false }) {

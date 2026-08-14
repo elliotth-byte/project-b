@@ -301,7 +301,7 @@ export default function ExileVoteHost({ gameId, players, round }) {
       )}
 
       <CopyMessage icon="🃏" label="Exile Vote Announcement"
-        text={`🃏 The Exile Vote is underway. Nominees: ${exile.nominees.map((n) => n.name).join(", ")}. Power of Khaos: ${chaosHolder?.display_name || "?"}.`} />
+        text={`In Olympus, all crave power. Power, however, comes at a cost. Whom are you willing to betray, to manipulate, to exile?\n\n🃏 The Exile Vote is underway. Nominees: ${exile.nominees.map((n) => n.name).join(", ")}. Power of Khaos: ${chaosHolder?.display_name || "?"}.`} />
     </Card>
   );
 }
