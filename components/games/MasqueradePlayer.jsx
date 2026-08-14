@@ -3,8 +3,7 @@ import { Card, Badge } from "../ui";
 import GameResultCard from "./GameResultCard";
 import { reportScore } from "../../lib/challengeScores";
 import {
-  subscribeMasquerade, submitTargetChoice, submitResponse, advanceAfterReveal,
-  autoResolveTargeting, autoResolveResponse, placementValue,
+  subscribeMasquerade, submitTargetChoice, submitResponse, advanceAfterReveal, placementValue,
 } from "../../lib/games/masqueradeData";
 
 export default function MasqueradePlayer({ gameId, round, challenge, player, players }) {
@@ -22,18 +21,15 @@ export default function MasqueradePlayer({ gameId, round, challenge, player, pla
 
   const byName = (id) => players?.find((p) => p.id === id)?.display_name || "?";
 
-  // Drives the shared state forward regardless of whose turn it is —
-  // catches a stalled targeting/response step past its deadline, or a
-  // reveal that's finished its display window. Any connected client does
-  // this, same pattern as the Plinko duel bracket.
+  // Only ever advances the reveal step (a display pause after a
+  // decision's already been made) — no auto-deciding on anyone's behalf.
+  // Any connected client does this, same "any client can drive shared
+  // state forward" pattern as the Plinko duel bracket, just scoped here
+  // to something that was never actually anyone's choice to make.
   useEffect(() => {
     if (!state || state.finalized) return;
     const interval = window.setInterval(() => {
-      const turn = state.turn;
-      if (!turn) return;
-      if (turn.phase === "targeting") autoResolveTargeting(gameId, round.round);
-      else if (turn.phase === "responding") autoResolveResponse(gameId, round.round);
-      else if (turn.phase === "revealed") advanceAfterReveal(gameId, round.round);
+      if (state.turn?.phase === "revealed") advanceAfterReveal(gameId, round.round);
     }, 1000);
     return () => window.clearInterval(interval);
   }, [gameId, round.round, state]);

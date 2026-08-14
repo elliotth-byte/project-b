@@ -22,8 +22,9 @@ import LogoutButton from "../components/LogoutButton";
 import ChallengeErrorBoundary from "../components/ChallengeErrorBoundary";
 import RoundTimerBanner from "../components/RoundTimerBanner";
 import { Card } from "../components/ui";
-import { subscribeRound, subscribeSettings, PHASES, KEY_EXILE_HISTORY } from "../lib/gameState";
+import { subscribeRound, subscribeSettings, PHASES, KEY_EXILE_HISTORY, KEY_CHALLENGE } from "../lib/gameState";
 import { subscribeGameState } from "../lib/gameStorage";
+import { subscribeScores } from "../lib/challengeScores";
 import { subscribeRevealAck } from "../lib/revealAck";
 import { resolveIdentities, identityComplete } from "../lib/playerIdentity";
 import { resolveAvatars } from "../lib/avatarIdentity";
@@ -84,6 +85,23 @@ export default function PlayPage() {
     const unsubscribe = subscribeRound(gameId, setRound);
     return unsubscribe;
   }, [gameId]);
+
+  // Only fetched to know whether chat should be locked down right now —
+  // see chatBlockedByWhoSaidIt below. Nothing else on this page needs
+  // the live challenge/score state directly; ChallengePlayer.jsx already
+  // manages its own subscriptions for actual gameplay.
+  const [currentChallenge, setCurrentChallenge] = useState(null);
+  const [currentScores, setCurrentScores] = useState({});
+  useEffect(() => {
+    if (!gameId) return;
+    const unsubscribe = subscribeGameState(gameId, KEY_CHALLENGE, setCurrentChallenge);
+    return unsubscribe;
+  }, [gameId]);
+  useEffect(() => {
+    if (!gameId || !round?.round) return;
+    const unsubscribe = subscribeScores(gameId, round.round, setCurrentScores);
+    return unsubscribe;
+  }, [gameId, round?.round]);
 
   useEffect(() => {
     if (!gameId) return;
@@ -241,6 +259,19 @@ export default function PlayPage() {
   // as..." up top and what name their own chat/confessional posts carry.
   const effectivePlayerName = settings?.aliasEnabled && myPlayer?.alias && round?.phase !== PHASES.ENDED ? myPlayer.alias : playerName;
   const player = myPlayer ? { id: myPlayer.id, name: effectivePlayerName, gamePrefs: myPlayer.gamePrefs || DEFAULT_GAME_PREFS } : null;
+
+  // Who Said It pulls its quiz straight from Panopticon chat history —
+  // leaving chat open mid-challenge would let a player just scroll up
+  // and read off the answers. Locked for THIS player specifically until
+  // their own score is locked in, not for the whole challenge duration —
+  // someone who finishes early gets chat back immediately rather than
+  // waiting on everyone else. Scoped to actual participants only — an
+  // eliminated player or spectator who isn't in this challenge at all
+  // has nothing to "cheat" by reading chat, so they keep normal access.
+  const chatBlockedByWhoSaidIt = !!(
+    currentChallenge?.active && currentChallenge?.gameType === "whosaidit" && player &&
+    currentChallenge?.participantIds?.includes(player.id) && !currentScores[player.id]?.locked
+  );
   const exiled = joined && myPlayer && myPlayer.alive === false;
   const quitByChoice = exiled && myPlayer.eliminationType === "quit";
   const approved = joined && !!myPlayer?.approved;
@@ -358,7 +389,7 @@ export default function PlayPage() {
                   borderBottom: tab === t.key ? "2px solid #ff2d95" : "2px solid transparent",
                 }}>
                   {t.label}
-                  {t.key === "chat" && hasUnreadChat && tab !== "chat" && (
+                  {t.key === "chat" && hasUnreadChat && tab !== "chat" && !chatBlockedByWhoSaidIt && (
                     <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: "#ff3860" }} />
                   )}
                 </button>
@@ -439,10 +470,20 @@ export default function PlayPage() {
               </ChallengeErrorBoundary>
             )}
 
-            {tab === "chat" && settings?.chatEnabled && (
+            {tab === "chat" && settings?.chatEnabled && !chatBlockedByWhoSaidIt && (
               <ChallengeErrorBoundary label="Chat">
                 <ChatPanel gameId={gameId} player={player} players={identityAllPlayers} realName={myPlayer.name} isExiled={exiled} />
               </ChallengeErrorBoundary>
+            )}
+
+            {tab === "chat" && settings?.chatEnabled && chatBlockedByWhoSaidIt && (
+              <Card style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>🔒</div>
+                <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>Chat's Locked</h3>
+                <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>
+                  Panopticon is off-limits until you finish Who Said It — no peeking at the chat log for answers. It'll unlock the moment you're done.
+                </p>
+              </Card>
             )}
 
             {tab === "help" && (
