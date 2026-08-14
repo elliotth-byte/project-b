@@ -95,7 +95,11 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     const freshReentry = await getReentry(gameId);
     const reentryEligibleIds = freshReentry.filter((r) => r.status === REENTRY_STATUS.PENDING).map((r) => r.playerId);
     const now = Date.now();
-    const endsAt = settings?.infiniteTime ? null : now + durationSec * 1000;
+    // Masquerade always runs to its natural conclusion (last player
+    // standing — see lib/games/masqueradeData.js) rather than being cut
+    // off by a fixed duration partway through, regardless of the
+    // season's infiniteTime setting.
+    const endsAt = (settings?.infiniteTime || gameType === "masquerade") ? null : now + durationSec * 1000;
     const configOverrides = MAZE_TYPES.includes(gameType) ? { size: mazeSize } : undefined;
     await storageSet(gameId, KEY_CHALLENGE, {
       round: round.round, active: true, startedAt: now, endsAt,
@@ -219,6 +223,8 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
 
         {settings?.infiniteTime ? (
           <p style={{ color: "#ff2d95", fontSize: 12, margin: "0 0 12px" }}>∞ Infinite time is on — this battle runs until you end it. (Change this in Admin → Round Lengths.)</p>
+        ) : gameType === "masquerade" ? (
+          <p style={{ color: "#ff2d95", fontSize: 12, margin: "0 0 12px" }}>∞ Murder at the Masquerade always runs until there's a last player standing — no duration to set.</p>
         ) : (
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
             <label style={{ fontSize: 12, color: "#a68fd6" }}>Duration:</label>
