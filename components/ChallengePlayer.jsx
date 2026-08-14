@@ -25,6 +25,7 @@ import MetronomePlayer from "./games/MetronomePlayer";
 import PitPlayer from "./games/PitPlayer";
 import WhoSaidItPlayer from "./games/WhoSaidItPlayer";
 import MasqueradePlayer from "./games/MasqueradePlayer";
+import CloseToTwentyPlayer from "./games/CloseToTwentyPlayer";
 import GameResultCard from "./games/GameResultCard";
 
 const GAME_COMPONENTS = {
@@ -47,6 +48,7 @@ const GAME_COMPONENTS = {
   pit: PitPlayer,
   whosaidit: WhoSaidItPlayer,
   masquerade: MasqueradePlayer,
+  closeto20: CloseToTwentyPlayer,
 };
 
 export default function ChallengePlayer({ gameId, player, players, round, readOnly = false }) {

@@ -11,6 +11,7 @@ import { DEFAULT_PARTICIPATION, computeParticipants } from "../lib/challengePart
 import { initPlinkoBracket, subscribePlinkoBracket } from "../lib/games/plinkoBracketData";
 import { initPit } from "../lib/games/pitData";
 import { initMasquerade } from "../lib/games/masqueradeData";
+import { initCloseToTwenty } from "../lib/games/closeToTwentyData";
 import ParticipantPicker from "./ParticipantPicker";
 import CopyMessage from "./CopyMessage";
 import { requestAdvance } from "../lib/advanceNow";
@@ -114,6 +115,9 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     }
     if (gameType === "masquerade") {
       await initMasquerade(gameId, round.round, participants, now);
+    }
+    if (gameType === "closeto20") {
+      await initCloseToTwenty(gameId, round.round, participants, now);
     }
     await storageUpdate(gameId, KEY_ROUND, (fresh) => ({ ...(fresh || {}), phaseStartedAt: now, phaseEndsAt: endsAt }));
     setBusy(false);
