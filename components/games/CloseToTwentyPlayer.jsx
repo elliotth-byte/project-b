@@ -1,16 +1,18 @@
 import { useState, useEffect, useRef } from "react";
 import { Card, Badge } from "../ui";
 import GameResultCard from "./GameResultCard";
+import { useCountdown } from "./useCountdown";
 import { reportScore } from "../../lib/challengeScores";
 import {
-  subscribeCloseToTwenty, submitDistribution, placementValue, STARTING_COINS, TARGET,
+  subscribeCloseToTwenty, submitDistribution, revealBanks, placementValue, STARTING_COINS, TARGET,
 } from "../../lib/games/closeToTwentyData";
 
 export default function CloseToTwentyPlayer({ gameId, round, challenge, player, players }) {
   const [state, setState] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [amounts, setAmounts] = useState({}); // { [targetId]: number }
-  const reportedRef = useRef(new Set());
+  const { timeUp } = useCountdown(challenge?.endsAt);
+  const reportedRef = useRef(false);
 
   useEffect(() => {
     const unsubscribe = subscribeCloseToTwenty(gameId, round.round, (v) => { setState(v); setLoaded(true); });
@@ -19,16 +21,22 @@ export default function CloseToTwentyPlayer({ gameId, round, challenge, player, 
 
   const byName = (id) => players?.find((p) => p.id === id)?.display_name || "?";
 
-  const myTurn = state?.order?.[state?.activeIndex] === player.id;
-  const alreadyWent = state?.turnsTaken?.includes(player.id);
+  const iHaveSubmitted = state?.submittedIds?.includes(player.id);
+
+  // Any connected client (not just participants — a spectator's screen
+  // works too) checks whether it's time to reveal, same "any client
+  // drives shared state forward" pattern as the other live games here.
+  useEffect(() => {
+    if (!state || state.revealed) return;
+    const everyoneIn = state.submittedIds.length >= state.participantIds.length;
+    if (everyoneIn || timeUp) revealBanks(gameId, round.round);
+  }, [state, timeUp, gameId, round.round]);
 
   useEffect(() => {
-    if (!state || reportedRef.current.has(player.id)) return;
-    if (alreadyWent || state.finalized) {
-      reportedRef.current.add(player.id);
-      reportScore(gameId, round.round, player.id, player.name, placementValue(state, player.id), { final: true });
-    }
-  }, [state, alreadyWent]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!state?.revealed || reportedRef.current) return;
+    reportedRef.current = true;
+    reportScore(gameId, round.round, player.id, player.name, placementValue(state, player.id), { final: true });
+  }, [state?.revealed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const total = Object.values(amounts).reduce((s, n) => s + (n || 0), 0);
   const distinctCount = Object.values(amounts).filter((n) => (n || 0) > 0).length;
@@ -55,10 +63,9 @@ export default function CloseToTwentyPlayer({ gameId, round, challenge, player, 
     return <GameResultCard icon="🐷" title="Not Enough Players" valueLabel="No one to bank with" />;
   }
 
-  const myBank = state.banks[player.id] || 0;
-  const iAmBusted = state.busted.includes(player.id);
-
-  if (state.finalized) {
+  if (state.revealed) {
+    const myBank = state.banks[player.id] || 0;
+    const iAmBusted = state.busted.includes(player.id);
     return (
       <GameResultCard
         icon="🐷"
@@ -72,30 +79,20 @@ export default function CloseToTwentyPlayer({ gameId, round, challenge, player, 
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
         <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🐷 Close to 20</h3>
-        <Badge color={iAmBusted ? "#ff3860" : "#ff2d95"}>Your bank: {myBank}{iAmBusted ? " (busted)" : ""}</Badge>
+        <Badge>{state.submittedIds.length}/{state.participantIds.length} decided</Badge>
       </div>
-      <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 10px", fontStyle: "italic" }}>
-        Closest to 20 without going over wins. Go over, and you're busted — out of contention, but you still get your turn.
+      <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 12px", fontStyle: "italic" }}>
+        Every bank — including your own — is a total mystery until everyone's decided. Closest to 20 without going over wins.
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 4, marginBottom: 10, textAlign: "left" }}>
-        {state.order.map((id) => (
-          <div key={id} style={{
-            fontSize: 11, padding: "4px 8px", borderRadius: 6,
-            background: state.busted.includes(id) ? "rgba(255,56,96,0.1)" : "#0d0618",
-            color: state.busted.includes(id) ? "#ff3860" : "#a68fd6",
-          }}>
-            {byName(id)}: {state.banks[id] || 0}{state.busted.includes(id) ? " 💥" : ""}
-          </div>
-        ))}
-      </div>
-
-      {myTurn && !alreadyWent ? (
+      {iHaveSubmitted ? (
+        <p style={{ color: "#a68fd6", fontSize: 13 }}>Your coins are placed — waiting on everyone else before the reveal.</p>
+      ) : (
         <div>
-          <p style={{ color: "#f5f0ff", fontSize: 13, margin: "0 0 4px" }}>Your turn — distribute all {STARTING_COINS} coins across at least 2 banks.</p>
+          <p style={{ color: "#f5f0ff", fontSize: 13, margin: "0 0 4px" }}>Distribute all {STARTING_COINS} coins across at least 2 banks.</p>
           <p style={{ color: remaining === 0 ? "#00ff9d" : "#ffd700", fontSize: 12, margin: "0 0 10px" }}>{remaining} coin{remaining === 1 ? "" : "s"} left to place</p>
           <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
-            {state.order.filter((id) => !state.busted.includes(id)).map((id) => (
+            {state.participantIds.map((id) => (
               <div key={id} style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "space-between" }}>
                 <span style={{ fontSize: 13, color: "#f5f0ff" }}>{byName(id)}{id === player.id ? " (you)" : ""}</span>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -110,12 +107,8 @@ export default function CloseToTwentyPlayer({ gameId, round, challenge, player, 
             padding: "10px 24px", borderRadius: 8, cursor: canSubmit ? "pointer" : "default",
             background: canSubmit ? "linear-gradient(135deg, #ff2d95, #b829ff)" : "#3d1f5c",
             color: canSubmit ? "#05010f" : "#6b4f99", border: "none", fontSize: 14, fontWeight: 700,
-          }}>Deposit</button>
+          }}>Lock It In</button>
         </div>
-      ) : alreadyWent ? (
-        <p style={{ color: "#a68fd6", fontSize: 13 }}>You've had your turn — waiting on everyone else.</p>
-      ) : (
-        <p style={{ color: "#a68fd6", fontSize: 13 }}>{byName(state.order[state.activeIndex])} is distributing their coins...</p>
       )}
     </Card>
   );
