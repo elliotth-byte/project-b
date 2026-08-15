@@ -6,6 +6,7 @@ import { reportScore } from "../../lib/challengeScores";
 import { generateLightSchedule, lightAt, TARGET_SCORE, STARTING_LIVES } from "../../lib/games/redLightGreenLightData";
 
 const FINISH_BASE = 10000000; // reported score tier for anyone who reaches 100 — always beats anyone who doesn't, faster finishers score higher within this tier
+const WARNING_WINDOW_MS = 600; // how long before a green segment ends that the yellow warning kicks in — purely visual, tapping here is still counted as green/safe
 
 export default function RedLightGreenLightPlayer({ gameId, challenge, round, player }) {
   const startedAt = challenge?.startedAt || null; // shared reference point — same reasoning as the Stroop wall, a late page-load shouldn't grant extra time
@@ -30,6 +31,11 @@ export default function RedLightGreenLightPlayer({ gameId, challenge, round, pla
   const elapsedMs = startedAt ? Date.now() - startedAt : 0;
   const current = lightAt(schedule, elapsedMs);
   const isGreen = current?.type === "green";
+  // A brief heads-up before red actually starts — still fully green/safe
+  // gameplay-wise (the underlying segment type hasn't changed, so a tap
+  // here still scores normally), just a visual cue that red is coming so
+  // it doesn't feel like an instant, unpredictable switch.
+  const isWarning = isGreen && current.endMs - elapsedMs <= WARNING_WINDOW_MS;
 
   const tap = () => {
     if (done) return;
@@ -90,13 +96,13 @@ export default function RedLightGreenLightPlayer({ gameId, challenge, round, pla
 
       <div style={{
         margin: "0 auto 16px", width: 90, height: 90, borderRadius: "50%",
-        background: isGreen ? "#00ff9d" : "#ff3860",
-        boxShadow: `0 0 30px ${isGreen ? "#00ff9d" : "#ff3860"}`,
+        background: isWarning ? "#ffd700" : isGreen ? "#00ff9d" : "#ff3860",
+        boxShadow: `0 0 30px ${isWarning ? "#ffd700" : isGreen ? "#00ff9d" : "#ff3860"}`,
         display: "flex", alignItems: "center", justifyContent: "center",
         fontSize: 13, fontWeight: 900, color: "#05010f", fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
         transition: "background 0.15s",
       }}>
-        {isGreen ? "GO" : "STOP"}
+        {isWarning ? "GET READY" : isGreen ? "GO" : "STOP"}
       </div>
 
       <button
@@ -111,7 +117,7 @@ export default function RedLightGreenLightPlayer({ gameId, challenge, round, pla
         TAP
       </button>
       <p style={{ color: "#6b4f99", fontSize: 11, fontStyle: "italic" }}>
-        Tap fast on green. Tap on red and you lose a life. First to {TARGET_SCORE} wins outright.
+        Tap fast on green. Yellow means red's about to start. Tap on red and you lose a life. First to {TARGET_SCORE} wins outright.
       </p>
     </Card>
   );

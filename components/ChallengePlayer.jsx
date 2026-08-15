@@ -30,6 +30,7 @@ import SnakePlayer from "./games/SnakePlayer";
 import MinesweeperPlayer from "./games/MinesweeperPlayer";
 import StroopPlayer from "./games/StroopPlayer";
 import RedLightGreenLightPlayer from "./games/RedLightGreenLightPlayer";
+import SlidingPuzzlePlayer from "./games/SlidingPuzzlePlayer";
 import GameResultCard from "./games/GameResultCard";
 
 const GAME_COMPONENTS = {
@@ -57,6 +58,7 @@ const GAME_COMPONENTS = {
   minesweeper: MinesweeperPlayer,
   stroop: StroopPlayer,
   redlightgreenlight: RedLightGreenLightPlayer,
+  slidingpuzzle: SlidingPuzzlePlayer,
 };
 
 export default function ChallengePlayer({ gameId, player, players, round, readOnly = false }) {
@@ -245,14 +247,31 @@ export default function ChallengePlayer({ gameId, player, players, round, readOn
         );
       }
       return (
-        <>
-          <GameComponent gameId={gameId} round={round} challenge={challenge} player={player} players={players} />
-          <div style={{ textAlign: "center", marginTop: 10 }}>
-            <Btn small variant="ghost" onClick={forfeitDigital} disabled={forfeiting}>
-              {forfeiting ? "Forfeiting..." : "🏳️ Forfeit Battle"}
-            </Btn>
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(5,1,15,0.94)", zIndex: 900,
+          display: "flex", alignItems: "flex-start", justifyContent: "center",
+          padding: "24px 12px", overflowY: "auto",
+        }}>
+          {/* Breaks out of the normal page's 400px-wide column entirely,
+              and scales the whole thing up on top of that — a wider
+              container alone wouldn't help games with small fixed-pixel
+              grids (Whack-a-Mole's 70px holes, Minesweeper's 30px cells,
+              etc.), since they'd just get more empty margin around an
+              unchanged-size grid. The scale is what actually gives more
+              real tap-target size everywhere, not just for the games
+              that already resize responsively (like Breakout's canvas).
+              Sized so 78vw/420px pre-scale times 1.28 lands at roughly
+              99vw/538px post-scale — comfortably fits without triggering
+              horizontal overflow on typical phone widths. */}
+          <div style={{ width: "78vw", maxWidth: 420, transform: "scale(1.28)", transformOrigin: "center top", marginTop: 20 }}>
+            <GameComponent gameId={gameId} round={round} challenge={challenge} player={player} players={players} />
+            <div style={{ textAlign: "center", marginTop: 10 }}>
+              <Btn small variant="ghost" onClick={forfeitDigital} disabled={forfeiting}>
+                {forfeiting ? "Forfeiting..." : "🏳️ Forfeit Battle"}
+              </Btn>
+            </div>
           </div>
-        </>
+        </div>
       );
     }
   }

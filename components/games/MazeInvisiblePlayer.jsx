@@ -25,7 +25,7 @@ export default function MazeInvisiblePlayer({ gameId, round, challenge, player }
     return clamped % 2 === 0 ? clamped + 1 : clamped;
   }, [challenge?.gameConfig?.size]);
   const seed = (challenge?.startedAt || 1) + (player?.id ? player.id.split("-")[0].length : 0);
-  const [{ grid, start, gems }] = useState(() => generateMazeWithGems(seed || 1, SIZE));
+  const [{ grid, start, gems }] = useState(() => generateMazeWithGems(seed || 1, SIZE, 3));
   // Bounds/wall-checking below is deliberately derived from the grid
   // itself, not the SIZE memo above — SIZE is only ever the INPUT to
   // generation. If challenge hadn't fully loaded yet on this component's
@@ -118,7 +118,7 @@ export default function MazeInvisiblePlayer({ gameId, round, challenge, player }
         <Badge>💎 {gemIndex}/{gems.length}</Badge>
       </div>
       <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 8px", fontStyle: "italic" }}>
-        Get all 5 gems in order. Toggle View to memorize, or Move blind — bumping a wall costs {WALL_BUMP_PENALTY_MS / 1000}s.
+        Get all {gems.length} gems in order. Toggle View to memorize, or Move blind — bumping a wall costs {WALL_BUMP_PENALTY_MS / 1000}s.
       </p>
       {penaltyMs > 0 && <p style={{ color: "#ff3860", fontSize: 11, margin: "0 0 6px", fontWeight: 700 }}>-{(penaltyMs / 1000).toFixed(1)}s in wall-bump penalties</p>}
 

@@ -11,7 +11,7 @@ const RULES_URL = "https://docs.google.com/document/d/1F8Hqc8GatMDt7t6qfDTDl0w2o
 // colorblind-safe palettes wherever color is a meaningful signal, and
 // swipe controls alongside tap/arrows in anything with directional
 // movement. Persisted to the player's own row, not just this device.
-export default function HelpPanel({ player, onPrefsChanged }) {
+export default function HelpPanel({ player, onPrefsChanged, onReplayTour }) {
   const [prefs, setPrefs] = useState(player?.gamePrefs || {});
   const [saving, setSaving] = useState(false);
 
@@ -39,6 +39,20 @@ export default function HelpPanel({ player, onPrefsChanged }) {
           📖 Read the Rules
         </a>
       </Card>
+
+      {onReplayTour && (
+        <Card style={{ textAlign: "center" }}>
+          <button
+            onClick={onReplayTour}
+            style={{
+              background: "none", border: "1px solid #3d1f5c", borderRadius: 8, padding: "8px 16px",
+              color: "#a68fd6", fontSize: 13, cursor: "pointer",
+            }}
+          >
+            🧭 Replay Navigation Tour
+          </button>
+        </Card>
+      )}
 
       {player && (
         <Card>

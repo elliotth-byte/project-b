@@ -13,6 +13,8 @@ import ChaosPowerPlayer from "../components/ChaosPowerPlayer";
 import ConfessionalPlayer from "../components/ConfessionalPlayer";
 import MusicPlayer from "../components/MusicPlayer";
 import HelpPanel from "../components/HelpPanel";
+import NavTourOverlay from "../components/NavTourOverlay";
+import { hasSeenNavTour } from "../lib/navTour";
 import ChatPanel from "../components/ChatPanel";
 import PlayerAvatarUpload from "../components/PlayerAvatarUpload";
 import PlayerMemoryWall from "../components/PlayerMemoryWall";
@@ -57,6 +59,7 @@ export default function PlayPage() {
   const [exileHistory, setExileHistory] = useState([]);
   const [revealAck, setRevealAck] = useState({});
   const [settings, setSettings] = useState(null);
+  const [showNavTour, setShowNavTour] = useState(false);
 
   useRoundWatcher(gameId);
 
@@ -302,6 +305,17 @@ export default function PlayPage() {
   // round ever triggers this.
   const pendingReveal = approved && !needsIdentity && !!playerName && !!latestExileEntry && !revealAck[player?.id];
 
+  const visibleTabs = BASE_TABS.filter((t) => t.key !== "chat" || settings?.chatEnabled);
+
+  // Shown once, automatically, the first time a player reaches the main
+  // tabbed screen — see lib/navTour.js for why this is tied to the login
+  // rather than resetting each new season.
+  useEffect(() => {
+    if (!approved || needsIdentity || !playerName || pendingReveal) return;
+    if (!user || hasSeenNavTour(user)) return;
+    setShowNavTour(true);
+  }, [approved, needsIdentity, playerName, pendingReveal, user]);
+
   const handleQuit = async () => {
     if (!myPlayer) return;
     const verb = approved ? "quit this game" : "cancel your join request";
@@ -398,7 +412,7 @@ export default function PlayPage() {
         {approved && !needsIdentity && playerName && !pendingReveal && (
           <>
             <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #3d1f5c" }}>
-              {BASE_TABS.filter((t) => t.key !== "chat" || settings?.chatEnabled).map((t) => (
+              {visibleTabs.map((t) => (
                 <button key={t.key} onClick={() => setTab(t.key)} style={{
                   flex: 1, background: tab === t.key ? "rgba(255,45,149,0.13)" : "transparent",
                   color: tab === t.key ? "#ff2d95" : "#a68fd6",
@@ -511,12 +525,19 @@ export default function PlayPage() {
               <HelpPanel
                 player={player}
                 onPrefsChanged={(gamePrefs) => setMyPlayer((p) => p && ({ ...p, gamePrefs }))}
+                onReplayTour={() => setShowNavTour(true)}
               />
             )}
           </>
         )}
       </div>
       {approved && <MusicPlayer gameId={gameId} isHost={false} />}
+      {showNavTour && (
+        <NavTourOverlay
+          visibleTabKeys={visibleTabs.map((t) => t.key)}
+          onDone={() => setShowNavTour(false)}
+        />
+      )}
     </div>
   );
 }
