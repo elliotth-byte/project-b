@@ -70,6 +70,7 @@ export default function PlayPage() {
   // in next to where its result is actually used.
   const hasUnreadChat = useHasUnreadChat(gameId, myPlayer?.id, !!(joined && myPlayer?.approved && settings?.chatEnabled));
 
+
   // Once the game ends there's nothing left to do on the Game tab — default
   // players over to Ceremony so they land on the recap instead of an empty tab.
   useEffect(() => {
@@ -137,6 +138,28 @@ export default function PlayPage() {
     const unsubscribe = subscribeRevealAck(gameId, latestExileEntry.round, setRevealAck);
     return unsubscribe;
   }, [gameId, latestExileEntry?.round]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Same "must run before any early return" reasoning as hasUnreadChat
+  // above — this MUST sit before the `if (!user) return null`-style
+  // early returns further down, or React sees a different number of
+  // hooks called depending on whether user is set yet, which is a hard
+  // crash (not a lint warning) the instant it happens: exactly the
+  // failure mode this hit in production, right at the moment of logging
+  // in, since that's precisely when `user` flips from unset to a real
+  // value and execution starts reaching past where this hook lives.
+  // Computes everything from raw state inside the effect body itself,
+  // rather than depending on the `approved`/`pendingReveal`-etc. consts
+  // defined later, for the same reason — latestExileEntry above is
+  // already raw-state-derived and safe to use directly here.
+  useEffect(() => {
+    const rawApproved = joined && !!myPlayer?.approved;
+    const rawNeedsIdentity = joined && myPlayer && !identityComplete(myPlayer, settings);
+    const rawPlayerName = myPlayer?.name;
+    const rawPendingReveal = rawApproved && !rawNeedsIdentity && !!rawPlayerName && !!latestExileEntry && !revealAck[myPlayer?.id];
+    if (!rawApproved || rawNeedsIdentity || !rawPlayerName || rawPendingReveal) return;
+    if (!user || hasSeenNavTour(user)) return;
+    setShowNavTour(true);
+  }, [joined, myPlayer, settings, latestExileEntry, revealAck, user]);
 
   // Full roster (needed by FatesPlayer to list nomination targets, and
   // by FinalePlayer to know who's a finalist).
@@ -306,15 +329,6 @@ export default function PlayPage() {
   const pendingReveal = approved && !needsIdentity && !!playerName && !!latestExileEntry && !revealAck[player?.id];
 
   const visibleTabs = BASE_TABS.filter((t) => t.key !== "chat" || settings?.chatEnabled);
-
-  // Shown once, automatically, the first time a player reaches the main
-  // tabbed screen — see lib/navTour.js for why this is tied to the login
-  // rather than resetting each new season.
-  useEffect(() => {
-    if (!approved || needsIdentity || !playerName || pendingReveal) return;
-    if (!user || hasSeenNavTour(user)) return;
-    setShowNavTour(true);
-  }, [approved, needsIdentity, playerName, pendingReveal, user]);
 
   const handleQuit = async () => {
     if (!myPlayer) return;
