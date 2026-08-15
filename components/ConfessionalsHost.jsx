@@ -153,8 +153,6 @@ export default function ConfessionalsHost({ gameId, round, players }) {
   };
   const togglePromptTarget = (id) => setPromptTargets((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   const deactivatePrompt = async (promptId) => { await removeConfessionalPrompt(gameId, promptId); };
-  const byPlayerId = {};
-  (players || []).forEach((p) => (byPlayerId[p.id] = p.display_name));
 
   const buildRecapText = () => {
     const chosen = items.filter((c) => recapSelected.includes(c.id));
