@@ -4,6 +4,25 @@ import {
   CONFESSIONAL_TAGS, submitConfessional, fetchOwnConfessionals, subscribeConfessionalPrompts,
   subscribeConfessionalsTable,
 } from "../lib/confessionalsData";
+import { supabase } from "../lib/supabaseClient";
+
+// Fire-and-forget — a push notification failing to send should never
+// block or show an error for the actual confessional submit, which
+// already succeeded by the time this is called.
+async function notifyHostsForConfessional(gameId, playerName) {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data?.session?.access_token;
+    if (!token) return;
+    await fetch("/api/push/notify-host-event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ gameId, eventType: "confessional", playerName }),
+    });
+  } catch (e) {
+    console.error("Push notify for confessional failed:", e);
+  }
+}
 
 export default function ConfessionalPlayer({ gameId, player, round, readOnly = false }) {
   const [text, setText] = useState("");
@@ -58,6 +77,7 @@ export default function ConfessionalPlayer({ gameId, player, round, readOnly = f
       setSelectedTags([]);
       setConfirmed(true);
       setTimeout(() => setConfirmed(false), 3500);
+      notifyHostsForConfessional(gameId, player.name);
     } else {
       alert("Couldn't submit: " + res.error);
     }

@@ -9,6 +9,7 @@ import {
   initRound, PHASES,
 } from "../lib/gameState";
 import { REENTRY_STATUS } from "../lib/reentryLogic";
+import { exileDrawContext, chaosPicksKey, FINALE_DRAW_CONTEXT } from "../lib/chaosDraw";
 import { AVATAR_COLLECTIONS } from "../lib/avatarCollections";
 import { uploadAvatar, removeAvatar } from "../lib/avatarUpload";
 
@@ -199,6 +200,17 @@ export default function AdminHost({ gameId, players, round }) {
       storageDelete(gameId, KEY_FATES),
       storageDelete(gameId, KEY_EXILE),
       storageDelete(gameId, `pb:exile-votes:${roundNum}`),
+      // Power of Khaos state for this specific round's Exile Vote — was
+      // previously left behind by a round reset entirely, meaning a
+      // holder's already-locked-in nullify pick (or an in-progress draw)
+      // could still be sitting there the next time this same round
+      // number played the Exile Vote again. pb:chaos-picks tracks each
+      // player's draw button pick (game_state); chaos_secrets holds the
+      // holder's actual nullify target (its own table, not game_state —
+      // see lib/chaosSecrets.js for why: RLS there restricts reads to
+      // the host or the current holder specifically).
+      storageDelete(gameId, chaosPicksKey(exileDrawContext(roundNum))),
+      supabase.from("chaos_secrets").delete().eq("game_id", gameId).eq("context", exileDrawContext(roundNum)),
       storageUpdate(gameId, KEY_CHALLENGE_HISTORY, (fresh) => (fresh || []).filter((c) => c.round !== roundNum)),
       storageUpdate(gameId, KEY_EXILE_HISTORY, (fresh) => (fresh || []).filter((e) => e.round !== roundNum)),
       // Every still-exiled player competes in every challenge automatically
@@ -234,10 +246,17 @@ export default function AdminHost({ gameId, players, round }) {
       storageDelete(gameId, KEY_FINALE), storageDelete(gameId, KEY_REENTRY),
       storageDelete(gameId, KEY_EXILE_HISTORY), storageDelete(gameId, KEY_CHALLENGE_HISTORY),
       storageDelete(gameId, "pb:finale-votes"),
+      // Same Power of Khaos cleanup as resetCurrentRound, but for every
+      // round this season ever reached (the per-round loop below) plus
+      // the finale's own context, and via a single game-wide delete for
+      // chaos_secrets rather than one call per round/context.
+      storageDelete(gameId, chaosPicksKey(FINALE_DRAW_CONTEXT)),
+      supabase.from("chaos_secrets").delete().eq("game_id", gameId),
     ];
     for (let r = 1; r <= maxRound; r++) {
       deletes.push(storageDelete(gameId, `pb:exile-votes:${r}`));
       deletes.push(storageDelete(gameId, `pb:challenge-scores:${r}`));
+      deletes.push(storageDelete(gameId, chaosPicksKey(exileDrawContext(r))));
     }
     await Promise.all(deletes);
     await initRound(gameId);

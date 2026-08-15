@@ -73,12 +73,12 @@ function MessageList({ messages, containerRef }) {
   );
 }
 
-function Composer({ onSend, placeholder }) {
+function Composer({ onSend, placeholder, readOnly = false }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const submit = async () => {
     const t = text.trim();
-    if (!t || sending) return;
+    if (!t || sending || readOnly) return;
     setSending(true);
     const prevText = t;
     setText("");
@@ -89,6 +89,15 @@ function Composer({ onSend, placeholder }) {
       alert("Couldn't send: " + (result.error || "unknown error — check the browser console for details."));
     }
   };
+  if (readOnly) {
+    return (
+      <div style={{ paddingTop: 8, textAlign: "center" }}>
+        <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic", margin: 0 }}>
+          Read-only preview — sending is disabled here so nothing goes out as this player.
+        </p>
+      </div>
+    );
+  }
   return (
     <div style={{ display: "flex", gap: 8, paddingTop: 8 }}>
       <input
@@ -103,7 +112,7 @@ function Composer({ onSend, placeholder }) {
   );
 }
 
-function GroupChatView({ gameId, player, players, realName, onRead }) {
+function GroupChatView({ gameId, player, players, realName, onRead, readOnly = false }) {
   const [messages, setMessages] = useState([]);
   const listRef = useRef(null);
 
@@ -128,7 +137,7 @@ function GroupChatView({ gameId, player, players, realName, onRead }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "60vh" }}>
       <MessageList messages={rows} containerRef={listRef} />
-      <Composer placeholder="Message everyone..." onSend={(t) => { sendGroupMessage(gameId, player.id, player.name, t, realName); notifyPushForMessage(gameId, "group", player.id, player.name, t); }} />
+      <Composer placeholder="Message everyone..." readOnly={readOnly} onSend={(t) => { sendGroupMessage(gameId, player.id, player.name, t, realName); notifyPushForMessage(gameId, "group", player.id, player.name, t); }} />
     </div>
   );
 }
@@ -139,7 +148,7 @@ function threadLabel(thread, player, byId) {
   return others.map((id) => byId[id] || "?").join(", ") || "?";
 }
 
-function ThreadView({ gameId, thread, player, players, byId, onBack, onRead }) {
+function ThreadView({ gameId, thread, player, players, byId, onBack, onRead, readOnly = false }) {
   const [messages, setMessages] = useState([]);
   const listRef = useRef(null);
   const label = threadLabel(thread, player, byId);
@@ -167,7 +176,7 @@ function ThreadView({ gameId, thread, player, players, byId, onBack, onRead }) {
         <strong style={{ color: "#f5f0ff", fontSize: 13 }}>{label}</strong>
       </div>
       <MessageList messages={rows} containerRef={listRef} />
-      <Composer placeholder={`Message ${label}...`} onSend={(t) => { sendThreadMessage(thread.id, player.id, t); notifyPushForMessage(gameId, "thread", player.id, player.name, t, thread.id); }} />
+      <Composer placeholder={`Message ${label}...`} readOnly={readOnly} onSend={(t) => { sendThreadMessage(thread.id, player.id, t); notifyPushForMessage(gameId, "thread", player.id, player.name, t, thread.id); }} />
     </div>
   );
 }
@@ -179,7 +188,7 @@ function unreadForThread(thread, reads, lastMessageAt) {
   return new Date(lastMessageAt).getTime() > new Date(readAt).getTime();
 }
 
-function ExileRoomView({ gameId, player, players, byId, onRead }) {
+function ExileRoomView({ gameId, player, players, byId, onRead, readOnly = false }) {
   const [thread, setThread] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -193,10 +202,10 @@ function ExileRoomView({ gameId, player, players, byId, onRead }) {
   if (!thread) {
     return <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No one's been exiled yet — this room opens up the moment someone is.</p>;
   }
-  return <ThreadView gameId={gameId} thread={thread} player={player} players={players} byId={byId} onBack={() => {}} onRead={onRead} />;
+  return <ThreadView gameId={gameId} thread={thread} player={player} players={players} byId={byId} onBack={() => {}} onRead={onRead} readOnly={readOnly} />;
 }
 
-function MessagesView({ gameId, player, players, byId, openThread, setOpenThread, reads, onRead, isExiled }) {
+function MessagesView({ gameId, player, players, byId, openThread, setOpenThread, reads, onRead, isExiled, readOnly = false }) {
   const [threads, setThreads] = useState([]);
   const [picking, setPicking] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -238,7 +247,7 @@ function MessagesView({ gameId, player, players, byId, openThread, setOpenThread
   };
 
   if (openThread) {
-    return <ThreadView gameId={gameId} thread={openThread} player={player} players={players} byId={byId} onBack={() => { setOpenThread(null); reload(); }} onRead={onRead} />;
+    return <ThreadView gameId={gameId} thread={openThread} player={player} players={players} byId={byId} onBack={() => { setOpenThread(null); reload(); }} onRead={onRead} readOnly={readOnly} />;
   }
 
   // Same restriction applies to who shows up when starting a brand new
@@ -278,7 +287,7 @@ function MessagesView({ gameId, player, players, byId, openThread, setOpenThread
       )}
       {threads.length === 0 && !picking && <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic", margin: "0 0 12px" }}>No conversations yet.</p>}
 
-      {picking ? (
+      {readOnly ? null : picking ? (
         <div>
           <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
             Select one person for a DM, or several for a group
@@ -331,7 +340,7 @@ function MessagesView({ gameId, player, players, byId, openThread, setOpenThread
 // member groups, both the same underlying model — see
 // sql/add-group-chat.sql). Only shown at all when the host has turned
 // chat on for this season (settings.chatEnabled).
-export default function ChatPanel({ gameId, player, players, realName, isExiled }) {
+export default function ChatPanel({ gameId, player, players, realName, isExiled, readOnly = false }) {
   const [mode, setMode] = useState(isExiled ? "exile" : "group"); // "group" | "exile" | "messages"
   const [openThread, setOpenThread] = useState(null);
   const [groupReadAt, setGroupReadAt] = useState(null);
@@ -417,8 +426,8 @@ export default function ChatPanel({ gameId, player, players, realName, isExiled 
       </div>
 
       <Card>
-        {mode === "group" && !isExiled && <GroupChatView gameId={gameId} player={player} players={players} realName={realName} onRead={markGroupReadNow} />}
-        {mode === "exile" && isExiled && <ExileRoomView gameId={gameId} player={player} players={players} byId={byId} onRead={markThreadReadNow} />}
+        {mode === "group" && !isExiled && <GroupChatView gameId={gameId} player={player} players={players} realName={realName} onRead={markGroupReadNow} readOnly={readOnly} />}
+        {mode === "exile" && isExiled && <ExileRoomView gameId={gameId} player={player} players={players} byId={byId} onRead={markThreadReadNow} readOnly={readOnly} />}
         {mode === "messages" && (
           <MessagesView
             gameId={gameId} player={player} players={players} byId={byId}
@@ -426,6 +435,7 @@ export default function ChatPanel({ gameId, player, players, realName, isExiled 
             reads={{ thread: threadReads, latest: threadLatest }}
             onRead={markThreadReadNow}
             isExiled={isExiled}
+            readOnly={readOnly}
           />
         )}
       </Card>

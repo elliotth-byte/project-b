@@ -509,6 +509,7 @@ export default function HostPage() {
                   players={players}
                   isPrimaryHost={isPrimaryHost}
                   origin={origin}
+                  userId={user?.id}
                   coHosts={coHosts}
                   inviteEmail={inviteEmail}
                   setInviteEmail={setInviteEmail}

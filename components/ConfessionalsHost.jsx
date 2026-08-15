@@ -28,6 +28,27 @@ export default function ConfessionalsHost({ gameId, round, players }) {
   const [replyDrafts, setReplyDrafts] = useState({});
   const [replySaving, setReplySaving] = useState({});
 
+  // The stored player_name is whatever was actually shown to the player
+  // at submission time — their alias, if alias mode was on then. The
+  // host's own roster (players prop) always resolves to real names
+  // regardless of alias mode (see resolveIdentitiesForHost), so cross-
+  // referencing by the stable player_id is what actually tells the host
+  // who someone is — the stored alias alone doesn't. Only shown as a
+  // parenthetical when it's actually informative (the two differ); no
+  // redundant "(Sarah)" next to a name that already says Sarah. Defined
+  // this early (rather than down near where it's first used) because the
+  // filter/group/search logic further down runs directly during render,
+  // not inside a later-firing callback — referencing a const declared
+  // after that point would be a temporal-dead-zone crash, not just bad
+  // style.
+  const byPlayerId = {};
+  (players || []).forEach((p) => (byPlayerId[p.id] = p.display_name));
+  const identityLabel = (c) => {
+    const realName = byPlayerId[c.player_id];
+    if (!realName || realName === c.player_name) return c.player_name;
+    return `${c.player_name} (${realName})`;
+  };
+
   const reload = async () => {
     const data = await fetchAllConfessionals(gameId);
     setItems(data);
@@ -55,7 +76,7 @@ export default function ConfessionalsHost({ gameId, round, players }) {
     await Promise.all(items.filter((c) => !c.read_by_host).map((c) => updateConfessional(c.id, { read_by_host: true })));
     reload();
   };
-  const copyText = (c) => navigator.clipboard.writeText(`${c.player_name}${c.round ? ` (Round ${c.round})` : ""}: ${c.text}`);
+  const copyText = (c) => navigator.clipboard.writeText(`${identityLabel(c)}${c.round ? ` (Round ${c.round})` : ""}: ${c.text}`);
 
   // Compact rows truncate long confessionals to a preview — clicking one
   // expands just that row to show the full text, without switching the
@@ -80,6 +101,11 @@ export default function ConfessionalsHost({ gameId, round, players }) {
   // prompt-targeting picker above).
   const playerNamesInInbox = [...new Set(items.map((c) => c.player_name))].sort();
   const rounds = [...new Set(items.map((c) => c.round).filter(Boolean))].sort((a, b) => a - b);
+  // For the filter dropdown's display text only — the underlying filter
+  // still matches on the raw stored player_name (below), this just makes
+  // the option label show who that actually is too.
+  const playerNameToLabel = {};
+  items.forEach((c) => { if (!playerNameToLabel[c.player_name]) playerNameToLabel[c.player_name] = identityLabel(c); });
 
   let filtered = items.filter((c) => !c.archived || filterPlayer === "__archived__");
   if (filterPlayer && filterPlayer !== "__archived__") filtered = filtered.filter((c) => c.player_name === filterPlayer);
@@ -90,7 +116,10 @@ export default function ConfessionalsHost({ gameId, round, players }) {
   if (starredOnly) filtered = filtered.filter((c) => c.starred);
   if (search.trim()) {
     const s = search.trim().toLowerCase();
-    filtered = filtered.filter((c) => c.player_name.toLowerCase().includes(s) || c.text.toLowerCase().includes(s) || c.tags?.some((t) => t.toLowerCase().includes(s)));
+    // identityLabel covers both the stored alias and the real name (when
+    // they differ) in one check, so searching "Sarah" finds a
+    // confessional stored under her alias too.
+    filtered = filtered.filter((c) => identityLabel(c).toLowerCase().includes(s) || c.text.toLowerCase().includes(s) || c.tags?.some((t) => t.toLowerCase().includes(s)));
   }
   filtered = [...filtered].sort((a, b) => sortOrder === "newest" ? new Date(b.created_at) - new Date(a.created_at) : new Date(a.created_at) - new Date(b.created_at));
 
@@ -98,7 +127,7 @@ export default function ConfessionalsHost({ gameId, round, players }) {
     if (groupBy === "none") return [["", filtered]];
     if (groupBy === "player") {
       const m = {};
-      filtered.forEach((c) => { (m[c.player_name] = m[c.player_name] || []).push(c); });
+      filtered.forEach((c) => { (m[identityLabel(c)] = m[identityLabel(c)] || []).push(c); });
       return Object.entries(m);
     }
     if (groupBy === "round") {
@@ -130,7 +159,7 @@ export default function ConfessionalsHost({ gameId, round, players }) {
   const buildRecapText = () => {
     const chosen = items.filter((c) => recapSelected.includes(c.id));
     const lines = chosen.map((c) => {
-      const who = recapOpts.anonymous ? "Anonymous Confessional" : c.player_name;
+      const who = recapOpts.anonymous ? "Anonymous Confessional" : identityLabel(c);
       const roundPart = recapOpts.rounds && c.round ? `, Round ${c.round}` : "";
       const tagPart = recapOpts.tags && c.tags?.length ? ` [${c.tags.join(", ")}]` : "";
       return `*${who}${roundPart}:*${tagPart}\n"${c.text}"`;
@@ -202,7 +231,7 @@ export default function ConfessionalsHost({ gameId, round, players }) {
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
           <select value={filterPlayer} onChange={(e) => setFilterPlayer(e.target.value)} style={selStyle}>
             <option value="">All players</option>
-            {playerNamesInInbox.map((p) => <option key={p} value={p}>{p}</option>)}
+            {playerNamesInInbox.map((p) => <option key={p} value={p}>{playerNameToLabel[p] || p}</option>)}
             <option value="__archived__">📦 Archived only</option>
           </select>
           <select value={filterRound} onChange={(e) => setFilterRound(e.target.value)} style={selStyle}>
@@ -257,7 +286,7 @@ export default function ConfessionalsHost({ gameId, round, players }) {
             {items.filter((c) => !c.archived).map((c) => (
               <label key={c.id} style={{ display: "flex", gap: 6, alignItems: "flex-start", fontSize: 12, color: "#a68fd6" }}>
                 <input type="checkbox" checked={recapSelected.includes(c.id)} onChange={(e) => setRecapSelected(e.target.checked ? [...recapSelected, c.id] : recapSelected.filter((x) => x !== c.id))} style={{ marginTop: 3 }} />
-                <span>{c.starred && "⭐ "}<strong style={{ color: "#f5f0ff" }}>{c.player_name}</strong> — {c.text.slice(0, 80)}{c.text.length > 80 ? "..." : ""}</span>
+                <span>{c.starred && "⭐ "}<strong style={{ color: "#f5f0ff" }}>{identityLabel(c)}</strong> — {c.text.slice(0, 80)}{c.text.length > 80 ? "..." : ""}</span>
               </label>
             ))}
           </div>
@@ -285,7 +314,7 @@ export default function ConfessionalsHost({ gameId, round, players }) {
                   >
                     <span style={{ fontSize: 12, color: "#a68fd6" }}>
                       {!c.read_by_host && <strong style={{ color: "#ff2d95" }}>● </strong>}
-                      <strong style={{ color: "#f5f0ff" }}>{c.player_name}</strong>
+                      <strong style={{ color: "#f5f0ff" }}>{identityLabel(c)}</strong>
                       {c.round ? ` · Round ${c.round}` : ""}{c.tags?.length ? ` · ${c.tags.join(", ")}` : ""}
                       {" · "}"{expandedIds.has(c.id) || c.text.length <= 70 ? c.text : c.text.slice(0, 70) + "..."}"
                     </span>
@@ -300,7 +329,7 @@ export default function ConfessionalsHost({ gameId, round, players }) {
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: "#f5f0ff" }}>
                         {!c.read_by_host && <strong style={{ color: "#ff2d95" }}>● </strong>}
-                        {c.player_name}{c.round ? ` · Round ${c.round}` : ""}
+                        {identityLabel(c)}{c.round ? ` · Round ${c.round}` : ""}
                       </span>
                       <span style={{ fontSize: 11, color: "#6b4f99" }}>{new Date(c.created_at).toLocaleString()}</span>
                     </div>

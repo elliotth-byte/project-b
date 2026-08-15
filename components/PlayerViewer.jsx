@@ -7,30 +7,61 @@ import FinalePlayer from "./FinalePlayer";
 import CeremonyPlayer from "./CeremonyPlayer";
 import ChaosPowerPlayer from "./ChaosPowerPlayer";
 import ConfessionalPlayer from "./ConfessionalPlayer";
+import ChatPanel from "./ChatPanel";
+import HelpPanel from "./HelpPanel";
+import RoundRevealGate from "./RoundRevealGate";
 import ChallengeErrorBoundary from "./ChallengeErrorBoundary";
 import RoundTimerBanner from "./RoundTimerBanner";
-import { PHASES } from "../lib/gameState";
+import PlayerMemoryWall from "./PlayerMemoryWall";
+import { PHASES, KEY_EXILE_HISTORY, KEY_CHALLENGE, KEY_EXILE, KEY_CHALLENGE_HISTORY } from "../lib/gameState";
+import { subscribeGameState } from "../lib/gameStorage";
+import { subscribeScores } from "../lib/challengeScores";
+import { subscribeCloseToTwenty } from "../lib/games/closeToTwentyData";
+import { subscribeRevealAck } from "../lib/revealAck";
+import { identityComplete } from "../lib/playerIdentity";
+import { computeWinnerAndNomineeIds } from "../lib/memoryWallGlow";
 
 const TABS = [
   { key: "game", label: "🎲 Game" },
   { key: "ceremony", label: "⚖️ Ceremony" },
   { key: "confessional", label: "🎥 Confessional" },
+  { key: "chat", label: "💬 Chat" },
+  { key: "help", label: "❓ Help" },
 ];
 
 // ─── Host: View as Player ───
 // Mirrors exactly what a given player currently sees on pages/play.jsx —
-// same tabs, same phase-specific components — so the host can check what
-// someone's screen actually looks like without asking them or logging in
-// as them. Strictly READ-ONLY: every interactive control that could write
-// something on that player's behalf (a vote, a nomination, a forfeit, a
-// re-entry request, a confessional) is switched off via the `readOnly`
-// prop threaded through the underlying player components. That's not just
-// good manners — game_state writes aren't checked against who's actually
-// authenticated, only against whatever player id gets passed in, so
-// without this guard the host could accidentally cast a real vote or
-// nomination while just looking around.
-export default function PlayerViewer({ gameId, targetPlayer, allPlayers, round, onExit }) {
+// same tabs, same phase-specific components, same identity/reveal-gate/
+// chat-lock logic — so the host can check what someone's screen actually
+// looks like without asking them or logging in as them. Strictly
+// READ-ONLY: every interactive control that could write something on
+// that player's behalf (a vote, a nomination, a forfeit, a re-entry
+// request, a confessional, a chat message, a reveal acknowledgment, a
+// game preference, a notification setting) is switched off via the
+// `readOnly` prop threaded through the underlying components. That's not
+// just good manners — game_state writes aren't checked against who's
+// actually authenticated, only against whatever player id gets passed
+// in, so without this guard the host could accidentally cast a real vote
+// or dismiss a player's own dramatic reveal while just looking around.
+//
+// Two things this deliberately does NOT attempt to replicate, both for
+// the same reason — the data needed to do so accurately isn't actually
+// available from the host's own browser/session, so a wrong answer would
+// be worse than no answer: a player's own push-notification subscription
+// state (tied to their own device, not the host's — see HelpPanel.jsx),
+// and avatar upload (shown as a static current-avatar display instead of
+// the live upload control, so the host can't accidentally change
+// someone's picture for them).
+export default function PlayerViewer({ gameId, targetPlayer, allPlayers, round, settings, onExit }) {
   const [tab, setTab] = useState("game");
+  const [showMemoryWall, setShowMemoryWall] = useState(false);
+  const [exileHistory, setExileHistory] = useState([]);
+  const [revealAck, setRevealAck] = useState({});
+  const [currentChallenge, setCurrentChallenge] = useState(null);
+  const [currentScores, setCurrentScores] = useState({});
+  const [closeToTwentyState, setCloseToTwentyState] = useState(null);
+  const [liveExile, setLiveExile] = useState(null);
+  const [challengeHistory, setChallengeHistory] = useState([]);
 
   // Reset to the Game tab whenever the host switches which player
   // they're viewing, so leftover tab state doesn't carry over.
@@ -40,12 +71,76 @@ export default function PlayerViewer({ gameId, targetPlayer, allPlayers, round, 
     if (round?.phase === PHASES.ENDED) setTab((t) => (t === "game" ? "ceremony" : t));
   }, [round?.phase]);
 
+  useEffect(() => {
+    if (!gameId) return;
+    const unsubscribe = subscribeGameState(gameId, KEY_EXILE_HISTORY, (v) => setExileHistory(v || []));
+    return unsubscribe;
+  }, [gameId]);
+
+  const latestExileEntry = exileHistory.length > 0 ? exileHistory.reduce((a, b) => (b.round > a.round ? b : a)) : null;
+
+  useEffect(() => {
+    if (!gameId || !latestExileEntry) { setRevealAck({}); return; }
+    const unsubscribe = subscribeRevealAck(gameId, latestExileEntry.round, setRevealAck);
+    return unsubscribe;
+  }, [gameId, latestExileEntry?.round]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Same reasoning as pages/play.jsx's identical subscriptions — needed
+  // to accurately replicate the chat-lock behavior during Who Said It /
+  // Close to 20 (see chatBlockedByChallenge below).
+  useEffect(() => {
+    if (!gameId) return;
+    const unsubscribe = subscribeGameState(gameId, KEY_CHALLENGE, setCurrentChallenge);
+    return unsubscribe;
+  }, [gameId]);
+  useEffect(() => {
+    if (!gameId || !round?.round) return;
+    const unsubscribe = subscribeScores(gameId, round.round, setCurrentScores);
+    return unsubscribe;
+  }, [gameId, round?.round]);
+  useEffect(() => {
+    if (!gameId || !round?.round) return;
+    const unsubscribe = subscribeCloseToTwenty(gameId, round.round, setCloseToTwentyState);
+    return unsubscribe;
+  }, [gameId, round?.round]);
+
+  // Same data the Memory Wall glows need on pages/play.jsx — see
+  // lib/memoryWallGlow.js.
+  useEffect(() => {
+    if (!gameId) return;
+    const unsubscribe = subscribeGameState(gameId, KEY_EXILE, setLiveExile);
+    return unsubscribe;
+  }, [gameId]);
+  useEffect(() => {
+    if (!gameId) return;
+    const unsubscribe = subscribeGameState(gameId, KEY_CHALLENGE_HISTORY, (v) => setChallengeHistory(v || []));
+    return unsubscribe;
+  }, [gameId]);
+
   if (!targetPlayer) return null;
 
   const player = { id: targetPlayer.id, name: targetPlayer.display_name };
   const exiled = targetPlayer.alive === false;
   const quitByChoice = exiled && targetPlayer.elimination_type === "quit";
   const gameEnded = round?.phase === PHASES.ENDED;
+  // Full identityComplete check (color AND, if alias mode is on, an
+  // alias) — not just the color check this used to have, which meant a
+  // player who'd picked a color but not yet set an alias would
+  // incorrectly show the normal game tabs here instead of the identity
+  // setup screen they're actually stuck on.
+  const needsIdentity = !identityComplete(targetPlayer, settings);
+  const pendingReveal = targetPlayer.approved && !needsIdentity && !!latestExileEntry && !revealAck[targetPlayer.id];
+  const { winnerIds, nomineeIds } = computeWinnerAndNomineeIds(challengeHistory, liveExile, round?.round);
+  const visibleTabs = TABS.filter((t) => t.key !== "chat" || settings?.chatEnabled);
+
+  const iAmWhoSaidItParticipant = currentChallenge?.gameType === "whosaidit" && currentChallenge?.participantIds?.includes(player.id);
+  const iAmCloseToTwentyParticipant = currentChallenge?.gameType === "closeto20" && currentChallenge?.participantIds?.includes(player.id);
+  const chatBlockedByChallenge = !!(
+    currentChallenge?.active && (
+      (iAmWhoSaidItParticipant && !currentScores[player.id]?.locked) ||
+      (iAmCloseToTwentyParticipant && !closeToTwentyState?.submittedIds?.includes(player.id))
+    )
+  );
 
   return (
     <div>
@@ -65,12 +160,6 @@ export default function PlayerViewer({ gameId, targetPlayer, allPlayers, round, 
         )}
       </div>
 
-      {!targetPlayer.color && (
-        <Card style={{ marginBottom: 20, textAlign: "center" }}>
-          <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: 0 }}>Hasn't picked a color yet.</p>
-        </Card>
-      )}
-
       {!targetPlayer.approved && (
         <Card style={{ marginBottom: 20, textAlign: "center", borderColor: "#ff2d95" }}>
           <div style={{ fontSize: 28, marginBottom: 6 }}>⏳</div>
@@ -80,7 +169,15 @@ export default function PlayerViewer({ gameId, targetPlayer, allPlayers, round, 
         </Card>
       )}
 
-      {gameEnded && targetPlayer.approved && (
+      {targetPlayer.approved && needsIdentity && (
+        <Card style={{ marginBottom: 20, textAlign: "center" }}>
+          <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: 0 }}>
+            {!targetPlayer.color ? "Hasn't picked a color yet." : "Has picked a color but hasn't set an alias yet."}
+          </p>
+        </Card>
+      )}
+
+      {gameEnded && targetPlayer.approved && !pendingReveal && (
         <div style={{ marginBottom: 20, textAlign: "center", padding: "28px 20px", background: "linear-gradient(160deg, #1a0a2e 0%, #1a0a2e 100%)", border: "2px solid #ff2d95", borderRadius: 12 }}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>🏆</div>
           <p style={{ color: "#f5f0ff", fontSize: 18, fontWeight: 700, margin: 0, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
@@ -89,7 +186,7 @@ export default function PlayerViewer({ gameId, targetPlayer, allPlayers, round, 
         </div>
       )}
 
-      {exiled && targetPlayer.approved && !gameEnded && (
+      {exiled && targetPlayer.approved && !gameEnded && !pendingReveal && (
         <div style={{
           marginBottom: 20, textAlign: "center", padding: "24px 20px",
           background: "linear-gradient(160deg, #200a1a 0%, #120612 100%)",
@@ -102,10 +199,16 @@ export default function PlayerViewer({ gameId, targetPlayer, allPlayers, round, 
         </div>
       )}
 
-      {targetPlayer.approved && targetPlayer.color && (
+      {pendingReveal && (
+        <ChallengeErrorBoundary label="Round Reveal">
+          <RoundRevealGate gameId={gameId} player={player} players={allPlayers} entry={latestExileEntry} readOnly />
+        </ChallengeErrorBoundary>
+      )}
+
+      {targetPlayer.approved && !needsIdentity && !pendingReveal && (
         <>
           <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #3d1f5c" }}>
-            {TABS.map((t) => (
+            {visibleTabs.map((t) => (
               <button key={t.key} onClick={() => setTab(t.key)} style={{
                 flex: 1, background: tab === t.key ? "rgba(255,45,149,0.13)" : "transparent",
                 color: tab === t.key ? "#ff2d95" : "#a68fd6",
@@ -120,7 +223,31 @@ export default function PlayerViewer({ gameId, targetPlayer, allPlayers, round, 
 
           {tab === "game" && !gameEnded && (
             <>
+              {settings?.avatarMode === "player_upload" && targetPlayer.effectiveAvatarUrl && (
+                <Card style={{ marginBottom: 16, textAlign: "center" }}>
+                  <img src={targetPlayer.effectiveAvatarUrl} alt="" style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover" }} />
+                  <p style={{ color: "#6b4f99", fontSize: 11, margin: "8px 0 0", fontStyle: "italic" }}>Current avatar — upload isn't previewable here.</p>
+                </Card>
+              )}
               <div style={{ marginBottom: 16 }}><RoundTimerBanner round={round} /></div>
+              <div style={{ marginBottom: 16 }}>
+                <button
+                  onClick={() => setShowMemoryWall(!showMemoryWall)}
+                  style={{
+                    background: showMemoryWall ? "rgba(255,45,149,0.13)" : "transparent",
+                    border: `1px solid ${showMemoryWall ? "#ff2d95" : "#3d1f5c"}`,
+                    color: showMemoryWall ? "#ff2d95" : "#a68fd6", fontSize: 12, cursor: "pointer",
+                    borderRadius: 20, padding: "6px 14px", fontWeight: 600,
+                  }}
+                >
+                  🖼 {showMemoryWall ? "Hide" : "Show"} memory wall
+                </button>
+                {showMemoryWall && (
+                  <div style={{ marginTop: 12 }}>
+                    <PlayerMemoryWall players={allPlayers.filter((p) => p.approved)} hideNameLabels={settings?.avatarMode === "collection" && settings?.avatarCollectionId === "default-gods"} winnerIds={winnerIds} nomineeIds={nomineeIds} />
+                  </div>
+                )}
+              </div>
               {(!round || round.phase === PHASES.LOBBY) && (
                 <Card style={{ marginBottom: 20, textAlign: "center" }}>
                   <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: 0 }}>
@@ -132,18 +259,18 @@ export default function PlayerViewer({ gameId, targetPlayer, allPlayers, round, 
                 <ChallengeErrorBoundary label="Battle"><ChallengePlayer gameId={gameId} player={player} players={allPlayers} round={round} readOnly /></ChallengeErrorBoundary>
               )}
               {round?.phase === PHASES.FATES && (
-                <ChallengeErrorBoundary label="Fates Ceremony"><FatesPlayer gameId={gameId} player={player} players={allPlayers} round={round} readOnly /></ChallengeErrorBoundary>
+                <ChallengeErrorBoundary label="Fates Ceremony"><FatesPlayer gameId={gameId} player={player} players={allPlayers} round={round} settings={settings} readOnly /></ChallengeErrorBoundary>
               )}
               {round?.phase === PHASES.EXILE && !exiled && (
                 <ChallengeErrorBoundary label="Exile Vote">
-                  <ChaosPowerPlayer gameId={gameId} round={round} player={player} players={allPlayers} readOnly />
-                  <ExileVotePlayer gameId={gameId} player={player} round={round} players={allPlayers} readOnly />
+                  <ChaosPowerPlayer gameId={gameId} round={round} player={player} players={allPlayers} settings={settings} readOnly />
+                  <ExileVotePlayer gameId={gameId} player={player} round={round} players={allPlayers} settings={settings} readOnly />
                 </ChallengeErrorBoundary>
               )}
               {round?.phase === PHASES.FINALE && (
                 <ChallengeErrorBoundary label="Finale">
-                  <ChaosPowerPlayer gameId={gameId} round={round} player={player} players={allPlayers} readOnly />
-                  <FinalePlayer gameId={gameId} player={player} round={round} players={allPlayers} readOnly />
+                  <ChaosPowerPlayer gameId={gameId} round={round} player={player} players={allPlayers} settings={settings} readOnly />
+                  <FinalePlayer gameId={gameId} player={player} round={round} players={allPlayers} settings={settings} readOnly />
                 </ChallengeErrorBoundary>
               )}
             </>
@@ -165,6 +292,29 @@ export default function PlayerViewer({ gameId, targetPlayer, allPlayers, round, 
             <ChallengeErrorBoundary label="Confessional">
               <ConfessionalPlayer gameId={gameId} player={player} round={round?.round} readOnly />
             </ChallengeErrorBoundary>
+          )}
+
+          {tab === "chat" && settings?.chatEnabled && !chatBlockedByChallenge && (
+            <ChallengeErrorBoundary label="Chat">
+              <ChatPanel gameId={gameId} player={player} players={allPlayers} realName={targetPlayer.display_name} isExiled={exiled} readOnly />
+            </ChallengeErrorBoundary>
+          )}
+
+          {tab === "chat" && settings?.chatEnabled && chatBlockedByChallenge && (
+            <Card style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>🔒</div>
+              <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>Chat's Locked</h3>
+              <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>
+                {iAmWhoSaidItParticipant
+                  ? "Panopticon is off-limits until they finish Who Said It — no peeking at the chat log for answers."
+                  : "Panopticon is off-limits until they've locked in their coin distribution — no tipping each other off."}
+                {" "}It'll unlock the moment they're done.
+              </p>
+            </Card>
+          )}
+
+          {tab === "help" && (
+            <HelpPanel gameId={gameId} player={player} readOnly />
           )}
         </>
       )}

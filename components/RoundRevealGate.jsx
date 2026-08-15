@@ -12,7 +12,7 @@ import { markRevealAcknowledged } from "../lib/revealAck";
 // exiled by peeking at another tab (or, for the person who WAS exiled,
 // seeing the "You have been exiled" banner) before the reveal actually
 // gets to that moment.
-export default function RoundRevealGate({ gameId, player, players, entry }) {
+export default function RoundRevealGate({ gameId, player, players, entry, readOnly = false }) {
   const [stepIndex, setStepIndex] = useState(0);
   const [advancing, setAdvancing] = useState(false);
 
@@ -45,6 +45,11 @@ export default function RoundRevealGate({ gameId, player, players, entry }) {
       setStepIndex((i) => i + 1);
       return;
     }
+    // Never actually acknowledge on the real player's behalf when this
+    // is being previewed read-only (see PlayerViewer.jsx) — this write
+    // is what dismisses the gate for them permanently; a host clicking
+    // through their own preview must never able to do that for them.
+    if (readOnly) return;
     setAdvancing(true);
     await markRevealAcknowledged(gameId, entry.round, player.id);
     setAdvancing(false);
@@ -123,8 +128,8 @@ export default function RoundRevealGate({ gameId, player, players, entry }) {
       </Card>
 
       <div style={{ marginTop: 18 }}>
-        <Btn onClick={next} disabled={advancing} style={{ width: "100%" }}>
-          {advancing ? "..." : isLast ? "Continue" : "Next →"}
+        <Btn onClick={next} disabled={advancing || (readOnly && isLast)} style={{ width: "100%" }}>
+          {advancing ? "..." : isLast ? (readOnly ? "End of preview" : "Continue") : "Next →"}
         </Btn>
       </div>
       <div style={{ textAlign: "center", marginTop: 10, fontSize: 11, color: "#6b4f99" }}>

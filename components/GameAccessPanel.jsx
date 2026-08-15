@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import {
+  isPushSupported, getExistingHostSubscription, subscribeHostToPush, updateHostPushPrefs, unsubscribeHostFromPush,
+} from "../lib/hostPushNotifications";
 
 const inputStyle = {
   display: "block", width: "100%", background: "#0d0618", border: "1px solid #3d1f5c",
@@ -16,11 +19,54 @@ const btnStyle = {
 // staring at once the season's actually underway; Admin is where the rest
 // of the setup/roster tools already live.
 export default function GameAccessPanel({
-  game, players, isPrimaryHost, origin,
+  game, players, isPrimaryHost, origin, userId,
   coHosts, inviteEmail, setInviteEmail, inviteStatus, inviteCoHost, removeCoHost,
 }) {
   const [showCoHosts, setShowCoHosts] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [pushSupported] = useState(() => isPushSupported());
+  const [pushLoading, setPushLoading] = useState(true);
+  const [pushSub, setPushSub] = useState(null);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushMessage, setPushMessage] = useState("");
+
+  // Only checked once the section is actually opened — no point
+  // registering a service worker / querying a subscription for a host
+  // who never looks at this section this session.
+  useEffect(() => {
+    if (!showNotifications || !userId || !pushSupported) { setPushLoading(false); return; }
+    setPushLoading(true);
+    getExistingHostSubscription(userId).then((sub) => { setPushSub(sub); setPushLoading(false); });
+  }, [showNotifications, userId, pushSupported]);
+
+  const enablePush = async () => {
+    setPushBusy(true);
+    setPushMessage("");
+    const res = await subscribeHostToPush(userId, game.id, { notifyNewConfessional: true, notifyPendingPlayer: true });
+    setPushBusy(false);
+    if (!res.ok) { setPushMessage(res.error || "Couldn't turn on notifications."); return; }
+    const sub = await getExistingHostSubscription(userId);
+    setPushSub(sub);
+  };
+
+  const togglePushPref = async (dbColumn) => {
+    if (!pushSub) return;
+    const newValue = !pushSub[dbColumn];
+    setPushSub((s) => ({ ...s, [dbColumn]: newValue }));
+    await updateHostPushPrefs(userId, {
+      notifyNewConfessional: dbColumn === "notify_new_confessional" ? newValue : pushSub.notify_new_confessional,
+      notifyPendingPlayer: dbColumn === "notify_pending_player" ? newValue : pushSub.notify_pending_player,
+    });
+  };
+
+  const disablePush = async () => {
+    setPushBusy(true);
+    await unsubscribeHostFromPush(userId);
+    setPushBusy(false);
+    setPushSub(null);
+  };
 
   const joinUrl = game?.join_code ? `${origin}/join/${game.join_code}` : "";
   const copyLink = () => {
@@ -72,6 +118,59 @@ export default function GameAccessPanel({
             <p style={{ fontSize: 11, color: "#6b4f99", marginTop: 8, fontStyle: "italic" }}>
               Co-hosts need an existing host account (see README.md) and get full access to run this season — roster, battles, announcements. Only the primary host can add/remove co-hosts or archive/delete the season.
             </p>
+          </div>
+        )}
+      </div>
+
+      {/* ---------------- Notifications ---------------- */}
+      <div style={{ marginBottom: 14 }}>
+        <button onClick={() => setShowNotifications((v) => !v)} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 12, cursor: "pointer", padding: 0 }}>
+          {showNotifications ? "▾" : "▸"} 🔔 Notifications {pushSub ? "(on)" : ""}
+        </button>
+        {showNotifications && (
+          <div style={{ marginTop: 8 }}>
+            <p style={{ fontSize: 11, color: "#6b4f99", margin: "0 0 8px", fontStyle: "italic" }}>
+              Personal to you — each host (primary or co-) on this season sets their own, on their own device. If you're running this season with a co-host, they'll need to turn these on separately from their own account.
+            </p>
+            {!pushSupported ? (
+              <p style={{ fontSize: 12, color: "#6b4f99", margin: 0, fontStyle: "italic" }}>Not supported in this browser.</p>
+            ) : pushLoading ? (
+              <p style={{ fontSize: 12, color: "#6b4f99", margin: 0, fontStyle: "italic" }}>Loading...</p>
+            ) : !pushSub ? (
+              <div>
+                <button
+                  onClick={enablePush}
+                  disabled={pushBusy}
+                  style={{
+                    padding: "8px 16px", borderRadius: 6, border: "none", cursor: pushBusy ? "default" : "pointer",
+                    background: "linear-gradient(135deg, #ff2d95, #b829ff)", color: "#05010f", fontSize: 13, fontWeight: 700,
+                  }}
+                >
+                  {pushBusy ? "..." : "Enable Notifications"}
+                </button>
+                {pushMessage && <p style={{ fontSize: 12, color: "#ff3860", marginTop: 8, marginBottom: 0 }}>{pushMessage}</p>}
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: "grid", gap: 10, marginBottom: 10 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#f5f0ff", cursor: "pointer" }}>
+                    <input type="checkbox" checked={!!pushSub.notify_new_confessional} onChange={() => togglePushPref("notify_new_confessional")} />
+                    New confessional — a player just submitted one
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#f5f0ff", cursor: "pointer" }}>
+                    <input type="checkbox" checked={!!pushSub.notify_pending_player} onChange={() => togglePushPref("notify_pending_player")} />
+                    New player waiting — someone's requested to join and needs approval
+                  </label>
+                </div>
+                <button
+                  onClick={disablePush}
+                  disabled={pushBusy}
+                  style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 14px", color: "#a68fd6", fontSize: 12, cursor: pushBusy ? "default" : "pointer" }}
+                >
+                  {pushBusy ? "..." : "Turn Off Notifications"}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

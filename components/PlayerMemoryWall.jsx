@@ -14,7 +14,7 @@ import { colorFor } from "../lib/playerColors";
 // each name baked into the portrait itself), never on the color-swatch
 // fallback, and never the "OUT" badge, which is separate information
 // the photo doesn't carry.
-export default function PlayerMemoryWall({ players, hideNameLabels = false }) {
+export default function PlayerMemoryWall({ players, hideNameLabels = false, winnerIds, nomineeIds }) {
   const roster = [...(players || [])].sort((a, b) => {
     if (a.alive !== b.alive) return a.alive ? -1 : 1; // alive players first
     return (a.display_name || "").localeCompare(b.display_name || "");
@@ -28,13 +28,30 @@ export default function PlayerMemoryWall({ players, hideNameLabels = false }) {
         const eliminated = !p.alive;
         const grayscale = eliminated ? "grayscale(1) brightness(0.6)" : "none";
 
+        // Gold: has won at least one battle this season (cumulative —
+        // see lib/memoryWallGlow.js for why this has to be cumulative
+        // rather than "most recent" for the combined case below to ever
+        // actually happen). Red: named in the CURRENT round's exile.
+        // Orange: both at once — a past winner who's now nominated,
+        // since immunity from an earlier win doesn't protect them later.
+        // Applied regardless of eliminated status — a past win is still
+        // meaningful history even for someone who's since been voted
+        // out, just layered under the existing grayscale/dimmed look
+        // rather than replacing it.
+        const isWinner = winnerIds?.has(p.id);
+        const isNominee = nomineeIds?.has(p.id);
+        const glowColor = isWinner && isNominee ? "#ff9f4d" : isWinner ? "#ffd700" : isNominee ? "#ff3860" : null;
+        const borderColor = glowColor || (eliminated ? "#3d1f5c" : color);
+        const glowShadow = glowColor ? `0 0 16px ${glowColor}aa` : "none";
+
         if (avatarUrl) {
           return (
             <div
               key={p.id}
               style={{
                 aspectRatio: "1", borderRadius: 14,
-                border: `4px solid ${eliminated ? "#3d1f5c" : color}`,
+                border: `4px solid ${borderColor}`,
+                boxShadow: glowShadow,
                 opacity: eliminated ? 0.75 : 1,
                 position: "relative", overflow: "hidden", background: "#0d0618",
               }}
@@ -77,7 +94,8 @@ export default function PlayerMemoryWall({ players, hideNameLabels = false }) {
             style={{
               aspectRatio: "1", borderRadius: 14,
               background: "#0d0618",
-              border: `4px solid ${eliminated ? "#3d1f5c" : color}`,
+              border: `4px solid ${borderColor}`,
+              boxShadow: glowShadow,
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8,
               opacity: eliminated ? 0.55 : 1,
               padding: 8,

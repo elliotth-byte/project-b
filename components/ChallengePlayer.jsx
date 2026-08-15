@@ -31,7 +31,6 @@ import MinesweeperPlayer from "./games/MinesweeperPlayer";
 import StroopPlayer from "./games/StroopPlayer";
 import RedLightGreenLightPlayer from "./games/RedLightGreenLightPlayer";
 import SlidingPuzzlePlayer from "./games/SlidingPuzzlePlayer";
-import SimmotionPlayer from "./games/SimmotionPlayer";
 import GameResultCard from "./games/GameResultCard";
 
 const GAME_COMPONENTS = {
@@ -60,7 +59,6 @@ const GAME_COMPONENTS = {
   stroop: StroopPlayer,
   redlightgreenlight: RedLightGreenLightPlayer,
   slidingpuzzle: SlidingPuzzlePlayer,
-  simmotion: SimmotionPlayer,
 };
 
 export default function ChallengePlayer({ gameId, player, players, round, readOnly = false }) {

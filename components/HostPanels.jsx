@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { Btn, Card, Badge } from "./ui";
-import { subscribeRound, subscribeSettings, startSeason as startSeasonState, PHASES } from "../lib/gameState";
+import { subscribeRound, subscribeSettings, startSeason as startSeasonState, PHASES, KEY_EXILE, KEY_CHALLENGE_HISTORY } from "../lib/gameState";
+import { subscribeGameState } from "../lib/gameStorage";
+import { computeWinnerAndNomineeIds } from "../lib/memoryWallGlow";
 import { fetchAllConfessionals, subscribeConfessionalsTable } from "../lib/confessionalsData";
 import { resolveIdentities, resolveIdentitiesForHost } from "../lib/playerIdentity";
 import { resolveAvatars } from "../lib/avatarIdentity";
@@ -36,6 +38,8 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
   const [unreadConfessionals, setUnreadConfessionals] = useState(0);
   const [starting, setStarting] = useState(false);
   const [viewAsPlayerId, setViewAsPlayerId] = useState("");
+  const [liveExile, setLiveExile] = useState(null);
+  const [challengeHistory, setChallengeHistory] = useState([]);
 
   useEffect(() => {
     const unsubscribe = subscribeRound(gameId, setRound);
@@ -44,6 +48,16 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
 
   useEffect(() => {
     const unsubscribe = subscribeSettings(gameId, setSettingsState);
+    return unsubscribe;
+  }, [gameId]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeGameState(gameId, KEY_EXILE, setLiveExile);
+    return unsubscribe;
+  }, [gameId]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeGameState(gameId, KEY_CHALLENGE_HISTORY, (v) => setChallengeHistory(v || []));
     return unsubscribe;
   }, [gameId]);
 
@@ -64,6 +78,7 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
   // included, once the season has them on — not the host's own always-real
   // view. See lib/playerIdentity.js.
   const playerViewRoster = resolveAvatars(resolveIdentities(players, { settings, round, isHost: false }), settings);
+  const { winnerIds, nomineeIds } = computeWinnerAndNomineeIds(challengeHistory, liveExile, round?.round);
   // Everywhere ELSE in the host UI (Challenge/Fates/Exile/Finale, History,
   // host Chat) — real name with the alias alongside, baked right into
   // display_name so every one of those components shows both without
@@ -153,7 +168,7 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
                 </button>
                 {showMemoryWall && (
                   <div style={{ marginTop: 12 }}>
-                    <PlayerMemoryWall players={hostApprovedRoster} hideNameLabels={settings?.avatarMode === "collection" && settings?.avatarCollectionId === "default-gods"} />
+                    <PlayerMemoryWall players={hostApprovedRoster} hideNameLabels={settings?.avatarMode === "collection" && settings?.avatarCollectionId === "default-gods"} winnerIds={winnerIds} nomineeIds={nomineeIds} />
                   </div>
                 )}
               </div>
@@ -223,6 +238,7 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
                 targetPlayer={playerViewRoster.find((p) => p.id === viewAsPlayerId) || null}
                 allPlayers={playerViewRoster}
                 round={round}
+                settings={settings}
                 onExit={() => setViewAsPlayerId("")}
               />
             )}

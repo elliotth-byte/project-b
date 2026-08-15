@@ -12,7 +12,7 @@ const RULES_URL = "https://docs.google.com/document/d/1F8Hqc8GatMDt7t6qfDTDl0w2o
 // iPhone/iPad home screen as an app-like icon, Game Preferences —
 // player-level settings (see lib/gamePrefs.js) that every game respects
 // — and Notifications, opt-in only (see lib/pushNotifications.js).
-export default function HelpPanel({ gameId, player, onPrefsChanged, onReplayTour }) {
+export default function HelpPanel({ gameId, player, onPrefsChanged, onReplayTour, readOnly = false }) {
   const [prefs, setPrefs] = useState(player?.gamePrefs || {});
   const [saving, setSaving] = useState(false);
 
@@ -23,9 +23,17 @@ export default function HelpPanel({ gameId, player, onPrefsChanged, onReplayTour
   const [pushMessage, setPushMessage] = useState("");
 
   useEffect(() => {
-    if (!player || !pushSupported) { setPushLoading(false); return; }
+    // A push subscription is tied to a specific browser/device (see
+    // lib/pushNotifications.js) — checked here via THIS browser's own
+    // service worker registration. In a read-only "View as Player"
+    // preview, that's the HOST's browser, which has nothing to do with
+    // the player being previewed — checking it would show the host's own
+    // subscription status mislabeled as that player's. Skipped entirely
+    // rather than shown inaccurately; see the static note in the render
+    // below instead.
+    if (readOnly || !player || !pushSupported) { setPushLoading(false); return; }
     getExistingSubscription(player.id).then((sub) => { setPushSub(sub); setPushLoading(false); });
-  }, [player, pushSupported]);
+  }, [player, pushSupported, readOnly]);
 
   const enablePush = async () => {
     setPushBusy(true);
@@ -82,7 +90,7 @@ export default function HelpPanel({ gameId, player, onPrefsChanged, onReplayTour
         </a>
       </Card>
 
-      {onReplayTour && (
+      {onReplayTour && !readOnly && (
         <Card style={{ textAlign: "center" }}>
           <button
             onClick={onReplayTour}
@@ -102,17 +110,17 @@ export default function HelpPanel({ gameId, player, onPrefsChanged, onReplayTour
             🎮 Game Preferences
           </div>
           <div style={{ display: "grid", gap: 10 }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#f5f0ff", cursor: "pointer" }}>
-              <input type="checkbox" checked={!!prefs.colorBlindMode} onChange={() => toggle("colorBlindMode")} disabled={saving} />
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#f5f0ff", cursor: readOnly ? "default" : "pointer" }}>
+              <input type="checkbox" checked={!!prefs.colorBlindMode} onChange={() => toggle("colorBlindMode")} disabled={saving || readOnly} />
               Colorblind-friendly colors — swaps to a colorblind-safe palette in every game that uses color as a signal
             </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#f5f0ff", cursor: "pointer" }}>
-              <input type="checkbox" checked={!!prefs.swipeControls} onChange={() => toggle("swipeControls")} disabled={saving} />
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#f5f0ff", cursor: readOnly ? "default" : "pointer" }}>
+              <input type="checkbox" checked={!!prefs.swipeControls} onChange={() => toggle("swipeControls")} disabled={saving || readOnly} />
               Swipe controls — adds swipe-to-move alongside tap/arrows in any game with directional movement
             </label>
           </div>
           <p style={{ fontSize: 11, color: "#6b4f99", marginTop: 10, marginBottom: 0, fontStyle: "italic" }}>
-            Saved to your player, not just this device — applies wherever you're logged in.
+            {readOnly ? "Shown for reference only — not editable from this preview." : "Saved to your player, not just this device — applies wherever you're logged in."}
           </p>
         </Card>
       )}
@@ -121,7 +129,11 @@ export default function HelpPanel({ gameId, player, onPrefsChanged, onReplayTour
         <div style={{ fontSize: 12, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
           🔔 Notifications
         </div>
-        {!pushSupported ? (
+        {readOnly ? (
+          <p style={{ fontSize: 12, color: "#6b4f99", margin: 0, fontStyle: "italic" }}>
+            Notification settings are tied to each player's own device and can't be previewed from here.
+          </p>
+        ) : !pushSupported ? (
           <p style={{ fontSize: 12, color: "#6b4f99", margin: 0, fontStyle: "italic" }}>
             Not supported in this browser. On iPhone/iPad, this needs Safari and the app added to your Home Screen first (see below) — it won't work from a regular Safari tab.
           </p>
@@ -182,7 +194,22 @@ export default function HelpPanel({ gameId, player, onPrefsChanged, onReplayTour
           <li>Tap <strong>Add</strong> in the top corner.</li>
         </ol>
         <p style={{ fontSize: 12, color: "#6b4f99", marginTop: 10, marginBottom: 0, fontStyle: "italic" }}>
-          You'll get an icon that opens straight to the game — no need to keep finding the link.
+          You'll get an icon that opens straight to the game — no need to keep finding the link. This step is also required before Notifications above will work on iPhone/iPad.
+        </p>
+      </Card>
+
+      <Card>
+        <div style={{ fontSize: 12, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+          📱 Add to Home Screen (Android)
+        </div>
+        <ol style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: "#f5f0ff", lineHeight: 1.8 }}>
+          <li>Open this page in <strong>Chrome</strong>.</li>
+          <li>Tap the <strong>⋮</strong> menu icon in the top-right corner.</li>
+          <li>Tap <strong>Add to Home screen</strong> (sometimes shown as <strong>Install app</strong>).</li>
+          <li>Tap <strong>Add</strong> (or <strong>Install</strong>) to confirm.</li>
+        </ol>
+        <p style={{ fontSize: 12, color: "#6b4f99", marginTop: 10, marginBottom: 0, fontStyle: "italic" }}>
+          Same convenience as above — an icon that opens straight to the game. Unlike iPhone/iPad, this step is optional on Android: Notifications above already work from a regular Chrome tab without it.
         </p>
       </Card>
     </div>

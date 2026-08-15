@@ -24,11 +24,12 @@ import LogoutButton from "../components/LogoutButton";
 import ChallengeErrorBoundary from "../components/ChallengeErrorBoundary";
 import RoundTimerBanner from "../components/RoundTimerBanner";
 import { Card } from "../components/ui";
-import { subscribeRound, subscribeSettings, PHASES, KEY_EXILE_HISTORY, KEY_CHALLENGE } from "../lib/gameState";
+import { subscribeRound, subscribeSettings, PHASES, KEY_EXILE_HISTORY, KEY_CHALLENGE, KEY_EXILE, KEY_CHALLENGE_HISTORY } from "../lib/gameState";
 import { subscribeGameState } from "../lib/gameStorage";
 import { subscribeScores } from "../lib/challengeScores";
 import { subscribeCloseToTwenty } from "../lib/games/closeToTwentyData";
 import { subscribeRevealAck } from "../lib/revealAck";
+import { computeWinnerAndNomineeIds } from "../lib/memoryWallGlow";
 import { resolveIdentities, identityComplete } from "../lib/playerIdentity";
 import { resolveAvatars } from "../lib/avatarIdentity";
 import { DEFAULT_GAME_PREFS } from "../lib/gamePrefs";
@@ -98,9 +99,21 @@ export default function PlayPage() {
   const [currentChallenge, setCurrentChallenge] = useState(null);
   const [currentScores, setCurrentScores] = useState({});
   const [closeToTwentyState, setCloseToTwentyState] = useState(null);
+  const [liveExile, setLiveExile] = useState(null);
+  const [challengeHistory, setChallengeHistory] = useState([]);
   useEffect(() => {
     if (!gameId) return;
     const unsubscribe = subscribeGameState(gameId, KEY_CHALLENGE, setCurrentChallenge);
+    return unsubscribe;
+  }, [gameId]);
+  useEffect(() => {
+    if (!gameId) return;
+    const unsubscribe = subscribeGameState(gameId, KEY_EXILE, setLiveExile);
+    return unsubscribe;
+  }, [gameId]);
+  useEffect(() => {
+    if (!gameId) return;
+    const unsubscribe = subscribeGameState(gameId, KEY_CHALLENGE_HISTORY, (v) => setChallengeHistory(v || []));
     return unsubscribe;
   }, [gameId]);
   useEffect(() => {
@@ -252,6 +265,16 @@ export default function PlayPage() {
       } else {
         setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, approved: created.approved, color: created.color, alias: created.alias, avatarUrl: created.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(created.game_prefs || {}) } });
         setJoined(true);
+        // Fire-and-forget — a host notification failing to send should
+        // never block the join itself, which already succeeded. Uses
+        // this session's own token directly (not a fresh getSession()
+        // call) since it's the exact same freshly-fetched session that
+        // just succeeded at the insert above.
+        fetch("/api/push/notify-host-event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ gameId, eventType: "pending_player", playerName: created.display_name }),
+        }).catch((e) => console.error("Push notify for pending player failed:", e));
       }
     })();
   }, [user, gameId]);
@@ -329,6 +352,7 @@ export default function PlayPage() {
   const pendingReveal = approved && !needsIdentity && !!playerName && !!latestExileEntry && !revealAck[player?.id];
 
   const visibleTabs = BASE_TABS.filter((t) => t.key !== "chat" || settings?.chatEnabled);
+  const { winnerIds, nomineeIds } = computeWinnerAndNomineeIds(challengeHistory, liveExile, round?.round);
 
   const handleQuit = async () => {
     if (!myPlayer) return;
@@ -466,7 +490,7 @@ export default function PlayPage() {
                   </button>
                   {showMemoryWall && (
                     <div style={{ marginTop: 12 }}>
-                      <PlayerMemoryWall players={identityAllPlayers.filter((p) => p.approved)} hideNameLabels={settings?.avatarMode === "collection" && settings?.avatarCollectionId === "default-gods"} />
+                      <PlayerMemoryWall players={identityAllPlayers.filter((p) => p.approved)} hideNameLabels={settings?.avatarMode === "collection" && settings?.avatarCollectionId === "default-gods"} winnerIds={winnerIds} nomineeIds={nomineeIds} />
                     </div>
                   )}
                 </div>
