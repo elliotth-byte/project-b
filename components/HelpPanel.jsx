@@ -1,19 +1,61 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "./ui";
 import { setGamePrefs } from "../lib/gamePrefs";
+import {
+  isPushSupported, getExistingSubscription, subscribeToPush, updatePushPrefs, unsubscribeFromPush,
+} from "../lib/pushNotifications";
 
 const RULES_URL = "https://docs.google.com/document/d/1F8Hqc8GatMDt7t6qfDTDl0w2oR_Avi1WN_0apSH2PfY/edit?tab=t.0";
 
 // ─── Player help ───
 // A link straight to the rules doc, how to get this page onto an
-// iPhone/iPad home screen as an app-like icon, and Game Preferences —
-// player-level settings (see lib/gamePrefs.js) that every game respects:
-// colorblind-safe palettes wherever color is a meaningful signal, and
-// swipe controls alongside tap/arrows in anything with directional
-// movement. Persisted to the player's own row, not just this device.
-export default function HelpPanel({ player, onPrefsChanged, onReplayTour }) {
+// iPhone/iPad home screen as an app-like icon, Game Preferences —
+// player-level settings (see lib/gamePrefs.js) that every game respects
+// — and Notifications, opt-in only (see lib/pushNotifications.js).
+export default function HelpPanel({ gameId, player, onPrefsChanged, onReplayTour }) {
   const [prefs, setPrefs] = useState(player?.gamePrefs || {});
   const [saving, setSaving] = useState(false);
+
+  const [pushSupported] = useState(() => isPushSupported());
+  const [pushLoading, setPushLoading] = useState(true);
+  const [pushSub, setPushSub] = useState(null); // existing subscription row, or null if not subscribed
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushMessage, setPushMessage] = useState("");
+
+  useEffect(() => {
+    if (!player || !pushSupported) { setPushLoading(false); return; }
+    getExistingSubscription(player.id).then((sub) => { setPushSub(sub); setPushLoading(false); });
+  }, [player, pushSupported]);
+
+  const enablePush = async () => {
+    setPushBusy(true);
+    setPushMessage("");
+    const res = await subscribeToPush(player.id, gameId, {
+      notifyRounds: true, notifyPublicMessages: false, notifyPrivateMessages: true,
+    });
+    setPushBusy(false);
+    if (!res.ok) { setPushMessage(res.error || "Couldn't turn on notifications."); return; }
+    const sub = await getExistingSubscription(player.id);
+    setPushSub(sub);
+  };
+
+  const togglePushPref = async (dbColumn) => {
+    if (!pushSub) return;
+    const newValue = !pushSub[dbColumn];
+    setPushSub((s) => ({ ...s, [dbColumn]: newValue }));
+    await updatePushPrefs(player.id, {
+      notifyRounds: dbColumn === "notify_rounds" ? newValue : pushSub.notify_rounds,
+      notifyPublicMessages: dbColumn === "notify_public_messages" ? newValue : pushSub.notify_public_messages,
+      notifyPrivateMessages: dbColumn === "notify_private_messages" ? newValue : pushSub.notify_private_messages,
+    });
+  };
+
+  const disablePush = async () => {
+    setPushBusy(true);
+    await unsubscribeFromPush(player.id);
+    setPushBusy(false);
+    setPushSub(null);
+  };
 
   const toggle = async (key) => {
     if (!player) return;
@@ -74,6 +116,60 @@ export default function HelpPanel({ player, onPrefsChanged, onReplayTour }) {
           </p>
         </Card>
       )}
+
+      <Card>
+        <div style={{ fontSize: 12, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+          🔔 Notifications
+        </div>
+        {!pushSupported ? (
+          <p style={{ fontSize: 12, color: "#6b4f99", margin: 0, fontStyle: "italic" }}>
+            Not supported in this browser. On iPhone/iPad, this needs Safari and the app added to your Home Screen first (see below) — it won't work from a regular Safari tab.
+          </p>
+        ) : pushLoading ? (
+          <p style={{ fontSize: 12, color: "#6b4f99", margin: 0, fontStyle: "italic" }}>Loading...</p>
+        ) : !pushSub ? (
+          <div>
+            <p style={{ fontSize: 12, color: "#6b4f99", margin: "0 0 10px" }}>
+              Get notified even when the app's closed. On iPhone/iPad, this only works after adding the app to your Home Screen (see below) and opening it from that icon — not from a regular Safari tab.
+            </p>
+            <button
+              onClick={enablePush}
+              disabled={pushBusy}
+              style={{
+                padding: "8px 16px", borderRadius: 6, border: "none", cursor: pushBusy ? "default" : "pointer",
+                background: "linear-gradient(135deg, #ff2d95, #b829ff)", color: "#05010f", fontSize: 13, fontWeight: 700,
+              }}
+            >
+              {pushBusy ? "..." : "Enable Notifications"}
+            </button>
+            {pushMessage && <p style={{ fontSize: 12, color: "#ff3860", marginTop: 8, marginBottom: 0 }}>{pushMessage}</p>}
+          </div>
+        ) : (
+          <div>
+            <div style={{ display: "grid", gap: 10, marginBottom: 10 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#f5f0ff", cursor: "pointer" }}>
+                <input type="checkbox" checked={!!pushSub.notify_rounds} onChange={() => togglePushPref("notify_rounds")} />
+                Round changes — a new Battle, Exile Vote, or Fates Ceremony starting
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#f5f0ff", cursor: "pointer" }}>
+                <input type="checkbox" checked={!!pushSub.notify_public_messages} onChange={() => togglePushPref("notify_public_messages")} />
+                Public messages — new activity in Panopticon (group chat)
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#f5f0ff", cursor: "pointer" }}>
+                <input type="checkbox" checked={!!pushSub.notify_private_messages} onChange={() => togglePushPref("notify_private_messages")} />
+                Private messages — new DMs sent to you
+              </label>
+            </div>
+            <button
+              onClick={disablePush}
+              disabled={pushBusy}
+              style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 14px", color: "#a68fd6", fontSize: 12, cursor: pushBusy ? "default" : "pointer" }}
+            >
+              {pushBusy ? "..." : "Turn Off Notifications"}
+            </button>
+          </div>
+        )}
+      </Card>
 
       <Card>
         <div style={{ fontSize: 12, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>

@@ -537,6 +537,7 @@ export default function PlayPage() {
 
             {tab === "help" && (
               <HelpPanel
+                gameId={gameId}
                 player={player}
                 onPrefsChanged={(gamePrefs) => setMyPlayer((p) => p && ({ ...p, gamePrefs }))}
                 onReplayTour={() => setShowNavTour(true)}

@@ -7,6 +7,27 @@ import {
 } from "../lib/chatData";
 
 import { colorFor } from "../lib/playerColors";
+import { supabase } from "../lib/supabaseClient";
+
+// Fire-and-forget — a push notification failing to send should never
+// block or show an error for the actual message send, which already
+// succeeded by the time this is called. Needs the caller's own auth
+// token since pages/api/push/notify-message.js verifies the sender is
+// really who they claim, not just an unauthenticated broadcast trigger.
+async function notifyPushForMessage(gameId, kind, senderId, senderName, body, threadId) {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data?.session?.access_token;
+    if (!token) return;
+    await fetch("/api/push/notify-message", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ gameId, kind, senderId, senderName, body, threadId }),
+    });
+  } catch (e) {
+    console.error("Push notify for message failed:", e);
+  }
+}
 
 function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -107,7 +128,7 @@ function GroupChatView({ gameId, player, players, realName, onRead }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "60vh" }}>
       <MessageList messages={rows} containerRef={listRef} />
-      <Composer placeholder="Message everyone..." onSend={(t) => sendGroupMessage(gameId, player.id, player.name, t, realName)} />
+      <Composer placeholder="Message everyone..." onSend={(t) => { sendGroupMessage(gameId, player.id, player.name, t, realName); notifyPushForMessage(gameId, "group", player.id, player.name, t); }} />
     </div>
   );
 }
@@ -118,7 +139,7 @@ function threadLabel(thread, player, byId) {
   return others.map((id) => byId[id] || "?").join(", ") || "?";
 }
 
-function ThreadView({ thread, player, players, byId, onBack, onRead }) {
+function ThreadView({ gameId, thread, player, players, byId, onBack, onRead }) {
   const [messages, setMessages] = useState([]);
   const listRef = useRef(null);
   const label = threadLabel(thread, player, byId);
@@ -146,7 +167,7 @@ function ThreadView({ thread, player, players, byId, onBack, onRead }) {
         <strong style={{ color: "#f5f0ff", fontSize: 13 }}>{label}</strong>
       </div>
       <MessageList messages={rows} containerRef={listRef} />
-      <Composer placeholder={`Message ${label}...`} onSend={(t) => sendThreadMessage(thread.id, player.id, t)} />
+      <Composer placeholder={`Message ${label}...`} onSend={(t) => { sendThreadMessage(thread.id, player.id, t); notifyPushForMessage(gameId, "thread", player.id, player.name, t, thread.id); }} />
     </div>
   );
 }
@@ -172,7 +193,7 @@ function ExileRoomView({ gameId, player, players, byId, onRead }) {
   if (!thread) {
     return <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No one's been exiled yet — this room opens up the moment someone is.</p>;
   }
-  return <ThreadView thread={thread} player={player} players={players} byId={byId} onBack={() => {}} onRead={onRead} />;
+  return <ThreadView gameId={gameId} thread={thread} player={player} players={players} byId={byId} onBack={() => {}} onRead={onRead} />;
 }
 
 function MessagesView({ gameId, player, players, byId, openThread, setOpenThread, reads, onRead, isExiled }) {
@@ -217,7 +238,7 @@ function MessagesView({ gameId, player, players, byId, openThread, setOpenThread
   };
 
   if (openThread) {
-    return <ThreadView thread={openThread} player={player} players={players} byId={byId} onBack={() => { setOpenThread(null); reload(); }} onRead={onRead} />;
+    return <ThreadView gameId={gameId} thread={openThread} player={player} players={players} byId={byId} onBack={() => { setOpenThread(null); reload(); }} onRead={onRead} />;
   }
 
   // Same restriction applies to who shows up when starting a brand new
