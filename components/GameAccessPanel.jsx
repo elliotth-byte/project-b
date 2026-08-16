@@ -44,7 +44,9 @@ export default function GameAccessPanel({
   const enablePush = async () => {
     setPushBusy(true);
     setPushMessage("");
-    const res = await subscribeHostToPush(userId, game.id, { notifyNewConfessional: true, notifyPendingPlayer: true });
+    const res = await subscribeHostToPush(userId, game.id, {
+      notifyNewConfessional: true, notifyPendingPlayer: true, notifyRoundChanges: true, notifyChatActivity: false,
+    });
     setPushBusy(false);
     if (!res.ok) { setPushMessage(res.error || "Couldn't turn on notifications."); return; }
     const sub = await getExistingHostSubscription(userId);
@@ -58,6 +60,8 @@ export default function GameAccessPanel({
     await updateHostPushPrefs(userId, {
       notifyNewConfessional: dbColumn === "notify_new_confessional" ? newValue : pushSub.notify_new_confessional,
       notifyPendingPlayer: dbColumn === "notify_pending_player" ? newValue : pushSub.notify_pending_player,
+      notifyRoundChanges: dbColumn === "notify_round_changes" ? newValue : pushSub.notify_round_changes,
+      notifyChatActivity: dbColumn === "notify_chat_activity" ? newValue : pushSub.notify_chat_activity,
     });
   };
 
@@ -160,6 +164,14 @@ export default function GameAccessPanel({
                   <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#f5f0ff", cursor: "pointer" }}>
                     <input type="checkbox" checked={!!pushSub.notify_pending_player} onChange={() => togglePushPref("notify_pending_player")} />
                     New player waiting — someone's requested to join and needs approval
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#f5f0ff", cursor: "pointer" }}>
+                    <input type="checkbox" checked={!!pushSub.notify_round_changes} onChange={() => togglePushPref("notify_round_changes")} />
+                    Round updates — a new Battle, Exile Vote, Fates Ceremony, or Finale starting (including ones the cron job auto-advances without you)
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#f5f0ff", cursor: "pointer" }}>
+                    <input type="checkbox" checked={!!pushSub.notify_chat_activity} onChange={() => togglePushPref("notify_chat_activity")} />
+                    Chat activity — any new message, Panopticon or DM. Off by default — you can already read every thread, so this is the noisiest option here.
                   </label>
                 </div>
                 <button

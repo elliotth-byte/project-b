@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { sendPushToGame, sendPushToPlayers } from "../../../lib/sendPush";
+import { sendPushToGame, sendPushToPlayers, sendPushToHosts } from "../../../lib/sendPush";
 
 // ============================================================
 // Called by the client right after a message successfully sends (see
@@ -11,7 +11,11 @@ import { sendPushToGame, sendPushToPlayers } from "../../../lib/sendPush";
 // including the Exile Room). Group notifies everyone in the game who
 // opted into public-message pushes; thread notifies only that specific
 // thread's OTHER members who opted into private-message pushes — never
-// the whole game, and never the sender themselves either way.
+// the whole game, and never the sender themselves either way. Hosts get
+// a single combined "chat activity" option for either kind (rather than
+// their own public/private split like players have) since a host can
+// already read every thread in the game — there's no meaningful
+// public/private distinction from their side.
 // ============================================================
 
 const PREVIEW_LENGTH = 100;
@@ -45,6 +49,10 @@ export default async function handler(req, res) {
       title: `💬 ${senderName}`, body: preview, url: `/play?game=${gameId}`, tag: "chat-group",
       filterColumn: "notify_public_messages", excludePlayerId: senderId,
     });
+    await sendPushToHosts(gameId, {
+      title: `💬 ${senderName} (Panopticon)`, body: preview, url: `/host?game=${gameId}`, tag: "chat-group",
+      filterColumn: "notify_chat_activity",
+    });
     return res.status(200).json({ ok: true });
   }
 
@@ -57,6 +65,10 @@ export default async function handler(req, res) {
     await sendPushToPlayers(memberIds, {
       title: `💬 ${senderName}`, body: preview, url: `/play?game=${gameId}`, tag: `chat-thread-${threadId}`,
       filterColumn: "notify_private_messages", excludePlayerId: senderId,
+    });
+    await sendPushToHosts(gameId, {
+      title: `💬 ${senderName} (DM)`, body: preview, url: `/host?game=${gameId}`, tag: `chat-thread-${threadId}`,
+      filterColumn: "notify_chat_activity",
     });
     return res.status(200).json({ ok: true });
   }
