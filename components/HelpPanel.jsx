@@ -12,7 +12,7 @@ const RULES_URL = "https://docs.google.com/document/d/1F8Hqc8GatMDt7t6qfDTDl0w2o
 // iPhone/iPad home screen as an app-like icon, Game Preferences —
 // player-level settings (see lib/gamePrefs.js) that every game respects
 // — and Notifications, opt-in only (see lib/pushNotifications.js).
-export default function HelpPanel({ gameId, player, onPrefsChanged, onReplayTour, readOnly = false }) {
+export default function HelpPanel({ gameId, player, onPrefsChanged, onReplayTour, onQuit, quitBusy, readOnly = false }) {
   const [prefs, setPrefs] = useState(player?.gamePrefs || {});
   const [saving, setSaving] = useState(false);
 
@@ -89,6 +89,27 @@ export default function HelpPanel({ gameId, player, onPrefsChanged, onReplayTour
           📖 Read the Rules
         </a>
       </Card>
+
+      {onQuit && !readOnly && (
+        <Card style={{ borderColor: "rgba(255,56,96,0.4)", textAlign: "center" }}>
+          <div style={{ fontSize: 12, color: "#ff3860", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+            ⚠️ Leave the Game
+          </div>
+          <p style={{ fontSize: 12, color: "#a68fd6", margin: "0 0 12px" }}>
+            This removes you from the season entirely — it can't be undone, and you can't rejoin.
+          </p>
+          <button
+            onClick={onQuit}
+            disabled={quitBusy}
+            style={{
+              background: "none", border: "1px solid #ff3860", borderRadius: 8, padding: "8px 16px",
+              color: "#ff3860", fontSize: 13, fontWeight: 700, cursor: quitBusy ? "default" : "pointer",
+            }}
+          >
+            {quitBusy ? "Leaving..." : "🚪 Permanently Quit"}
+          </button>
+        </Card>
+      )}
 
       {onReplayTour && !readOnly && (
         <Card style={{ textAlign: "center" }}>

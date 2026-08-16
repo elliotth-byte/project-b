@@ -4,6 +4,7 @@ import { subscribeGameState, storageUpdate } from "../lib/gameStorage";
 import { KEY_CHALLENGE, KEY_REENTRY } from "../lib/gameState";
 import { setReentryDecision } from "../lib/reentryData";
 import { REENTRY_STATUS } from "../lib/reentryLogic";
+import { formatDurationHours } from "../lib/fatesLogic";
 import { subscribeScores, forfeitChallenge } from "../lib/challengeScores";
 import { GAME_REGISTRY } from "../lib/challengeGames";
 import Match3Player from "./games/Match3Player";
@@ -61,7 +62,7 @@ const GAME_COMPONENTS = {
   slidingpuzzle: SlidingPuzzlePlayer,
 };
 
-export default function ChallengePlayer({ gameId, player, players, round, readOnly = false }) {
+export default function ChallengePlayer({ gameId, player, players, round, settings, readOnly = false }) {
   const [challenge, setChallenge] = useState(null);
   const [scores, setScores] = useState({});
   const [reentry, setReentry] = useState([]);
@@ -297,6 +298,10 @@ export default function ChallengePlayer({ gameId, player, players, round, readOn
             )}
           </>
         )
+      ) : player?.battleBanRound === round?.round ? (
+        <p style={{ color: "#ff3860", fontSize: 14, margin: 0 }}>
+          🚫 Barred from this battle — missed your {settings?.fatesDurationSec ? formatDurationHours(settings.fatesDurationSec) : "Fates"} nomination window last round, so the game auto-nominated for you and this is the consequence.
+        </p>
       ) : (
         <p style={{ color: "#a68fd6", fontSize: 14, margin: 0 }}>Sitting this battle out — cheer everyone on!</p>
       )}

@@ -256,7 +256,7 @@ export default function PlayerViewer({ gameId, targetPlayer, allPlayers, round, 
                 </Card>
               )}
               {round?.phase === PHASES.CHALLENGE && (
-                <ChallengeErrorBoundary label="Battle"><ChallengePlayer gameId={gameId} player={player} players={allPlayers} round={round} readOnly /></ChallengeErrorBoundary>
+                <ChallengeErrorBoundary label="Battle"><ChallengePlayer gameId={gameId} player={player} players={allPlayers} round={round} settings={settings} readOnly /></ChallengeErrorBoundary>
               )}
               {round?.phase === PHASES.FATES && (
                 <ChallengeErrorBoundary label="Fates Ceremony"><FatesPlayer gameId={gameId} player={player} players={allPlayers} round={round} settings={settings} readOnly /></ChallengeErrorBoundary>

@@ -221,13 +221,13 @@ export default function PlayPage() {
     (async () => {
       const { data: existing } = await supabase
         .from("players")
-        .select("id, display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs")
+        .select("id, display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs, battle_ban_round")
         .eq("game_id", gameId)
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (existing) {
-        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, approved: existing.approved, color: existing.color, alias: existing.alias, avatarUrl: existing.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(existing.game_prefs || {}) } });
+        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, approved: existing.approved, color: existing.color, alias: existing.alias, avatarUrl: existing.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(existing.game_prefs || {}) }, battleBanRound: existing.battle_ban_round });
         setJoined(true);
         return;
       }
@@ -258,12 +258,12 @@ export default function PlayPage() {
       const { data: created, error } = await supabase
         .from("players")
         .insert({ game_id: gameId, user_id: session.user.id, display_name: displayNameFromUser(user), approved: false })
-        .select("id, display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs")
+        .select("id, display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs, battle_ban_round")
         .single();
       if (error) {
         setJoinError(`Couldn't join this game: ${error.message}${error.code ? ` [code=${error.code}]` : ""}${error.details ? ` — ${error.details}` : ""} (user_id=${session.user.id})`);
       } else {
-        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, approved: created.approved, color: created.color, alias: created.alias, avatarUrl: created.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(created.game_prefs || {}) } });
+        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, approved: created.approved, color: created.color, alias: created.alias, avatarUrl: created.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(created.game_prefs || {}) }, battleBanRound: created.battle_ban_round });
         setJoined(true);
         // Fire-and-forget — a host notification failing to send should
         // never block the join itself, which already succeeded. Uses
@@ -284,8 +284,8 @@ export default function PlayPage() {
   useEffect(() => {
     if (!myPlayer?.id) return;
     const load = async () => {
-      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs").eq("id", myPlayer.id).maybeSingle();
-      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, approved: data.approved, color: data.color, alias: data.alias, avatarUrl: data.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(data.game_prefs || {}) } }));
+      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs, battle_ban_round").eq("id", myPlayer.id).maybeSingle();
+      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, approved: data.approved, color: data.color, alias: data.alias, avatarUrl: data.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(data.game_prefs || {}) }, battleBanRound: data.battle_ban_round }));
     };
     const channel = supabase
       .channel(`self-player-${myPlayer.id}`)
@@ -314,7 +314,7 @@ export default function PlayPage() {
   // including to themselves, right down to what shows up in "Playing
   // as..." up top and what name their own chat/confessional posts carry.
   const effectivePlayerName = settings?.aliasEnabled && myPlayer?.alias && round?.phase !== PHASES.ENDED ? myPlayer.alias : playerName;
-  const player = myPlayer ? { id: myPlayer.id, name: effectivePlayerName, gamePrefs: myPlayer.gamePrefs || DEFAULT_GAME_PREFS } : null;
+  const player = myPlayer ? { id: myPlayer.id, name: effectivePlayerName, gamePrefs: myPlayer.gamePrefs || DEFAULT_GAME_PREFS, battleBanRound: myPlayer.battleBanRound } : null;
 
   // Who Said It pulls its quiz straight from Panopticon chat history, and
   // Close to 20 needs every bank kept a total mystery until the reveal
@@ -373,12 +373,12 @@ export default function PlayPage() {
         <HomeLink />
         <span style={{ color: "#a68fd6", fontSize: 13 }}>Playing as {effectivePlayerName || "..."}</span>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          {joined && myPlayer && myPlayer.alive !== false && !gameEnded && (
+          {joined && myPlayer && !approved && (
             <button onClick={handleQuit} disabled={quitBusy} style={{
               background: "none", border: "none", color: "#ff3860", fontSize: 12,
               cursor: quitBusy ? "not-allowed" : "pointer", opacity: quitBusy ? 0.5 : 1,
             }}>
-              {quitBusy ? "Leaving..." : approved ? "🚪 Quit" : "✕ Cancel"}
+              {quitBusy ? "Leaving..." : "✕ Cancel"}
             </button>
           )}
           <button onClick={signOut} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 12, cursor: "pointer" }}>Log out</button>
@@ -502,7 +502,7 @@ export default function PlayPage() {
                   </Card>
                 )}
                 {round?.phase === PHASES.CHALLENGE && (
-                  <ChallengeErrorBoundary label="Battle"><ChallengePlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} /></ChallengeErrorBoundary>
+                  <ChallengeErrorBoundary label="Battle"><ChallengePlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} settings={settings} /></ChallengeErrorBoundary>
                 )}
                 {round?.phase === PHASES.FATES && (
                   <ChallengeErrorBoundary label="Fates Ceremony"><FatesPlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} settings={settings} /></ChallengeErrorBoundary>
@@ -565,6 +565,8 @@ export default function PlayPage() {
                 player={player}
                 onPrefsChanged={(gamePrefs) => setMyPlayer((p) => p && ({ ...p, gamePrefs }))}
                 onReplayTour={() => setShowNavTour(true)}
+                onQuit={approved && myPlayer.alive !== false && !gameEnded ? handleQuit : undefined}
+                quitBusy={quitBusy}
               />
             )}
           </>

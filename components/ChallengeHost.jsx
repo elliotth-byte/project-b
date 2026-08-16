@@ -7,6 +7,7 @@ import { GAME_REGISTRY, gameConfigWithDefaults } from "../lib/challengeGames";
 import { subscribeScores, scoresToPlacements, resetPlayerAttempt } from "../lib/challengeScores";
 import { subscribeReentry, getReentry } from "../lib/reentryData";
 import { REENTRY_STATUS } from "../lib/reentryLogic";
+import { formatDurationHours } from "../lib/fatesLogic";
 import { DEFAULT_PARTICIPATION, computeParticipants } from "../lib/challengeParticipants";
 import { initPlinkoBracket, subscribePlinkoBracket } from "../lib/games/plinkoBracketData";
 import { initPit } from "../lib/games/pitData";
@@ -67,7 +68,16 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   }, [gameId]);
 
   const approvedAlive = players.filter((p) => p.approved && p.alive);
-  const alivePicker = approvedAlive.map((p) => ({ id: p.id, name: p.display_name }));
+  // A player barred from THIS round's Battle (see lib/roundEngine.js's
+  // autoNominateForWinnerIfTimedOut — the consequence for a battle
+  // winner missing their own Fates nomination within the ceremony's
+  // configured time limit) is excluded from the participant pool
+  // entirely, same as if they'd never been alive-and-approved in the
+  // first place. battle_ban_round naturally stops applying after this
+  // round passes — a later round's number will never match it again.
+  const eligibleForBattle = approvedAlive.filter((p) => p.battle_ban_round !== round?.round);
+  const battleBannedPlayers = approvedAlive.filter((p) => p.battle_ban_round === round?.round);
+  const alivePicker = eligibleForBattle.map((p) => ({ id: p.id, name: p.display_name }));
 
   // Every exiled player still eligible (hasn't used their one shot yet)
   // gets to opt in or out of THIS specific challenge, deliberately, from
@@ -203,6 +213,17 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
         )}
 
         <ParticipantPicker alive={alivePicker} value={config} onChange={setConfig} />
+
+        {battleBannedPlayers.length > 0 && (
+          <div style={{ background: "rgba(255,56,96,0.08)", border: "1px solid rgba(255,56,96,0.3)", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: "#ff3860", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+              🚫 Barred from this battle
+            </div>
+            <p style={{ fontSize: 11, color: "#a68fd6", margin: 0, fontStyle: "italic" }}>
+              {battleBannedPlayers.map((p) => p.display_name).join(", ")} — missed their {settings?.fatesDurationSec ? formatDurationHours(settings.fatesDurationSec) : "Fates"} nomination window last round, so the game auto-nominated on their behalf and barred them from competing this round as the consequence.
+            </p>
+          </div>
+        )}
 
         {pendingReentrants.length > 0 && (
           <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
