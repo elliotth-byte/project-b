@@ -13,9 +13,11 @@ import { submitStatement, submitJuryQuestion, submitResponse, isJuryEligible } f
 //     write one question or statement to the final 3
 //   - everyone else — including a quit/removed player, or the host's own
 //     "View as Player" — just reads
-// Submitting is only offered during finale.phase === "qa" — once voting
-// opens the window's closed, but the whole feed stays visible afterward
-// as a permanent record.
+// Submitting is open for as long as voting itself is open — the two now
+// run concurrently for the whole Finale rather than Q&A closing the
+// moment voting starts, so this tracks finale.votingOpen directly
+// instead of a separate "qa" phase value. The whole feed stays visible
+// as a permanent record even after voting (and submissions) close.
 export default function FinaleQaPanel({ gameId, finale, qa, players, player, readOnly = false }) {
   const [statementDraft, setStatementDraft] = useState("");
   const [questionDraft, setQuestionDraft] = useState("");
@@ -27,7 +29,7 @@ export default function FinaleQaPanel({ gameId, finale, qa, players, player, rea
   const me = canSubmit ? (players || []).find((p) => p.id === player.id) : null;
   const isFinalist = canSubmit && finalistIds.includes(player.id);
   const isJuror = canSubmit && isJuryEligible(me);
-  const submissionsOpen = finale.phase === "qa";
+  const submissionsOpen = !!finale.votingOpen;
 
   const myStatement = isFinalist ? qa.statements[player.id] : null;
   const myQuestion = isJuror ? qa.questions.find((q) => q.jurorId === player.id) : null;

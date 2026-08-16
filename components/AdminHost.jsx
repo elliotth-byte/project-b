@@ -25,6 +25,30 @@ export default function AdminHost({ gameId, players, round }) {
   const [resettingId, setResettingId] = useState(null);
   const [resetResult, setResetResult] = useState(null); // { playerId, username, newPassword } | null
   const [resetError, setResetError] = useState("");
+  const [notifiedPlayerIds, setNotifiedPlayerIds] = useState(new Set());
+
+  // A player can have multiple subscription rows (one per device — see
+  // sql/add-push-subscriptions.sql), so this only needs to know WHICH
+  // player_ids appear at all, not the individual rows or their specific
+  // preferences. select() is scoped to just player_id deliberately —
+  // the host read policy (sql/add-host-reads-push-subscriptions.sql)
+  // grants row access, but there's no reason to also pull each device's
+  // actual push endpoint/keys over the network for a view that only
+  // needs a yes/no per player.
+  useEffect(() => {
+    if (!gameId) return;
+    let active = true;
+    const load = async () => {
+      const { data } = await supabase.from("push_subscriptions").select("player_id").eq("game_id", gameId);
+      if (active) setNotifiedPlayerIds(new Set((data || []).map((r) => r.player_id)));
+    };
+    load();
+    const channel = supabase
+      .channel(`push-subs-roster:${gameId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "push_subscriptions", filter: `game_id=eq.${gameId}` }, load)
+      .subscribe();
+    return () => { active = false; supabase.removeChannel(channel); };
+  }, [gameId]);
 
   const resetPassword = async (player) => {
     if (!window.confirm(`Reset ${player.display_name}'s password? Their old password stops working immediately.`)) return;
@@ -308,6 +332,28 @@ export default function AdminHost({ gameId, players, round }) {
               </div>
             </Card>
           )}
+
+          <Card>
+            <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
+              🔔 Notifications
+            </h3>
+            <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+              {notifiedPlayerIds.size} of {players.filter((p) => p.approved).length} approved players have notifications enabled on at least one device.
+            </p>
+            <div style={{ display: "grid", gap: 6 }}>
+              {players.filter((p) => p.approved).map((p) => {
+                const notified = notifiedPlayerIds.has(p.id);
+                return (
+                  <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0d0618", borderRadius: 6, padding: "6px 12px" }}>
+                    <span style={{ fontSize: 13, color: "#f5f0ff" }}>{p.display_name}</span>
+                    <span style={{ fontSize: 11, color: notified ? "#00ff9d" : "#6b4f99", fontWeight: 600 }}>
+                      {notified ? "🔔 On" : "🔕 Off"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
 
           <Card>
             <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🛠 Player Names</h3>

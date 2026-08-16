@@ -55,7 +55,23 @@ function groupReactions(reactions, myPlayerId) {
 
 function MessageBubble({ mine, name, nameColor, avatarUrl, body, time, reactions, myPlayerId, onToggleReaction, readOnly = false }) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customEmoji, setCustomEmoji] = useState("");
   const grouped = groupReactions(reactions, myPlayerId);
+
+  const submitCustom = () => {
+    // Unicode code points, not JS string length (which counts UTF-16
+    // units and would undercount most emoji) — trimmed and capped
+    // generously enough for a compound emoji (skin tone modifier, ZWJ
+    // sequences like a family or a flag) without accepting someone
+    // pasting in actual sentences as a "reaction".
+    const codePoints = [...customEmoji.trim()];
+    if (codePoints.length === 0 || codePoints.length > 8) return;
+    onToggleReaction?.(codePoints.join(""));
+    setCustomEmoji("");
+    setCustomOpen(false);
+    setPickerOpen(false);
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: mine ? "row-reverse" : "row", alignItems: "flex-end", gap: 6, marginBottom: 8 }}>
@@ -69,7 +85,7 @@ function MessageBubble({ mine, name, nameColor, avatarUrl, body, time, reactions
       <div style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start", maxWidth: "78%" }}>
         {!mine && <div style={{ fontSize: 10, color: nameColor || "#a68fd6", fontWeight: 700, marginBottom: 2, marginLeft: 4 }}>{name}</div>}
         <div
-          onClick={() => !readOnly && setPickerOpen((v) => !v)}
+          onClick={() => { if (readOnly) return; setPickerOpen((v) => { if (v) { setCustomOpen(false); setCustomEmoji(""); } return !v; }); }}
           style={{
             background: mine ? "linear-gradient(135deg, #ff2d95, #b829ff)" : "#0d0618",
             border: mine ? "none" : `1px solid ${nameColor ? nameColor + "55" : "#3d1f5c"}`, color: mine ? "#05010f" : "#f5f0ff",
@@ -81,16 +97,49 @@ function MessageBubble({ mine, name, nameColor, avatarUrl, body, time, reactions
         </div>
 
         {pickerOpen && !readOnly && (
-          <div style={{ display: "flex", gap: 4, background: "#150a28", border: "1px solid #3d1f5c", borderRadius: 20, padding: "4px 8px", marginTop: 4 }}>
-            {QUICK_REACTIONS.map((emoji) => (
-              <button
-                key={emoji}
-                onClick={() => { onToggleReaction?.(emoji); setPickerOpen(false); }}
-                style={{ background: "none", border: "none", fontSize: 16, cursor: "pointer", padding: 2, lineHeight: 1 }}
-              >
-                {emoji}
-              </button>
-            ))}
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, background: "#150a28", border: "1px solid #3d1f5c", borderRadius: 20, padding: "4px 8px", marginTop: 4 }}>
+            {!customOpen ? (
+              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                {QUICK_REACTIONS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    onClick={() => { onToggleReaction?.(emoji); setPickerOpen(false); }}
+                    style={{ background: "none", border: "none", fontSize: 16, cursor: "pointer", padding: 2, lineHeight: 1 }}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setCustomOpen(true)}
+                  title="Choose any emoji"
+                  style={{
+                    background: "none", border: "1px solid #3d1f5c", borderRadius: "50%", width: 22, height: 22,
+                    color: "#a68fd6", fontSize: 14, fontWeight: 700, cursor: "pointer", lineHeight: 1,
+                    display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                  }}
+                >
+                  +
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: 4, alignItems: "center", padding: "4px 2px" }}>
+                <input
+                  autoFocus
+                  value={customEmoji}
+                  onChange={(e) => setCustomEmoji(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") submitCustom(); if (e.key === "Escape") setCustomOpen(false); }}
+                  placeholder="Any emoji..."
+                  style={{ width: 90, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 12, padding: "4px 8px", color: "#f5f0ff", fontSize: 14 }}
+                />
+                <button
+                  onClick={submitCustom}
+                  disabled={!customEmoji.trim()}
+                  style={{ background: "none", border: "none", color: customEmoji.trim() ? "#ff2d95" : "#3d1f5c", fontSize: 13, fontWeight: 700, cursor: customEmoji.trim() ? "pointer" : "default" }}
+                >
+                  Add
+                </button>
+              </div>
+            )}
           </div>
         )}
 

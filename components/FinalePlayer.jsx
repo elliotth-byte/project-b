@@ -66,16 +66,20 @@ export default function FinalePlayer({ gameId, player, round, players, readOnly 
         <div style={{ fontSize: 32, marginBottom: 8 }}>🔥</div>
         <p style={{ color: "#f5f0ff", fontSize: 16, fontWeight: 700, margin: "0 0 6px", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>You made the Finale!</p>
         <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>
-          {finale.phase === "qa" ? "Write your statement below, and answer the jury's questions as they come in." : "Every exiled player is voting right now for who should win. Good luck."}
+          Voting is open right now — write your statement below and answer the jury's questions as they come in while it runs.
         </p>
         {chaosBanner}
       </Card>
     );
   } else if (!votingOpen && !submitted) {
+    // Voting genuinely closed (timer ran out, everyone else voted, or
+    // the host closed it) before this jury member cast one — there's no
+    // more "hasn't opened yet" state now that voting starts immediately,
+    // so this can only mean it's over and they missed it.
     voteSection = (
       <Card style={{ marginBottom: 20, textAlign: "center" }}>
         <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: 0 }}>
-          {finale.phase === "qa" ? "The finale vote hasn't opened yet — read and respond to the Q&A below first." : "The finale vote hasn't opened yet."}
+          Voting has closed — you didn't cast a vote this round.
         </p>
         {chaosBanner}
       </Card>
