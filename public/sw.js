@@ -7,7 +7,22 @@
 // Deliberately minimal — this app has no offline-caching needs, so this
 // file's only job is push + notification click handling, not a full PWA
 // asset cache.
+//
+// skipWaiting()/clients.claim() below matter more than they might look —
+// without them, a newly deployed service worker sits in a "waiting"
+// state and never actually takes over for anyone who doesn't fully
+// close every tab of this site first, which for a browser tab people
+// just leave open could mean days of running stale code. This makes a
+// new service worker activate and take control immediately instead.
 // ============================================================
+
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
 
 self.addEventListener("push", (event) => {
   if (!event.data) return;

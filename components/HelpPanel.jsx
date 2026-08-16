@@ -271,6 +271,10 @@ export default function HelpPanel({ gameId, player, onPrefsChanged, onReplayTour
           Same convenience as above — an icon that opens straight to the game. Unlike iPhone/iPad, this step is optional on Android: Notifications above already work from a regular Chrome tab without it.
         </p>
       </Card>
+
+      <p style={{ fontSize: 10, color: "#3d1f5c", textAlign: "center", margin: 0 }}>
+        Version {process.env.NEXT_PUBLIC_APP_VERSION || "dev"} — include this if you're reporting a problem, in case you're on an older version than expected.
+      </p>
     </div>
   );
 }

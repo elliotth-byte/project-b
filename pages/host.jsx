@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabaseClient";
 import { signInHost, signOut, isHost } from "../lib/auth";
 import HostPanels from "../components/HostPanels";
 import GameAccessPanel from "../components/GameAccessPanel";
+import UpdateBanner from "../components/UpdateBanner";
 import MusicPlayer from "../components/MusicPlayer";
 import HomeLink from "../components/HomeLink";
 import { useRoundWatcher } from "../lib/useRoundWatcher";
@@ -358,6 +359,7 @@ export default function HostPage() {
   return (
     <div style={{ ...pageStyle, alignItems: "flex-start", justifyContent: "center", flexDirection: "column", padding: 24 }}>
       <div style={{ maxWidth: 640, width: "100%", margin: "0 auto" }}>
+        <UpdateBanner />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <HomeLink />
@@ -528,6 +530,9 @@ export default function HostPage() {
         )}
       </div>
       {game && <MusicPlayer key={`music-${game.id}`} gameId={game.id} isHost={true} portalTarget={radioPortalNode} />}
+      <p style={{ fontSize: 10, color: "#3d1f5c", textAlign: "center", margin: "16px 0 0" }}>
+        Version {process.env.NEXT_PUBLIC_APP_VERSION || "dev"}
+      </p>
     </div>
   );
 }

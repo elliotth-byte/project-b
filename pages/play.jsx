@@ -13,6 +13,7 @@ import ChaosPowerPlayer from "../components/ChaosPowerPlayer";
 import ConfessionalPlayer from "../components/ConfessionalPlayer";
 import MusicPlayer from "../components/MusicPlayer";
 import HelpPanel from "../components/HelpPanel";
+import UpdateBanner from "../components/UpdateBanner";
 import NavTourOverlay from "../components/NavTourOverlay";
 import { hasSeenNavTour } from "../lib/navTour";
 import ChatPanel from "../components/ChatPanel";
@@ -369,6 +370,7 @@ export default function PlayPage() {
 
   return (
     <div style={{ ...pageStyle, alignItems: "flex-start", flexDirection: "column" }}>
+      <div style={{ width: "100%", maxWidth: 400, margin: "0 auto" }}><UpdateBanner /></div>
       <div style={{ display: "flex", justifyContent: "space-between", width: "100%", maxWidth: 400, margin: "0 auto 12px" }}>
         <HomeLink />
         <span style={{ color: "#a68fd6", fontSize: 13 }}>Playing as {effectivePlayerName || "..."}</span>
