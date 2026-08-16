@@ -4,6 +4,7 @@ import {
   subscribeGroupChat, sendGroupMessage, subscribeGroupChatReads, markGroupChatRead,
   createOrGetThread, fetchMyThreads, fetchExileRoom, subscribeThreadMessages, sendThreadMessage,
   markThreadRead, fetchThreadReads, subscribeThreadReads, fetchLatestMessageTimestamps, subscribeAnyThreadActivity,
+  toggleGroupReaction, subscribeThreadReactions, toggleThreadReaction,
 } from "../lib/chatData";
 
 import { colorFor } from "../lib/playerColors";
@@ -37,7 +38,25 @@ function UnreadDot() {
   return <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: "#ff3860", marginLeft: 5 }} />;
 }
 
-function MessageBubble({ mine, name, nameColor, avatarUrl, body, time }) {
+const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
+
+// Groups a flat [{playerId, emoji}] list into [{emoji, count, mine}] for
+// display — mine controls the highlighted/filled look on a pill the
+// current player has themselves reacted with.
+function groupReactions(reactions, myPlayerId) {
+  const byEmoji = {};
+  (reactions || []).forEach((r) => {
+    if (!byEmoji[r.emoji]) byEmoji[r.emoji] = { emoji: r.emoji, count: 0, mine: false };
+    byEmoji[r.emoji].count += 1;
+    if (r.playerId === myPlayerId) byEmoji[r.emoji].mine = true;
+  });
+  return Object.values(byEmoji);
+}
+
+function MessageBubble({ mine, name, nameColor, avatarUrl, body, time, reactions, myPlayerId, onToggleReaction, readOnly = false }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const grouped = groupReactions(reactions, myPlayerId);
+
   return (
     <div style={{ display: "flex", flexDirection: mine ? "row-reverse" : "row", alignItems: "flex-end", gap: 6, marginBottom: 8 }}>
       {!mine && (
@@ -49,13 +68,52 @@ function MessageBubble({ mine, name, nameColor, avatarUrl, body, time }) {
       )}
       <div style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start", maxWidth: "78%" }}>
         {!mine && <div style={{ fontSize: 10, color: nameColor || "#a68fd6", fontWeight: 700, marginBottom: 2, marginLeft: 4 }}>{name}</div>}
-        <div style={{
-          background: mine ? "linear-gradient(135deg, #ff2d95, #b829ff)" : "#0d0618",
-          border: mine ? "none" : `1px solid ${nameColor ? nameColor + "55" : "#3d1f5c"}`, color: mine ? "#05010f" : "#f5f0ff",
-          borderRadius: 14, padding: "8px 12px", fontSize: 13, wordBreak: "break-word",
-        }}>
+        <div
+          onClick={() => !readOnly && setPickerOpen((v) => !v)}
+          style={{
+            background: mine ? "linear-gradient(135deg, #ff2d95, #b829ff)" : "#0d0618",
+            border: mine ? "none" : `1px solid ${nameColor ? nameColor + "55" : "#3d1f5c"}`, color: mine ? "#05010f" : "#f5f0ff",
+            borderRadius: 14, padding: "8px 12px", fontSize: 13, wordBreak: "break-word",
+            cursor: readOnly ? "default" : "pointer",
+          }}
+        >
           {body}
         </div>
+
+        {pickerOpen && !readOnly && (
+          <div style={{ display: "flex", gap: 4, background: "#150a28", border: "1px solid #3d1f5c", borderRadius: 20, padding: "4px 8px", marginTop: 4 }}>
+            {QUICK_REACTIONS.map((emoji) => (
+              <button
+                key={emoji}
+                onClick={() => { onToggleReaction?.(emoji); setPickerOpen(false); }}
+                style={{ background: "none", border: "none", fontSize: 16, cursor: "pointer", padding: 2, lineHeight: 1 }}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {grouped.length > 0 && (
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4 }}>
+            {grouped.map((g) => (
+              <button
+                key={g.emoji}
+                onClick={() => !readOnly && onToggleReaction?.(g.emoji)}
+                disabled={readOnly}
+                style={{
+                  display: "flex", alignItems: "center", gap: 3, fontSize: 11, borderRadius: 12, padding: "2px 7px",
+                  background: g.mine ? "rgba(255,45,149,0.18)" : "#0d0618",
+                  border: `1px solid ${g.mine ? "#ff2d95" : "#3d1f5c"}`,
+                  color: g.mine ? "#ff2d95" : "#a68fd6", cursor: readOnly ? "default" : "pointer",
+                }}
+              >
+                <span>{g.emoji}</span><span>{g.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <div style={{ fontSize: 9, color: "#6b4f99", marginTop: 2 }}>{fmtTime(time)}</div>
       </div>
     </div>
@@ -131,7 +189,14 @@ function GroupChatView({ gameId, player, players, realName, onRead, readOnly = f
 
   const rows = messages.map((m) => ({
     id: m.id,
-    node: <MessageBubble mine={m.senderId === player.id} name={m.senderName} nameColor={colorFor(players, m.senderId)} avatarUrl={(players || []).find((p) => p.id === m.senderId)?.effectiveAvatarUrl} body={m.body} time={m.createdAt} />,
+    node: (
+      <MessageBubble
+        mine={m.senderId === player.id} name={m.senderName} nameColor={colorFor(players, m.senderId)}
+        avatarUrl={(players || []).find((p) => p.id === m.senderId)?.effectiveAvatarUrl} body={m.body} time={m.createdAt}
+        reactions={m.reactions} myPlayerId={player.id} readOnly={readOnly}
+        onToggleReaction={(emoji) => toggleGroupReaction(gameId, m.id, player.id, emoji)}
+      />
+    ),
   }));
 
   return (
@@ -150,11 +215,17 @@ function threadLabel(thread, player, byId) {
 
 function ThreadView({ gameId, thread, player, players, byId, onBack, onRead, readOnly = false }) {
   const [messages, setMessages] = useState([]);
+  const [reactions, setReactions] = useState([]);
   const listRef = useRef(null);
   const label = threadLabel(thread, player, byId);
 
   useEffect(() => {
     const unsubscribe = subscribeThreadMessages(thread.id, setMessages);
+    return unsubscribe;
+  }, [thread.id]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeThreadReactions(thread.id, setReactions);
     return unsubscribe;
   }, [thread.id]);
 
@@ -166,7 +237,15 @@ function ThreadView({ gameId, thread, player, players, byId, onBack, onRead, rea
 
   const rows = messages.map((m) => ({
     id: m.id,
-    node: <MessageBubble mine={m.sender_id === player.id} name={byId[m.sender_id] || "?"} nameColor={colorFor(players, m.sender_id)} avatarUrl={(players || []).find((p) => p.id === m.sender_id)?.effectiveAvatarUrl} body={m.body} time={m.created_at} />,
+    node: (
+      <MessageBubble
+        mine={m.sender_id === player.id} name={byId[m.sender_id] || "?"} nameColor={colorFor(players, m.sender_id)}
+        avatarUrl={(players || []).find((p) => p.id === m.sender_id)?.effectiveAvatarUrl} body={m.body} time={m.created_at}
+        reactions={reactions.filter((r) => r.message_id === m.id).map((r) => ({ playerId: r.player_id, emoji: r.emoji }))}
+        myPlayerId={player.id} readOnly={readOnly}
+        onToggleReaction={(emoji) => toggleThreadReaction(thread.id, m.id, player.id, emoji)}
+      />
+    ),
   }));
 
   return (
