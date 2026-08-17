@@ -35,6 +35,16 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
   const [drawPicks, setDrawPicks] = useState({});
   const [drawSubmitting, setDrawSubmitting] = useState(null); // index currently being submitted
   const [justWon, setJustWon] = useState(false);
+  // Declared here (not down near where it's first used, next to
+  // confirmPick) specifically because everything between here and there
+  // is a series of early returns (readOnly checks, draw-stage branches,
+  // etc.) — a hook declared past any of those would only execute on
+  // SOME renders and not others, which is exactly the "Rendered more
+  // hooks than during the previous render" class of crash. This
+  // component hit that exact bug: a player's screen would crash the
+  // moment they actually became the Power of Khaos holder, right when
+  // they'd need to act on it.
+  const [pendingPick, setPendingPick] = useState(null); // candidate selected but not yet locked in — reason is required before it actually submits
 
   useEffect(() => {
     if (!key) return;
@@ -186,8 +196,6 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
   const nomineeIds = candidates.map((c) => c.playerId);
   const voteRows = Object.entries(votes).map(([voterId, v]) => ({ voterId, targetId: v.targetId }));
   const myPickId = myPick?.nomineeId || null;
-
-  const [pendingPick, setPendingPick] = useState(null); // candidate selected but not yet locked in — reason is required before it actually submits
 
   const confirmPick = async () => {
     if (!pendingPick || !reasonDraft.trim()) return;

@@ -32,6 +32,10 @@ import MinesweeperPlayer from "./games/MinesweeperPlayer";
 import StroopPlayer from "./games/StroopPlayer";
 import RedLightGreenLightPlayer from "./games/RedLightGreenLightPlayer";
 import SlidingPuzzlePlayer from "./games/SlidingPuzzlePlayer";
+import TorchedPlayer from "./games/TorchedPlayer";
+import ChainsPlayer from "./games/ChainsPlayer";
+import LabyrinthPlayer from "./games/LabyrinthPlayer";
+import OraclesSealPlayer from "./games/OraclesSealPlayer";
 import GameResultCard from "./games/GameResultCard";
 
 const GAME_COMPONENTS = {
@@ -60,6 +64,10 @@ const GAME_COMPONENTS = {
   stroop: StroopPlayer,
   redlightgreenlight: RedLightGreenLightPlayer,
   slidingpuzzle: SlidingPuzzlePlayer,
+  torched: TorchedPlayer,
+  chains: ChainsPlayer,
+  labyrinth: LabyrinthPlayer,
+  oraclesseal: OraclesSealPlayer,
 };
 
 export default function ChallengePlayer({ gameId, player, players, round, settings, readOnly = false }) {

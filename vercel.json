@@ -1,12 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/cron/post-scheduled",
-      "schedule": "0 13 * * *"
-    },
-    {
       "path": "/api/cron/advance-rounds",
-      "schedule": "0 14 * * *"
+      "schedule": "*/15 * * * *"
     }
   ]
 }

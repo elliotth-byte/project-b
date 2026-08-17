@@ -13,11 +13,13 @@ import { initPlinkoBracket, subscribePlinkoBracket } from "../lib/games/plinkoBr
 import { initPit } from "../lib/games/pitData";
 import { initMasquerade } from "../lib/games/masqueradeData";
 import { initCloseToTwenty } from "../lib/games/closeToTwentyData";
+import { initTorched } from "../lib/games/torchedData";
+import { initChains } from "../lib/games/chainsData";
 import ParticipantPicker from "./ParticipantPicker";
 import CopyMessage from "./CopyMessage";
 import { requestAdvance } from "../lib/advanceNow";
 
-const MAZE_TYPES = ["maze2d", "mazeinvisible", "mazetrivia"]; // all three share the same host-configurable size control
+const MAZE_TYPES = ["maze2d", "mazeinvisible", "mazetrivia", "labyrinth"]; // all four share the same host-configurable size control
 
 // ─── Challenge: Host Control ───
 // Setup (pick a game + who's competing + duration) -> either the host
@@ -69,9 +71,9 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
 
   const approvedAlive = players.filter((p) => p.approved && p.alive);
   // A player barred from THIS round's Battle (see lib/roundEngine.js's
-  // autoNominateForWinnerIfTimedOut — the consequence for a battle
-  // winner missing their own Fates nomination within the ceremony's
-  // configured time limit) is excluded from the participant pool
+  // autoNominateTimedOutNominators — the consequence for any of the
+  // three Fates nominators missing their own nomination within the
+  // ceremony's configured time limit) is excluded from the participant pool
   // entirely, same as if they'd never been alive-and-approved in the
   // first place. battle_ban_round naturally stops applying after this
   // round passes — a later round's number will never match it again.
@@ -106,11 +108,16 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     const freshReentry = await getReentry(gameId);
     const reentryEligibleIds = freshReentry.filter((r) => r.status === REENTRY_STATUS.PENDING).map((r) => r.playerId);
     const now = Date.now();
-    // Masquerade always runs to its natural conclusion (last player
-    // standing — see lib/games/masqueradeData.js) rather than being cut
-    // off by a fixed duration partway through, regardless of the
-    // season's infiniteTime setting.
-    const endsAt = (settings?.infiniteTime || gameType === "masquerade") ? null : now + durationSec * 1000;
+    // Masquerade, Torched, and Chains all always run to their natural
+    // conclusion (last player standing for the first two; everyone
+    // locked in for Chains — see lib/games/masqueradeData.js,
+    // lib/games/torchedData.js, lib/games/chainsData.js) rather than
+    // being cut off by a fixed duration partway through, regardless of
+    // the season's infiniteTime setting — a turn-based elimination game
+    // or a lock-in-gated reveal forced to stop mid-way (possibly even
+    // before it's really begun) has no clean resolution the way a
+    // scored game does.
+    const endsAt = (settings?.infiniteTime || gameType === "masquerade" || gameType === "torched" || gameType === "chains") ? null : now + durationSec * 1000;
     const configOverrides = MAZE_TYPES.includes(gameType) ? { size: mazeSize } : undefined;
     await storageSet(gameId, KEY_CHALLENGE, {
       round: round.round, active: true, startedAt: now, endsAt,
@@ -128,6 +135,12 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     }
     if (gameType === "closeto20") {
       await initCloseToTwenty(gameId, round.round, participants, now);
+    }
+    if (gameType === "torched") {
+      await initTorched(gameId, round.round, participants, now);
+    }
+    if (gameType === "chains") {
+      await initChains(gameId, round.round, participants);
     }
     await storageUpdate(gameId, KEY_ROUND, (fresh) => ({ ...(fresh || {}), phaseStartedAt: now, phaseEndsAt: endsAt }));
     setBusy(false);
@@ -250,6 +263,10 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
           <p style={{ color: "#ff2d95", fontSize: 12, margin: "0 0 12px" }}>∞ Infinite time is on — this battle runs until you end it. (Change this in Admin → Round Lengths.)</p>
         ) : gameType === "masquerade" ? (
           <p style={{ color: "#ff2d95", fontSize: 12, margin: "0 0 12px" }}>∞ Murder at the Masquerade always runs until there's a last player standing — no duration to set.</p>
+        ) : gameType === "torched" ? (
+          <p style={{ color: "#ff2d95", fontSize: 12, margin: "0 0 12px" }}>∞ Torched always runs until there's a last marker standing — no duration to set.</p>
+        ) : gameType === "chains" ? (
+          <p style={{ color: "#ff2d95", fontSize: 12, margin: "0 0 12px" }}>∞ Chains always runs until every player has locked in — no duration to set.</p>
         ) : (
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
             <label style={{ fontSize: 12, color: "#a68fd6" }}>Duration:</label>

@@ -65,12 +65,19 @@ export default function WordScramblePlayer({ gameId, round, challenge, player })
   }
 
   const visibleLetters = lettersRef.current.filter((l) => !solved.has(l.wi));
+  const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
+  const timerLabel = `${Math.floor(elapsedSec / 60)}:${String(elapsedSec % 60).padStart(2, "0")}`;
 
   return (
     <Card style={{ marginBottom: 20 }}>
-      <h3 style={{ color: "#ff2d95", margin: "0 0 8px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🔤 Word Scramble</h3>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🔤 Word Scramble</h3>
+        <span style={{ color: "#a68fd6", fontSize: 13, fontFamily: "'Orbitron', 'Segoe UI', sans-serif", fontVariantNumeric: "tabular-nums" }}>
+          ⏱ {timerLabel}
+        </span>
+      </div>
       <div style={{
-        position: "relative", width: arenaW, height: arenaH, margin: "0 auto 12px",
+        position: "relative", width: "100%", maxWidth: arenaW, aspectRatio: `${arenaW} / ${arenaH}`, margin: "0 auto 12px",
         background: "#0d0618", borderRadius: 10, border: "1px solid #3d1f5c", overflow: "hidden",
       }}>
         {visibleLetters.map((l, i) => {
@@ -80,7 +87,17 @@ export default function WordScramblePlayer({ gameId, round, challenge, player })
           const opacity = 0.08 + 0.92 * (0.5 + 0.5 * Math.sin((Date.now() / l.fadePeriodMs) * Math.PI * 2 + l.fadePhase));
           return (
             <div key={i} style={{
-              position: "absolute", left: l.x, top: l.y,
+              // Percentage-based, not raw pixels — the physics
+              // simulation itself still runs in the fixed arenaW x
+              // arenaH coordinate space (see initFloatingLetters and the
+              // bounce logic above, both unchanged), but rendering as a
+              // percentage of that space is what lets the actual
+              // container be genuinely responsive (width: 100%, capped
+              // at arenaW) without letters spilling past its right edge
+              // on a narrower viewport than arenaW's fixed pixel value —
+              // exactly what was happening before this on some Android
+              // screens.
+              position: "absolute", left: `${(l.x / arenaW) * 100}%`, top: `${(l.y / arenaH) * 100}%`,
               fontSize: 20, fontWeight: 900, color: WORD_COLORS[l.wi],
               fontFamily: WORD_FONTS[l.wi % WORD_FONTS.length],
               textShadow: `0 0 8px ${WORD_COLORS[l.wi]}66`, userSelect: "none", pointerEvents: "none",
