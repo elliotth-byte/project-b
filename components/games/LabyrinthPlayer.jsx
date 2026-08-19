@@ -54,6 +54,31 @@ function generateMaze(seed, size) {
     }
   }
   carve(1, 1);
+
+  // Recursive backtracking alone produces a "perfect maze" — by
+  // definition, exactly ONE path between any two cells, with zero
+  // loops. That's exactly what made the Minotaur uncatchable-by-you:
+  // wherever it's chasing from, there was never an alternate route to
+  // dodge around it, only forward into it or back the way you came.
+  // This knocks down a fraction of the remaining interior walls — only
+  // ones where BOTH neighboring cells are already open, so this only
+  // adds shortcuts and loops, never creates a new isolated pocket —
+  // giving the maze genuine branch points a player can actually use to
+  // evade. Verified this keeps the whole maze fully connected (every
+  // open cell still reachable from the start) across many seeds before
+  // this went in, not just assumed.
+  const LOOP_CHANCE = 0.22;
+  for (let r = 1; r < size - 1; r++) {
+    for (let c = 1; c < size - 1; c++) {
+      if (grid[r][c] !== 1) continue;
+      if (r % 2 === 0 && c % 2 === 1) {
+        if (grid[r - 1][c] === 0 && grid[r + 1][c] === 0 && rand() < LOOP_CHANCE) grid[r][c] = 0;
+      } else if (r % 2 === 1 && c % 2 === 0) {
+        if (grid[r][c - 1] === 0 && grid[r][c + 1] === 0 && rand() < LOOP_CHANCE) grid[r][c] = 0;
+      }
+    }
+  }
+
   return grid;
 }
 

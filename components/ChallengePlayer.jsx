@@ -75,6 +75,14 @@ export default function ChallengePlayer({ gameId, player, players, round, settin
   const [scores, setScores] = useState({});
   const [reentry, setReentry] = useState([]);
   const [readyToPlay, setReadyToPlay] = useState(false);
+  // Minimizing keeps the overlay (and the mini-game inside it) fully
+  // MOUNTED — just visually hidden — rather than unmounting it. That
+  // matters because several games (Snake, Labyrinth, The Oracle's Seal,
+  // ...) keep all their progress in local component state with nothing
+  // persisted server-side; unmounting to "go back" would silently wipe
+  // it. This just toggles visibility, so returning to the battle picks
+  // up exactly where it was left, no matter which kind of game it is.
+  const [minimized, setMinimized] = useState(false);
   const [forfeiting, setForfeiting] = useState(false);
   const [deciding, setDeciding] = useState(false);
 
@@ -256,31 +264,49 @@ export default function ChallengePlayer({ gameId, player, players, round, settin
         );
       }
       return (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(5,1,15,0.94)", zIndex: 900,
-          display: "flex", alignItems: "flex-start", justifyContent: "center",
-          padding: "24px 12px", overflowY: "auto",
-        }}>
-          {/* Breaks out of the normal page's 400px-wide column entirely,
-              and scales the whole thing up on top of that — a wider
-              container alone wouldn't help games with small fixed-pixel
-              grids (Whack-a-Mole's 70px holes, Minesweeper's 30px cells,
-              etc.), since they'd just get more empty margin around an
-              unchanged-size grid. The scale is what actually gives more
-              real tap-target size everywhere, not just for the games
-              that already resize responsively (like Breakout's canvas).
-              Sized so 78vw/420px pre-scale times 1.28 lands at roughly
-              99vw/538px post-scale — comfortably fits without triggering
-              horizontal overflow on typical phone widths. */}
-          <div style={{ width: "78vw", maxWidth: 420, transform: "scale(1.28)", transformOrigin: "center top", marginTop: 20 }}>
-            <GameComponent gameId={gameId} round={round} challenge={challenge} player={player} players={players} />
-            <div style={{ textAlign: "center", marginTop: 10 }}>
-              <Btn small variant="ghost" onClick={forfeitDigital} disabled={forfeiting}>
-                {forfeiting ? "Forfeiting..." : "🏳️ Forfeit Battle"}
-              </Btn>
+        <>
+          {minimized && (
+            <Card style={{ marginBottom: 20, textAlign: "center" }}>
+              <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#ff2d95", marginBottom: 6 }}>
+                {registryEntry?.icon || "⚔️"} {registryEntry?.label || "Battle"}
+              </div>
+              <p style={{ color: "#a68fd6", fontSize: 13, margin: "0 0 14px" }}>
+                Still in progress in the background — nothing's lost, come back whenever.
+              </p>
+              <Btn onClick={() => setMinimized(false)}>▶ Return to Battle</Btn>
+            </Card>
+          )}
+          {/* Kept mounted even while minimized — see the minimized state's
+              own comment above for why unmounting isn't an option here.
+              display:none rather than a conditional return is what
+              actually preserves it. */}
+          <div style={{
+            position: "fixed", inset: 0, background: "rgba(5,1,15,0.94)", zIndex: 900,
+            display: minimized ? "none" : "flex", alignItems: "flex-start", justifyContent: "center",
+            padding: "24px 12px", overflowY: "auto",
+          }}>
+            {/* Breaks out of the normal page's 400px-wide column entirely,
+                and scales the whole thing up on top of that — a wider
+                container alone wouldn't help games with small fixed-pixel
+                grids (Whack-a-Mole's 70px holes, Minesweeper's 30px cells,
+                etc.), since they'd just get more empty margin around an
+                unchanged-size grid. The scale is what actually gives more
+                real tap-target size everywhere, not just for the games
+                that already resize responsively (like Breakout's canvas).
+                Sized so 78vw/420px pre-scale times 1.28 lands at roughly
+                99vw/538px post-scale — comfortably fits without triggering
+                horizontal overflow on typical phone widths. */}
+            <div style={{ width: "78vw", maxWidth: 420, transform: "scale(1.28)", transformOrigin: "center top", marginTop: 20 }}>
+              <GameComponent gameId={gameId} round={round} challenge={challenge} player={player} players={players} />
+              <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 10 }}>
+                <Btn small variant="ghost" onClick={() => setMinimized(true)}>↙ Minimize</Btn>
+                <Btn small variant="ghost" onClick={forfeitDigital} disabled={forfeiting}>
+                  {forfeiting ? "Forfeiting..." : "🏳️ Forfeit Battle"}
+                </Btn>
+              </div>
             </div>
           </div>
-        </div>
+        </>
       );
     }
   }

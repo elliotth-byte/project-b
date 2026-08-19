@@ -14,7 +14,7 @@ import { initPit } from "../lib/games/pitData";
 import { initMasquerade } from "../lib/games/masqueradeData";
 import { initCloseToTwenty } from "../lib/games/closeToTwentyData";
 import { initTorched } from "../lib/games/torchedData";
-import { initChains } from "../lib/games/chainsData";
+import { initChains, subscribeChains } from "../lib/games/chainsData";
 import ParticipantPicker from "./ParticipantPicker";
 import CopyMessage from "./CopyMessage";
 import { requestAdvance } from "../lib/advanceNow";
@@ -22,21 +22,32 @@ import { requestAdvance } from "../lib/advanceNow";
 const MAZE_TYPES = ["maze2d", "mazeinvisible", "mazetrivia", "labyrinth"]; // all four share the same host-configurable size control
 
 // ─── Challenge: Host Control ───
-// Setup (pick a game + who's competing + duration) -> either the host
-// manually enters results ("Manual / In-Person" mode) or, for any of the
-// 10 built-in mini-games, players play on their own screens and the
-// round engine (lib/roundEngine.js) derives placements from their scores
-// automatically once the timer's up.
+// Setup (pick a game + who's competing + duration) -> players play on
+// their own screens and the round engine (lib/roundEngine.js) derives
+// placements from their scores automatically once the timer's up.
+// "Manual / In-Person" (the host running something offline and entering
+// results by hand) is no longer offered as a selectable option here —
+// see the game picker below — but the underlying mechanism for it
+// (isDigital, further down) is deliberately left in place rather than
+// removed outright, since any past challenge that already used it needs
+// to keep displaying correctly in history.
 export default function ChallengeHost({ gameId, players, round, settings }) {
   const [challenge, setChallenge] = useState(null);
   const [scores, setScores] = useState({});
   const [reentry, setReentry] = useState([]);
   const [config, setConfig] = useState(DEFAULT_PARTICIPATION);
-  const [gameType, setGameType] = useState("manual");
+  // "manual" is deliberately excluded here — see the picker below, which
+  // no longer offers it as a selectable option at all (kept only in the
+  // registry itself, for historical challenges that already used it —
+  // see lib/challengeGames.js). Defaulting to it here would leave the
+  // picker showing nothing highlighted at all on first load, since it's
+  // no longer one of the rendered options.
+  const [gameType, setGameType] = useState(Object.keys(GAME_REGISTRY).find((k) => k !== "manual"));
   const [durationSec, setDurationSec] = useState(settings?.challengeDurationSec || 900);
   const [mazeSize, setMazeSize] = useState(GAME_REGISTRY.maze2d.config.size);
   const [busy, setBusy] = useState(false);
   const [plinkoBracket, setPlinkoBracket] = useState(null);
+  const [chainsState, setChainsState] = useState(null);
   const [resettingId, setResettingId] = useState(null);
 
   const resetAttempt = async (playerId, playerName) => {
@@ -61,6 +72,12 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   useEffect(() => {
     if (!round?.round) return;
     const unsubscribe = subscribePlinkoBracket(gameId, round.round, setPlinkoBracket);
+    return unsubscribe;
+  }, [gameId, round?.round]);
+
+  useEffect(() => {
+    if (!round?.round) return;
+    const unsubscribe = subscribeChains(gameId, round.round, setChainsState);
     return unsubscribe;
   }, [gameId, round?.round]);
 
@@ -137,7 +154,12 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
       await initCloseToTwenty(gameId, round.round, participants, now);
     }
     if (gameType === "torched") {
-      await initTorched(gameId, round.round, participants, now);
+      // Pulled from the full roster (not just the participants array,
+      // which only carries id/name), player-set ahead of time from
+      // their own Help tab — see sql/add-torched-preset.sql.
+      const presetsByPlayerId = {};
+      players.forEach((p) => { if (p.torched_preset) presetsByPlayerId[p.id] = p.torched_preset; });
+      await initTorched(gameId, round.round, participants, now, presetsByPlayerId);
     }
     if (gameType === "chains") {
       await initChains(gameId, round.round, participants);
@@ -196,11 +218,11 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
       <Card>
         <h3 style={{ color: "#f5f0ff", margin: "0 0 8px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>⚔️ Battle — Setup</h3>
         <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
-          Pick a challenge. Digital ones play out live on each player's own screen and score themselves; Manual / In-Person just tracks who's competing and how long they have while you run the challenge yourselves.
+          Pick a challenge — each one plays out live on each player's own screen and scores itself.
         </p>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 6, marginBottom: 10 }}>
-          {Object.entries(GAME_REGISTRY).map(([key, g]) => (
+          {Object.entries(GAME_REGISTRY).filter(([key]) => key !== "manual").map(([key, g]) => (
             <button key={key} onClick={() => pickGameType(key)} style={{
               display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
               padding: "10px 8px", borderRadius: 8, cursor: "pointer",
@@ -364,6 +386,23 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
               : plinkoBracket.champion
                 ? `${players.find((p) => p.id === plinkoBracket.champion)?.display_name || "?"} is picking their next challenger...`
                 : "Setting up..."}
+          </p>
+        </div>
+      )}
+
+      {challenge?.gameType === "chains" && challenge.active && chainsState && !chainsState.revealed && (
+        <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+            ✊ Chains — {Object.keys(chainsState.chains || {}).length} of {chainsState.participantIds.length} locked in
+          </div>
+          <p style={{ fontSize: 12, color: "#f5f0ff", margin: 0 }}>
+            {chainsState.participantIds.map((id) => {
+              const locked = !!chainsState.chains?.[id];
+              return `${locked ? "✓" : "⋯"} ${players.find((p) => p.id === id)?.display_name || "?"}`;
+            }).join("  ·  ")}
+          </p>
+          <p style={{ fontSize: 10, color: "#6b4f99", margin: "6px 0 0", fontStyle: "italic" }}>
+            Only who's locked in — what they actually picked stays hidden until everyone's in.
           </p>
         </div>
       )}

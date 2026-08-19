@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Card, Btn } from "./ui";
-import { subscribeGroupChat, sendGroupMessage, fetchAllThreads, fetchThreadMessages, subscribeAnyThreadActivity } from "../lib/chatData";
+import { subscribeGroupChat, sendGroupMessage, fetchAllThreads, fetchThreadMessages, subscribeAnyThreadActivity, fetchLatestMessageTimestamps } from "../lib/chatData";
 import { colorFor } from "../lib/playerColors";
 
 function fmtTime(ts) {
@@ -16,6 +16,7 @@ export default function ChatHostPanel({ gameId, players }) {
   const [mode, setMode] = useState("group");
   const [messages, setMessages] = useState([]);
   const [threads, setThreads] = useState([]);
+  const [threadLatest, setThreadLatest] = useState({}); // threadId -> latest message's created_at, for most-recent-first sorting
   const [openThreadId, setOpenThreadId] = useState(null);
   const [threadMessages, setThreadMessages] = useState([]);
   const listRef = useRef(null);
@@ -28,7 +29,12 @@ export default function ChatHostPanel({ gameId, players }) {
     return unsubscribe;
   }, [gameId]);
 
-  const reloadThreads = async () => setThreads(await fetchAllThreads(gameId));
+  const reloadThreads = async () => {
+    const all = await fetchAllThreads(gameId);
+    setThreads(all);
+    if (all.length === 0) { setThreadLatest({}); return; }
+    setThreadLatest(await fetchLatestMessageTimestamps(all.map((t) => t.id)));
+  };
   useEffect(() => {
     reloadThreads();
     const unsubscribe = subscribeAnyThreadActivity(gameId, reloadThreads);
@@ -122,7 +128,15 @@ export default function ChatHostPanel({ gameId, players }) {
           {threads.length === 0 ? (
             <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No DMs or groups yet.</p>
           ) : (
-            threads.map((t) => (
+            [...threads].sort((a, b) => {
+              // Most-recently-active thread first — same reasoning and
+              // same epoch fallback as the player-side thread list in
+              // ChatPanel.jsx: a thread with no messages yet naturally
+              // sorts to the very end rather than jumping to the top.
+              const aLatest = threadLatest[a.id] ? new Date(threadLatest[a.id]).getTime() : 0;
+              const bLatest = threadLatest[b.id] ? new Date(threadLatest[b.id]).getTime() : 0;
+              return bLatest - aLatest;
+            }).map((t) => (
               <button
                 key={t.id}
                 onClick={() => setOpenThreadId(t.id)}

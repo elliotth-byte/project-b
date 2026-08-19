@@ -392,7 +392,17 @@ function MessagesView({ gameId, player, players, byId, openThread, setOpenThread
       )}
       {threads.length > 0 && (
         <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
-          {threads.map((t) => {
+          {[...threads].sort((a, b) => {
+            // Most-recently-active thread first — a thread with no
+            // messages yet (just created, nobody's said anything)
+            // falls back to epoch, so it naturally sorts to the very
+            // end rather than crashing on a missing timestamp or
+            // jumping to the top ahead of threads people are actually
+            // using.
+            const aLatest = reads.latest[a.id] ? new Date(reads.latest[a.id]).getTime() : 0;
+            const bLatest = reads.latest[b.id] ? new Date(reads.latest[b.id]).getTime() : 0;
+            return bLatest - aLatest;
+          }).map((t) => {
             return (
               <button
                 key={t.id}
