@@ -38,11 +38,25 @@ export default function PlayerMemoryWall({ players, hideNameLabels = false, winn
         // meaningful history even for someone who's since been voted
         // out, just layered under the existing grayscale/dimmed look
         // rather than replacing it.
+        //
+        // Rendered as an INTERIOR glow, deliberately never touching the
+        // border — the border's own color is a player's identity (their
+        // own chosen or assigned color, same as everywhere else in the
+        // app), and swapping it out for gold/red/orange was overwriting
+        // that identity rather than layering on top of it. This is a
+        // separate overlay div, placed AFTER the avatar image in the
+        // DOM (not just a box-shadow on the outer tile) specifically so
+        // it reliably paints ON TOP of the image rather than risking
+        // being visually covered by it — an inset box-shadow on the
+        // outer container alone isn't guaranteed to show through an
+        // absolutely-positioned child that covers the whole tile.
         const isWinner = winnerIds?.has(p.id);
         const isNominee = nomineeIds?.has(p.id);
         const glowColor = isWinner && isNominee ? "#ff9f4d" : isWinner ? "#ffd700" : isNominee ? "#ff3860" : null;
-        const borderColor = glowColor || (eliminated ? "#3d1f5c" : color);
-        const glowShadow = glowColor ? `0 0 16px ${glowColor}aa` : "none";
+        const borderColor = eliminated ? "#3d1f5c" : color;
+        const glowOverlay = glowColor
+          ? <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", boxShadow: `inset 0 0 20px 6px ${glowColor}`, pointerEvents: "none" }} />
+          : null;
 
         if (avatarUrl) {
           return (
@@ -51,7 +65,6 @@ export default function PlayerMemoryWall({ players, hideNameLabels = false, winn
               style={{
                 aspectRatio: "1", borderRadius: 14,
                 border: `4px solid ${borderColor}`,
-                boxShadow: glowShadow,
                 opacity: eliminated ? 0.75 : 1,
                 position: "relative", overflow: "hidden", background: "#0d0618",
               }}
@@ -84,6 +97,7 @@ export default function PlayerMemoryWall({ players, hideNameLabels = false, winn
                   OUT
                 </div>
               )}
+              {glowOverlay}
             </div>
           );
         }
@@ -95,10 +109,10 @@ export default function PlayerMemoryWall({ players, hideNameLabels = false, winn
               aspectRatio: "1", borderRadius: 14,
               background: "#0d0618",
               border: `4px solid ${borderColor}`,
-              boxShadow: glowShadow,
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8,
               opacity: eliminated ? 0.55 : 1,
               padding: 8,
+              position: "relative",
             }}
           >
             <div style={{
@@ -113,6 +127,7 @@ export default function PlayerMemoryWall({ players, hideNameLabels = false, winn
             }}>
               {p.display_name}
             </span>
+            {glowOverlay}
           </div>
         );
       })}

@@ -3,13 +3,20 @@ import { Card, Btn } from "./ui";
 import { supabase } from "../lib/supabaseClient";
 import { PLAYER_COLORS, takenColors } from "../lib/playerColors";
 import { ALIASES, takenAliases } from "../lib/aliases";
+import { collectionImageUrl } from "../lib/avatarCollections";
 
 // ─── Onboarding: color (+ alias, if the season has it on) ───
 // Alias mode adds a step and a confirmation screen, since getting your
 // alias wrong isn't as harmless as picking a different color would be —
 // see components/AdminHost.jsx for the toggle. Without alias mode, this
 // behaves exactly like it always has: pick a color, done immediately.
-export default function ColorPicker({ player, allPlayers, aliasEnabled, onPicked }) {
+// avatarCollectionSlug: only set when the season's avatarMode is
+// "collection" (see lib/gameState.js / lib/avatarCollections.js) — shows
+// each alias's actual portrait right on the picker itself, so a player
+// isn't choosing a name blind before finding out what they'll look like.
+// null in every other avatar mode (upload-based or none), where there's
+// nothing fixed yet to preview.
+export default function ColorPicker({ player, allPlayers, aliasEnabled, avatarCollectionSlug, onPicked }) {
   // A player might already have a color from before alias mode was
   // turned on (it can be toggled any time before Round 1 starts) — start
   // them straight at the alias step instead of making them re-pick a
@@ -71,17 +78,28 @@ export default function ColorPicker({ player, allPlayers, aliasEnabled, onPicked
                 disabled={isTaken}
                 onClick={() => pickAlias(a.name)}
                 style={{
-                  display: "flex", flexDirection: "column", gap: 2, padding: "10px 14px", borderRadius: 10,
+                  display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 10,
                   cursor: isTaken ? "not-allowed" : "pointer", textAlign: "left",
                   background: isTaken ? "#1a1025" : "#0d0618",
                   border: `1px solid ${isTaken ? "#3d1f5c" : "#ff2d9555"}`,
                   opacity: isTaken ? 0.4 : 1,
                 }}
               >
-                <span style={{ color: "#f5f0ff", fontSize: 14, fontWeight: 700 }}>
-                  {a.name}{isTaken && " — taken"}
-                </span>
-                <span style={{ color: "#a68fd6", fontSize: 11 }}>{a.blurb}</span>
+                {avatarCollectionSlug && (
+                  <img
+                    src={collectionImageUrl(avatarCollectionSlug, a.name)} alt=""
+                    style={{
+                      width: 44, height: 44, borderRadius: 8, objectFit: "cover", flexShrink: 0,
+                      filter: isTaken ? "grayscale(1)" : "none",
+                    }}
+                  />
+                )}
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ color: "#f5f0ff", fontSize: 14, fontWeight: 700 }}>
+                    {a.name}{isTaken && " — taken"}
+                  </span>
+                  <span style={{ color: "#a68fd6", fontSize: 11 }}>{a.blurb}</span>
+                </div>
               </button>
             );
           })}
@@ -99,7 +117,14 @@ export default function ColorPicker({ player, allPlayers, aliasEnabled, onPicked
         <div style={{ fontSize: 28, marginBottom: 10 }}>✅</div>
         <h3 style={{ margin: "0 0 12px", fontSize: 17, fontWeight: 900 }}>Confirm Your Identity</h3>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginBottom: 6 }}>
-          <span style={{ width: 32, height: 32, borderRadius: 8, background: color, border: `2px solid ${color}`, boxShadow: `0 0 14px ${color}aa`, display: "inline-block" }} />
+          {avatarCollectionSlug ? (
+            <img
+              src={collectionImageUrl(avatarCollectionSlug, alias)} alt=""
+              style={{ width: 56, height: 56, borderRadius: 10, objectFit: "cover", border: `2px solid ${color}`, boxShadow: `0 0 14px ${color}aa` }}
+            />
+          ) : (
+            <span style={{ width: 32, height: 32, borderRadius: 8, background: color, border: `2px solid ${color}`, boxShadow: `0 0 14px ${color}aa`, display: "inline-block" }} />
+          )}
           <span style={{ color: "#f5f0ff", fontSize: 16, fontWeight: 800 }}>{alias}</span>
         </div>
         <p style={{ fontSize: 11, color: "#a68fd6", margin: "0 0 4px" }}>{chosenColorMeta?.name}</p>

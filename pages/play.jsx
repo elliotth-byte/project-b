@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabaseClient";
 import { signOut, displayNameFromUser } from "../lib/auth";
 import { removePendingPlayer, quitOrRemoveApprovedPlayer } from "../lib/playerRemoval";
 import ColorPicker from "../components/ColorPicker";
+import { AVATAR_COLLECTIONS } from "../lib/avatarCollections";
 import ChallengePlayer from "../components/ChallengePlayer";
 import FatesPlayer from "../components/FatesPlayer";
 import ExileVotePlayer from "../components/ExileVotePlayer";
@@ -401,6 +402,7 @@ export default function PlayPage() {
             player={myPlayer}
             allPlayers={allPlayers}
             aliasEnabled={settings?.aliasEnabled}
+            avatarCollectionSlug={settings?.avatarMode === "collection" ? AVATAR_COLLECTIONS.find((c) => c.id === settings.avatarCollectionId)?.slug : null}
             onPicked={(row) => setMyPlayer((p) => p && ({ ...p, color: row.color, alias: row.alias }))}
           />
         )}

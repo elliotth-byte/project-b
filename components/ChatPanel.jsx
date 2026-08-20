@@ -380,8 +380,14 @@ function MessagesView({ gameId, player, players, byId, openThread, setOpenThread
 
   // Same restriction applies to who shows up when starting a brand new
   // conversation — an exiled player can only pick from other players
-  // who are also out of the game.
-  const others = players.filter((p) => p.id !== player.id && p.approved && (!isExiled || p.alive === false));
+  // who are also out of the game, and (this was the actual bug: the old
+  // condition let this side through unrestricted) an alive player can
+  // only pick from other players who are STILL alive. Symmetric on
+  // purpose — exiled and alive players are each confined to their own
+  // side, never able to newly reach across it, matching how the main
+  // Group chat itself disappears entirely once a player's exiled rather
+  // than just going read-only.
+  const others = players.filter((p) => p.id !== player.id && p.approved && (isExiled ? p.alive === false : p.alive !== false));
 
   return (
     <div>
