@@ -4,6 +4,7 @@ import { storageGet, storageUpdate, subscribeGameState } from "../lib/gameStorag
 import { KEY_FINALE } from "../lib/gameState";
 import { subscribeFinaleQa } from "../lib/finaleQaData";
 import MemoryWall from "./MemoryWall";
+import { aphroditeBlocksTargeting, powerFor } from "../lib/characterPowers";
 import FinaleQaPanel from "./FinaleQaPanel";
 
 const VOTES_KEY = "pb:finale-votes";
@@ -107,9 +108,22 @@ export default function FinalePlayer({ gameId, player, round, players, readOnly 
         {chaosBanner}
       </Card>
     );
+  } else if (powerFor(player, settings) === "Dionysus") {
+    // Dionysus's character power (see lib/characterPowers.js): "Does not
+    // have the ability to cast a vote" — same restriction and same
+    // reasoning as ExileVotePlayer.jsx's own Dionysus branch.
+    voteSection = (
+      <Card style={{ marginBottom: 20, textAlign: "center" }}>
+        <div style={{ fontSize: 22, marginBottom: 4 }}>🍇</div>
+        <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>Dionysus's power: you can't cast a vote in the finale.</p>
+        {chaosBanner}
+      </Card>
+    );
   } else {
+    const aphroditeBlockedId = aphroditeBlocksTargeting(players, settings, player?.id);
     const submit = async () => {
       if (!choice || !reason.trim()) return;
+      if (aphroditeBlockedId === choice) return; // same defense-in-depth pattern as ExileVotePlayer.jsx
       const targetName = finale.finalists.find((f) => f.playerId === choice)?.name || "";
       const res = await storageUpdate(gameId, VOTES_KEY, (fresh) => {
         const existingMap = fresh || {};
@@ -127,7 +141,14 @@ export default function FinalePlayer({ gameId, player, round, players, readOnly 
           {chaosBanner}
         </div>
         <Card style={{ marginBottom: 14 }}>
-          <MemoryWall candidates={finale.finalists} players={players} selectedId={choice} onSelect={setChoice} hideNameLabels={settings?.avatarMode === "collection" && settings?.avatarCollectionId === "default-gods"} />
+          <MemoryWall
+            candidates={finale.finalists}
+            players={players}
+            selectedId={choice}
+            onSelect={setChoice}
+            hideNameLabels={settings?.avatarMode === "collection" && settings?.avatarCollectionId === "default-gods"}
+            disabledIds={aphroditeBlockedId ? [aphroditeBlockedId] : []}
+          />
         </Card>
         <Card style={{ marginBottom: 18 }}>
           <label style={{ display: "block", fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>

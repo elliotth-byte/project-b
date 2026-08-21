@@ -264,21 +264,53 @@ that calls `reportScore(...)` as it plays, add an entry to
 
 ## Automatic phase advancement — how it actually works
 
-Vercel's **Hobby plan only runs cron jobs once per day**, which isn't
-close to real-time. Rather than requiring a paid plan, this app also
-has any open browser tab (host **or** player) quietly check in every few
-seconds via `pages/api/advance-phase.js` — the server only actually does
-anything once the current phase's timer has genuinely elapsed and
-everything that phase needed is complete. That's what makes "the game
-automatically begins the next phase and posts an update" true in
-practice, without requiring Vercel Pro.
+Vercel's **Hobby plan only runs its own cron feature once per day**,
+which isn't close to real-time. Rather than requiring a paid plan, this
+app covers the gap two ways:
 
-`pages/api/cron/advance-rounds.js` is a second, belt-and-suspenders path
-for the same logic, wired up in `vercel.json` at a frequency Hobby
-supports (once/day) as a safety net for a game left running unattended.
-**If you're on Vercel Pro**, change its schedule in `vercel.json` to
-`* * * * *` (every minute) and it becomes a fully reliable path that
-doesn't need anyone's browser tab open at all.
+1. **Any open browser tab** (host **or** player) quietly checks in every
+   few seconds via `pages/api/advance-phase.js` — the server only
+   actually does anything once the current phase's timer has genuinely
+   elapsed and everything that phase needed is complete. This is the
+   primary, near-instant path whenever anyone has the app open.
+
+2. **`pages/api/cron/advance-rounds.js`**, hit on a schedule, covers the
+   gap when nobody does. Vercel's own once-daily cron entry in
+   `vercel.json` stays wired up as a low-frequency backstop regardless
+   of plan — but the once-per-day cap is a limit on *Vercel's own
+   scheduler*, not on this endpoint, which is a completely ordinary HTTP
+   route that answers any caller with the right secret. A free external
+   scheduler calling it every few minutes gets you real, near-real-time
+   coverage without upgrading anything:
+
+   **Setup (cron-job.org, free, no code changes needed):**
+   1. Confirm `CRON_SECRET` is set in Vercel → Project Settings →
+      Environment Variables. If it isn't already set (Vercel's own cron
+      entry works fine without it, since the check in
+      `advance-rounds.js` only enforces it when the variable is
+      present), add one now — any long random string works. Redeploy
+      after adding it.
+   2. Create a free account at [cron-job.org](https://cron-job.org).
+   3. Create a new cron job:
+      - **URL**: `https://<your-production-domain>/api/cron/advance-rounds`
+        (find your exact domain in Vercel → Project → Domains — this
+        changes if you ever rename the project)
+      - **Schedule**: every 5 minutes (cron-job.org's own minimum)
+      - **Request method**: GET (the default — this route doesn't
+        restrict by method)
+      - **Custom header**: `Authorization: Bearer <your CRON_SECRET value>`
+   4. Save, then use cron-job.org's "Run now" / test option to confirm
+      you get back a `200` with a JSON body like
+      `{"checked": N, "results": [...]}` — a `401` means the header
+      doesn't match what's in Vercel's environment variables.
+
+   This is deliberately additive, not a replacement — Vercel's own
+   once-daily cron entry stays in `vercel.json` as a backstop in case
+   the external scheduler ever has an outage of its own. If you're ever
+   on **Vercel Pro** instead, you can skip the external scheduler
+   entirely and just change `vercel.json`'s schedule to `* * * * *`
+   (every minute — Pro supports true per-minute cadence) or anything
+   less frequent.
 
 ## Announcements
 

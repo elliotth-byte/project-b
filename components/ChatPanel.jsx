@@ -8,6 +8,9 @@ import {
 } from "../lib/chatData";
 
 import { colorFor } from "../lib/playerColors";
+import { isPoseidonDmBlockActive, heraChatBlockActive } from "../lib/characterPowers";
+import { subscribeGameState } from "../lib/gameStorage";
+import { KEY_EXILE, KEY_FINALE } from "../lib/gameState";
 import { supabase } from "../lib/supabaseClient";
 
 // Fire-and-forget — a push notification failing to send should never
@@ -180,12 +183,12 @@ function MessageList({ messages, containerRef }) {
   );
 }
 
-function Composer({ onSend, placeholder, readOnly = false }) {
+function Composer({ onSend, placeholder, readOnly = false, disabledMessage = null }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const submit = async () => {
     const t = text.trim();
-    if (!t || sending || readOnly) return;
+    if (!t || sending || readOnly || disabledMessage) return;
     setSending(true);
     const prevText = t;
     setText("");
@@ -205,6 +208,13 @@ function Composer({ onSend, placeholder, readOnly = false }) {
       </div>
     );
   }
+  if (disabledMessage) {
+    return (
+      <div style={{ paddingTop: 8, textAlign: "center" }}>
+        <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic", margin: 0 }}>{disabledMessage}</p>
+      </div>
+    );
+  }
   return (
     <div style={{ display: "flex", gap: 8, paddingTop: 8 }}>
       <input
@@ -219,9 +229,21 @@ function Composer({ onSend, placeholder, readOnly = false }) {
   );
 }
 
-function GroupChatView({ gameId, player, players, realName, onRead, readOnly = false }) {
+function GroupChatView({ gameId, player, players, realName, onRead, readOnly = false, round, settings }) {
   const [messages, setMessages] = useState([]);
   const listRef = useRef(null);
+  // Hera's character power (see lib/characterPowers.js) — only ever
+  // subscribes when the round is actually in a deliberation phase, same
+  // scoping ChatPanel.jsx's Poseidon block already uses; there's no
+  // relevant state to read outside Exile/Finale anyway.
+  const heraKey = round?.phase === "exile" ? KEY_EXILE : round?.phase === "finale" ? KEY_FINALE : null;
+  const [heraState, setHeraState] = useState(null);
+
+  useEffect(() => {
+    if (!heraKey) { setHeraState(null); return; }
+    const unsubscribe = subscribeGameState(gameId, heraKey, setHeraState);
+    return unsubscribe;
+  }, [gameId, heraKey]);
 
   useEffect(() => {
     const unsubscribe = subscribeGroupChat(gameId, setMessages);
@@ -235,6 +257,25 @@ function GroupChatView({ gameId, player, players, realName, onRead, readOnly = f
   // Viewing the tab is what counts as "read" — matches how the other
   // rooms work (opening a thread marks it read the same way).
   useEffect(() => { onRead?.(); }, [messages.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Hera's character power: "exile" is stronger language than "mute" —
+  // reads as losing access to the room itself for this deliberation
+  // window, not just being unable to send, so this replaces the whole
+  // view (message history included) rather than just disabling the
+  // composer — the same shape actual game-elimination already uses to
+  // remove the Group Chat tab entirely for an exiled player.
+  if (!readOnly && heraChatBlockActive(heraState, player.id)) {
+    return (
+      <div style={{ height: "60vh", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 20 }}>
+        <div>
+          <div style={{ fontSize: 32, marginBottom: 10 }}>👑</div>
+          <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>
+            Hera has exiled you from the main chat for this deliberation — you'll be back once it ends.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const rows = messages.map((m) => ({
     id: m.id,
@@ -251,7 +292,10 @@ function GroupChatView({ gameId, player, players, realName, onRead, readOnly = f
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "60vh" }}>
       <MessageList messages={rows} containerRef={listRef} />
-      <Composer placeholder="Message everyone..." readOnly={readOnly} onSend={(t) => { sendGroupMessage(gameId, player.id, player.name, t, realName); notifyPushForMessage(gameId, "group", player.id, player.name, t); }} />
+      <Composer
+        placeholder="Message everyone..." readOnly={readOnly}
+        onSend={(t) => { sendGroupMessage(gameId, player.id, player.name, t, realName); notifyPushForMessage(gameId, "group", player.id, player.name, t); }}
+      />
     </div>
   );
 }
@@ -262,11 +306,18 @@ function threadLabel(thread, player, byId) {
   return others.map((id) => byId[id] || "?").join(", ") || "?";
 }
 
-function ThreadView({ gameId, thread, player, players, byId, onBack, onRead, readOnly = false }) {
+function ThreadView({ gameId, thread, player, players, byId, onBack, onRead, readOnly = false, round, settings }) {
   const [messages, setMessages] = useState([]);
   const [reactions, setReactions] = useState([]);
   const listRef = useRef(null);
   const label = threadLabel(thread, player, byId);
+  // Poseidon's character power (see lib/characterPowers.js) — round and
+  // settings are only ever passed in from MessagesView's regular-DM call
+  // sites below, deliberately NOT from ExileRoomView's — the Exile Room
+  // only holds players already out of the game, who aren't part of
+  // whatever round's Fates/Exile deliberation Poseidon actually blocked,
+  // so there'd be nothing for this to meaningfully affect there anyway.
+  const poseidonBlocked = round && settings && isPoseidonDmBlockActive(players, settings, round);
 
   useEffect(() => {
     const unsubscribe = subscribeThreadMessages(thread.id, setMessages);
@@ -304,7 +355,11 @@ function ThreadView({ gameId, thread, player, players, byId, onBack, onRead, rea
         <strong style={{ color: "#f5f0ff", fontSize: 13 }}>{label}</strong>
       </div>
       <MessageList messages={rows} containerRef={listRef} />
-      <Composer placeholder={`Message ${label}...`} readOnly={readOnly} onSend={(t) => { sendThreadMessage(thread.id, player.id, t); notifyPushForMessage(gameId, "thread", player.id, player.name, t, thread.id); }} />
+      <Composer
+        placeholder={`Message ${label}...`} readOnly={readOnly}
+        disabledMessage={poseidonBlocked ? "🌊 Poseidon has turned off DMs for this Fates Ceremony and Exile Vote." : null}
+        onSend={(t) => { sendThreadMessage(thread.id, player.id, t); notifyPushForMessage(gameId, "thread", player.id, player.name, t, thread.id); }}
+      />
     </div>
   );
 }
@@ -333,7 +388,7 @@ function ExileRoomView({ gameId, player, players, byId, onRead, readOnly = false
   return <ThreadView gameId={gameId} thread={thread} player={player} players={players} byId={byId} onBack={() => {}} onRead={onRead} readOnly={readOnly} />;
 }
 
-function MessagesView({ gameId, player, players, byId, openThread, setOpenThread, reads, onRead, isExiled, readOnly = false }) {
+function MessagesView({ gameId, player, players, byId, openThread, setOpenThread, reads, onRead, isExiled, readOnly = false, round, settings }) {
   const [threads, setThreads] = useState([]);
   const [picking, setPicking] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -375,7 +430,7 @@ function MessagesView({ gameId, player, players, byId, openThread, setOpenThread
   };
 
   if (openThread) {
-    return <ThreadView gameId={gameId} thread={openThread} player={player} players={players} byId={byId} onBack={() => { setOpenThread(null); reload(); }} onRead={onRead} readOnly={readOnly} />;
+    return <ThreadView gameId={gameId} thread={openThread} player={player} players={players} byId={byId} onBack={() => { setOpenThread(null); reload(); }} onRead={onRead} readOnly={readOnly} round={round} settings={settings} />;
   }
 
   // Same restriction applies to who shows up when starting a brand new
@@ -484,7 +539,7 @@ function MessagesView({ gameId, player, players, byId, openThread, setOpenThread
 // member groups, both the same underlying model — see
 // sql/add-group-chat.sql). Only shown at all when the host has turned
 // chat on for this season (settings.chatEnabled).
-export default function ChatPanel({ gameId, player, players, realName, isExiled, readOnly = false }) {
+export default function ChatPanel({ gameId, player, players, realName, isExiled, readOnly = false, round, settings }) {
   const [mode, setMode] = useState(isExiled ? "exile" : "group"); // "group" | "exile" | "messages"
   const [openThread, setOpenThread] = useState(null);
   const [groupReadAt, setGroupReadAt] = useState(null);
@@ -570,7 +625,7 @@ export default function ChatPanel({ gameId, player, players, realName, isExiled,
       </div>
 
       <Card>
-        {mode === "group" && !isExiled && <GroupChatView gameId={gameId} player={player} players={players} realName={realName} onRead={markGroupReadNow} readOnly={readOnly} />}
+        {mode === "group" && !isExiled && <GroupChatView gameId={gameId} player={player} players={players} realName={realName} onRead={markGroupReadNow} readOnly={readOnly} round={round} settings={settings} />}
         {mode === "exile" && isExiled && <ExileRoomView gameId={gameId} player={player} players={players} byId={byId} onRead={markThreadReadNow} readOnly={readOnly} />}
         {mode === "messages" && (
           <MessagesView
@@ -580,6 +635,7 @@ export default function ChatPanel({ gameId, player, players, realName, isExiled,
             onRead={markThreadReadNow}
             isExiled={isExiled}
             readOnly={readOnly}
+            round={round} settings={settings}
           />
         )}
       </Card>

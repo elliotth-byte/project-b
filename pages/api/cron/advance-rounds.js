@@ -5,14 +5,20 @@ import { makeInAppPostMessage } from "../../../lib/announcements";
 import { KEY_ROUND } from "../../../lib/gameState";
 
 // ============================================================
-// Runs on Vercel's cron schedule (see vercel.json).
+// Runs on a schedule — see vercel.json for Vercel's own once-daily
+// cron entry (Hobby plan caps native Vercel cron at once per day; this
+// stays wired up as a low-frequency backstop regardless of plan).
 //
-// IMPORTANT — Vercel plan limits: Hobby accounts can only run a cron job
-// once per DAY, so on Hobby this route is really just a safety net that
-// sweeps up any game whose timer expired while no one had a browser tab
-// open (see pages/api/advance-phase.js for the primary, near-real-time
-// path). On a Pro plan, set this to run every minute in vercel.json and
-// it becomes the reliable, always-on path — no open tab required at all.
+// The actual frequent, near-real-time trigger is an EXTERNAL free
+// scheduler (cron-job.org) hitting this same URL every 5 minutes —
+// Vercel's own cron limit is a restriction on Vercel's scheduler
+// specifically, not on this endpoint, which is just a normal HTTP route
+// that answers any caller with the right secret. See README.md for the
+// exact cron-job.org setup (URL, header, and interval).
+//
+// pages/api/advance-phase.js remains the primary, near-instant path
+// whenever someone actually has a browser tab open (polls every few
+// seconds) — this route is what covers the gap when nobody does.
 // ============================================================
 export default async function handler(req, res) {
   const authHeader = req.headers.authorization || "";

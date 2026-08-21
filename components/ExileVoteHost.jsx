@@ -3,6 +3,7 @@ import { Btn, Card, Badge, ChaosStatusBadge } from "./ui";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_EXILE } from "../lib/gameState";
 import { computeEliminateOutcome, computeSaveOutcome, buildRevealOrder } from "../lib/exileLogic";
+import { filterCancelledVote } from "../lib/characterPowers";
 import { exileContext, subscribeChaosSecret } from "../lib/chaosSecrets";
 import { exileDrawContext, chaosPicksKey } from "../lib/chaosDraw";
 import CopyMessage from "./CopyMessage";
@@ -68,7 +69,10 @@ export default function ExileVoteHost({ gameId, players, round }) {
 
   const chaosHolder = players.find((p) => p.id === exile.chaosHolderId);
   const nullifiedId = chaosSecret?.nomineeId || null;
-  const voteRows = Object.entries(votes).map(([voterId, v]) => ({ voterId, targetId: v.targetId, reason: v.reason }));
+  const voteRows = filterCancelledVote(
+    Object.entries(votes).map(([voterId, v]) => ({ voterId, targetId: v.targetId, reason: v.reason })),
+    exile.artemisCancelledVoterId
+  );
   const nomineeIds = exile.nominees.map((n) => n.playerId);
   const byId = {};
   exile.nominees.forEach((n) => (byId[n.playerId] = n.name));

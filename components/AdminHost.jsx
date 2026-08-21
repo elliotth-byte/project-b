@@ -12,6 +12,7 @@ import { REENTRY_STATUS } from "../lib/reentryLogic";
 import { exileDrawContext, chaosPicksKey, FINALE_DRAW_CONTEXT } from "../lib/chaosDraw";
 import { AVATAR_COLLECTIONS } from "../lib/avatarCollections";
 import { uploadAvatar, removeAvatar } from "../lib/avatarUpload";
+import { CHARACTER_POWERS, powerFor, assignRandomPowers } from "../lib/characterPowers";
 
 export default function AdminHost({ gameId, players, round }) {
   const [names, setNames] = useState({});
@@ -21,6 +22,7 @@ export default function AdminHost({ gameId, players, round }) {
   const [status, setStatus] = useState("");
   const [settings, setLocalSettings] = useState(DEFAULT_SETTINGS);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [assigningPowers, setAssigningPowers] = useState(false);
   const [adminSubTab, setAdminSubTab] = useState("roster"); // "roster" | "setup"
   const [resettingId, setResettingId] = useState(null);
   const [resetResult, setResetResult] = useState(null); // { playerId, username, newPassword } | null
@@ -135,6 +137,22 @@ export default function AdminHost({ gameId, players, round }) {
     setSavingSettings(true);
     await setSettings(gameId, patch);
     setSavingSettings(false);
+  };
+
+  // Random-mode power assignment — one-time (well, re-triggerable, but
+  // doing so mid-season would reshuffle everyone's power out from under
+  // them, so this is only ever offered before Round 1 — see
+  // seasonStarted gating below). No bulk "different value per row"
+  // update in the Supabase JS client without an RPC, so this loops over
+  // players individually — the player count here is small enough
+  // (typically well under 20) that this is fine.
+  const assignRandomPowersNow = async () => {
+    setAssigningPowers(true);
+    const assignments = assignRandomPowers(players);
+    for (const p of players) {
+      await supabase.from("players").update({ power_state: { ...(p.power_state || {}), assignedPower: assignments[p.id] } }).eq("id", p.id);
+    }
+    setAssigningPowers(false);
   };
 
   // Avatar moderation — available regardless of mode, since a photo set
@@ -459,9 +477,8 @@ export default function AdminHost({ gameId, players, round }) {
           <Card>
             <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>⏱ Round Lengths</h3>
             <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
-              Default timer for each phase. The Battle phase's duration can still be overridden per-round when the host starts that
-              round's challenge. When a phase's timer runs out, the game automatically moves to the next phase and posts an update
-              in-app — as long as the host has finished entering whatever that phase needed (results, nominations, etc.).
+              Default timer for each phase. When a phase's timer runs out, the game automatically moves to the next phase and posts
+              an update in-app — as long as the host has finished entering whatever that phase needed (results, nominations, etc.).
             </p>
             <div style={{ display: "grid", gap: 10 }}>
               {[
@@ -507,6 +524,104 @@ export default function AdminHost({ gameId, players, round }) {
                 <strong>{seasonStarted ? "Locked — can only be changed before Round 1 starts." : "Only changeable now, before Round 1 starts."}</strong>
               </label>
               {savingSettings && <span style={{ fontSize: 11, color: "#00ff9d" }}>Saved.</span>}
+            </div>
+          </Card>
+
+          <Card>
+            <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🏛 Character Powers</h3>
+            <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+              Optional variant/advanced play — each of the 14 gods carries its own special, ongoing ability. Locked once Round 1 starts, same as Alias mode, since reshuffling who has which power mid-season would undercut whatever anyone's already built around theirs.
+            </p>
+            <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
+              {[
+                { value: "off", label: "Off", blurb: "No character powers this season." },
+                {
+                  value: "by_character", label: "Assigned by character", blurb: "Your power is simply whichever alias you are — Zeus the alias gets Zeus's power.",
+                  disabled: !settings.aliasEnabled, disabledNote: "Requires Alias mode to be on — this mode IS the alias.",
+                },
+                { value: "random", label: "Assigned at random", blurb: "Every player gets a random power, independent of their alias (or color, if alias mode is off)." },
+              ].map((opt) => (
+                <label
+                  key={opt.value}
+                  style={{
+                    display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12.5,
+                    color: (opt.disabled || seasonStarted) ? "#3d1f5c" : "#a68fd6", cursor: (opt.disabled || seasonStarted) ? "not-allowed" : "pointer",
+                  }}
+                >
+                  <input
+                    type="radio" name="characterPowersMode" checked={settings.characterPowersMode === opt.value} disabled={opt.disabled || seasonStarted}
+                    onChange={() => saveSettings({ characterPowersMode: opt.value })}
+                    style={{ marginTop: 2 }}
+                  />
+                  <span>
+                    <strong style={{ color: (opt.disabled || seasonStarted) ? "#3d1f5c" : "#f5f0ff" }}>{opt.label}</strong> — {opt.blurb}
+                    {opt.disabled && <span style={{ display: "block", fontStyle: "italic" }}>{opt.disabledNote}</span>}
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            {settings.characterPowersMode === "random" && !seasonStarted && (
+              <div style={{ marginBottom: 14 }}>
+                <Btn small onClick={assignRandomPowersNow} disabled={assigningPowers || players.length === 0}>
+                  {assigningPowers ? "Assigning..." : "🎲 Assign Random Powers"}
+                </Btn>
+                <p style={{ fontSize: 11, color: "#6b4f99", marginTop: 6, fontStyle: "italic" }}>
+                  Re-running this reshuffles everyone — fine to use again right up until Round 1 starts if the roster changes, but there's no undo once players are relying on what they've got.
+                </p>
+              </div>
+            )}
+
+            {settings.characterPowersMode !== "off" && (
+              <div style={{ background: "#0d0618", borderRadius: 8, padding: 10 }}>
+                <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+                  Who has which power
+                </div>
+                {players.length === 0 ? (
+                  <p style={{ fontSize: 12, color: "#6b4f99", margin: 0, fontStyle: "italic" }}>No players yet.</p>
+                ) : (
+                  <div style={{ display: "grid", gap: 4 }}>
+                    {players.map((p) => {
+                      const power = powerFor(p, settings);
+                      const meta = power ? CHARACTER_POWERS.find((c) => c.name === power) : null;
+                      return (
+                        <div key={p.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                          <span style={{ color: "#f5f0ff" }}>{p.display_name}</span>
+                          <span style={{ color: power ? "#f5f0ff" : "#6b4f99" }}>
+                            {power ? `${meta?.icon || ""} ${power}${meta && !meta.implemented ? " (not yet active)" : ""}` : "— none"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+
+          <Card>
+            <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🎲 Challenge Selection</h3>
+            <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+              How the challenge gets picked each round. Switching modes mid-season is fine — this doesn't touch any identity or history, unlike Alias/Character Powers.
+            </p>
+            <div style={{ display: "grid", gap: 8 }}>
+              {[
+                { value: "manual", label: "Host picks", blurb: "You choose the game type each round, same as always." },
+                {
+                  value: "random", label: "Random", blurb: "The app picks for you, weighted so no subcategory (Arcade, Maze, Puzzle, ...) plays more than twice all season.",
+                },
+              ].map((opt) => (
+                <label key={opt.value} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12.5, color: "#a68fd6", cursor: "pointer" }}>
+                  <input
+                    type="radio" name="challengeSelectionMode" checked={settings.challengeSelectionMode === opt.value}
+                    onChange={() => saveSettings({ challengeSelectionMode: opt.value })}
+                    style={{ marginTop: 2 }}
+                  />
+                  <span>
+                    <strong style={{ color: "#f5f0ff" }}>{opt.label}</strong> — {opt.blurb}
+                  </span>
+                </label>
+              ))}
             </div>
           </Card>
 

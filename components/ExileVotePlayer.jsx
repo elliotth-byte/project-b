@@ -3,6 +3,7 @@ import { Card, Badge } from "./ui";
 import { storageGet, storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_EXILE } from "../lib/gameState";
 import MemoryWall from "./MemoryWall";
+import { aphroditeBlocksTargeting, powerFor } from "../lib/characterPowers";
 
 // Who's voted, who hasn't — WITHOUT revealing anyone's actual pick
 // (that stays secret until the host reveals). Shown throughout the vote
@@ -68,6 +69,7 @@ export default function ExileVotePlayer({ gameId, player, round, players, readOn
   const alivePlayers = (players || []).filter((p) => p.approved && p.alive);
   const byId = {};
   (players || []).forEach((p) => (byId[p.id] = p.display_name));
+  const aphroditeBlockedId = aphroditeBlocksTargeting(players, settings, player?.id);
 
   useEffect(() => {
     const unsubscribe = subscribeGameState(gameId, KEY_EXILE, setExile);
@@ -124,6 +126,7 @@ export default function ExileVotePlayer({ gameId, player, round, players, readOn
 
   const submitVote = async () => {
     if (!choice || !reason.trim()) return;
+    if (aphroditeBlocksTargeting(players, settings, player?.id) === choice) return; // same defense-in-depth pattern as the disabledIds check below
     const targetName = exile.nominees.find((n) => n.playerId === choice)?.name || "";
     const res = await storageUpdate(gameId, votesKey, (fresh) => {
       const existingMap = fresh || {};
@@ -195,6 +198,23 @@ export default function ExileVotePlayer({ gameId, player, round, players, readOn
     );
   }
 
+  // Dionysus's character power (see lib/characterPowers.js): "Does not
+  // have the ability to cast a vote" — whoever currently resolves to
+  // Dionysus (however many times the power's been swapped around) never
+  // gets the actual voting picker, though everything informational
+  // (nominations, chaos banner, live voter count) still shows.
+  if (powerFor(player, settings) === "Dionysus") {
+    return (
+      <Card style={{ marginBottom: 20, textAlign: "center" }}>
+        <div style={{ fontSize: 22, marginBottom: 4 }}>🍇</div>
+        <p style={{ color: "#a68fd6", fontSize: 13, margin: "0 0 10px" }}>Dionysus's power: you can't cast a vote this round.</p>
+        {chaosBanner}
+        <div style={{ textAlign: "left" }}>{nominationsRecap}</div>
+        <div style={{ textAlign: "left" }}>{voterStatus}</div>
+      </Card>
+    );
+  }
+
   return (
     <div style={{ marginBottom: 20 }}>
       <div style={{ textAlign: "center", marginBottom: 20 }}>
@@ -208,7 +228,14 @@ export default function ExileVotePlayer({ gameId, player, round, players, readOn
       <Card style={{ marginBottom: 14 }}>
         {/* Nominees never include the voter themselves — a player can't
             vote to eliminate/save themselves. */}
-        <MemoryWall candidates={exile.nominees.filter((n) => n.playerId !== player?.id)} players={players} selectedId={choice} onSelect={setChoice} hideNameLabels={settings?.avatarMode === "collection" && settings?.avatarCollectionId === "default-gods"} />
+        <MemoryWall
+          candidates={exile.nominees.filter((n) => n.playerId !== player?.id)}
+          players={players}
+          selectedId={choice}
+          onSelect={setChoice}
+          hideNameLabels={settings?.avatarMode === "collection" && settings?.avatarCollectionId === "default-gods"}
+          disabledIds={aphroditeBlockedId ? [aphroditeBlockedId] : []}
+        />
       </Card>
       <Card style={{ marginBottom: 18 }}>
         <label style={{ display: "block", fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>

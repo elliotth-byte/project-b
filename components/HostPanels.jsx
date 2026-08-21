@@ -177,7 +177,7 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
                 <ChallengeErrorBoundary label="Battle"><ChallengeHost gameId={gameId} players={hostApprovedRoster} round={round} settings={settings} /></ChallengeErrorBoundary>
               )}
               {round.phase === PHASES.FATES && (
-                <ChallengeErrorBoundary label="Fates Ceremony"><FatesHost gameId={gameId} players={hostApprovedRoster} round={round} /></ChallengeErrorBoundary>
+                <ChallengeErrorBoundary label="Fates Ceremony"><FatesHost gameId={gameId} players={hostApprovedRoster} round={round} settings={settings} /></ChallengeErrorBoundary>
               )}
               {round.phase === PHASES.EXILE && (
                 <ChallengeErrorBoundary label="Exile Vote"><ExileVoteHost gameId={gameId} players={hostApprovedRoster} round={round} /></ChallengeErrorBoundary>

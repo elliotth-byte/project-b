@@ -5,8 +5,9 @@ import { KEY_CHALLENGE, KEY_REENTRY } from "../lib/gameState";
 import { setReentryDecision } from "../lib/reentryData";
 import { REENTRY_STATUS } from "../lib/reentryLogic";
 import { formatDurationHours } from "../lib/fatesLogic";
-import { subscribeScores, forfeitChallenge } from "../lib/challengeScores";
+import { subscribeScores, forfeitChallenge, unlockScoreForRetry } from "../lib/challengeScores";
 import { GAME_REGISTRY } from "../lib/challengeGames";
+import { powerFor } from "../lib/characterPowers";
 import Match3Player from "./games/Match3Player";
 import FroggerPlayer from "./games/FroggerPlayer";
 import WordScramblePlayer from "./games/WordScramblePlayer";
@@ -83,6 +84,15 @@ export default function ChallengePlayer({ gameId, player, players, round, settin
   // it. This just toggles visibility, so returning to the battle picks
   // up exactly where it was left, no matter which kind of game it is.
   const [minimized, setMinimized] = useState(false);
+  // Demeter's character power (see lib/characterPowers.js) — forcing a
+  // fresh `key` on GameComponent below triggers a full React remount,
+  // which resets EVERY game's internal state cleanly (Snake's board,
+  // Match3's grid, an in-progress Word Scramble scatter, all of it)
+  // without needing to teach each individual game component anything
+  // about being "retried" — they just mount fresh, exactly as if the
+  // player had never played this round at all.
+  const [attemptKey, setAttemptKey] = useState(0);
+  const [retrying, setRetrying] = useState(false);
   const [forfeiting, setForfeiting] = useState(false);
   const [deciding, setDeciding] = useState(false);
 
@@ -209,6 +219,13 @@ export default function ChallengePlayer({ gameId, player, players, round, settin
     setForfeiting(false);
   };
 
+  const retryAsDemeter = async () => {
+    setRetrying(true);
+    await unlockScoreForRetry(gameId, round.round, player.id);
+    setAttemptKey((k) => k + 1);
+    setRetrying(false);
+  };
+
   if (isDigital && amCompeting) {
     // Already locked in a final score for this round (e.g. after a page
     // refresh) — show the result instead of restarting the mini-game
@@ -222,7 +239,28 @@ export default function ChallengePlayer({ gameId, player, players, round, settin
           </Card>
         );
       }
-      return <GameResultCard icon={registryEntry?.icon || "🎮"} title={`${registryEntry?.label || "Battle"} Complete`} valueLabel={String(myScore.value)} />;
+      // Demeter's character power (see lib/characterPowers.js): a
+      // second attempt that outright replaces the first, once per
+      // challenge. Not offered in a readOnly (host "view as") preview —
+      // this unlocks and re-plays for real, same reasoning as every
+      // other real write action in this file being readOnly-gated.
+      const isDemeter = !readOnly && powerFor(player, settings) === "Demeter";
+      const canRetry = isDemeter && !myScore.demeterRetried;
+      return (
+        <>
+          <GameResultCard icon={registryEntry?.icon || "🎮"} title={`${registryEntry?.label || "Battle"} Complete`} valueLabel={String(myScore.value)} />
+          {canRetry && (
+            <Card style={{ marginBottom: 20, textAlign: "center" }}>
+              <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 10px" }}>
+                🌾 Demeter's power: you may make a second attempt — it will completely replace this result.
+              </p>
+              <Btn small onClick={retryAsDemeter} disabled={retrying}>
+                {retrying ? "Preparing..." : "🌾 Retry (Demeter)"}
+              </Btn>
+            </Card>
+          )}
+        </>
+      );
     }
 
     const GameComponent = GAME_COMPONENTS[challenge.gameType];
@@ -297,7 +335,7 @@ export default function ChallengePlayer({ gameId, player, players, round, settin
                 99vw/538px post-scale — comfortably fits without triggering
                 horizontal overflow on typical phone widths. */}
             <div style={{ width: "78vw", maxWidth: 420, transform: "scale(1.28)", transformOrigin: "center top", marginTop: 20 }}>
-              <GameComponent gameId={gameId} round={round} challenge={challenge} player={player} players={players} />
+              <GameComponent key={attemptKey} gameId={gameId} round={round} challenge={challenge} player={player} players={players} />
               <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 10 }}>
                 <Btn small variant="ghost" onClick={() => setMinimized(true)}>↙ Minimize</Btn>
                 <Btn small variant="ghost" onClick={forfeitDigital} disabled={forfeiting}>

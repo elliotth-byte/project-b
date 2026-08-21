@@ -3,6 +3,7 @@ import { Card, Badge } from "./ui";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_FATES, KEY_CHALLENGE } from "../lib/gameState";
 import { isValidNomination, takenNomineeIds } from "../lib/fatesLogic";
+import { aphroditeBlocksTargeting, findAresImmunePlayerId } from "../lib/characterPowers";
 import MemoryWall from "./MemoryWall";
 
 // Shared live-status list — who's nominating, who's already submitted
@@ -93,6 +94,8 @@ export default function FatesPlayer({ gameId, player, players, round, readOnly =
   }
 
   const taken = takenNomineeIds(fates.nominations, player.id);
+  const aphroditeBlockedId = aphroditeBlocksTargeting(players, settings, player.id);
+  const aresImmuneId = findAresImmunePlayerId(players, settings, round);
 
   // A read-only viewer (the host "viewing as" this player) can watch the
   // live status but must never be able to submit a real nomination on
@@ -115,6 +118,8 @@ export default function FatesPlayer({ gameId, player, players, round, readOnly =
 
   const submit = async () => {
     if (!choice || !reason.trim()) return;
+    if (aphroditeBlockedId && choice === aphroditeBlockedId) return; // same defense-in-depth pattern as the taken-nominee re-check just below
+    if (aresImmuneId && choice === aresImmuneId) return;
     await storageUpdate(gameId, KEY_FATES, (fresh) => {
       if (!fresh) return null;
       const stillTaken = takenNomineeIds(fresh.nominations, player.id);
@@ -148,7 +153,7 @@ export default function FatesPlayer({ gameId, player, players, round, readOnly =
           selectedId={choice}
           onSelect={setChoice}
           hideNameLabels={settings?.avatarMode === "collection" && settings?.avatarCollectionId === "default-gods"}
-          disabledIds={others.filter((p) => !isValidNomination(player.id, p.id, winnerId, taken).ok).map((p) => p.id)}
+          disabledIds={others.filter((p) => !isValidNomination(player.id, p.id, winnerId, taken, aphroditeBlockedId, aresImmuneId).ok).map((p) => p.id)}
         />
       </Card>
       <Card style={{ marginBottom: 16 }}>

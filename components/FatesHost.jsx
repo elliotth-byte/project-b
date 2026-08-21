@@ -3,10 +3,11 @@ import { Btn, Card, Badge } from "./ui";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_FATES, KEY_CHALLENGE } from "../lib/gameState";
 import { isValidNomination, nominationsComplete, takenNomineeIds } from "../lib/fatesLogic";
+import { aphroditeBlocksTargeting, findAresImmunePlayerId } from "../lib/characterPowers";
 import CopyMessage from "./CopyMessage";
 import { requestAdvance } from "../lib/advanceNow";
 
-export default function FatesHost({ gameId, players, round }) {
+export default function FatesHost({ gameId, players, round, settings }) {
   const [fates, setFates] = useState(null);
   const [challenge, setChallenge] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -27,6 +28,7 @@ export default function FatesHost({ gameId, players, round }) {
   if (!fates) return <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>Loading...</p></Card>;
 
   const winnerId = (challenge?.placements || []).find((p) => p.place === 1)?.playerId || null;
+  const aresImmuneId = findAresImmunePlayerId(players, settings, round);
   const winnerName = players.find((p) => p.id === winnerId)?.display_name;
   const alive = players.filter((p) => p.approved && p.alive);
 
@@ -60,6 +62,7 @@ export default function FatesHost({ gameId, players, round }) {
           const currentNominee = fates.nominations?.[nominator.playerId] || "";
           const reason = fates.nominationReasons?.[nominator.playerId];
           const taken = takenNomineeIds(fates.nominations, nominator.playerId);
+          const aphroditeBlockedId = aphroditeBlocksTargeting(players, settings, nominator.playerId);
           return (
             <div key={nominator.playerId}>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -72,7 +75,7 @@ export default function FatesHost({ gameId, players, round }) {
                 >
                   <option value="">— choose nominee —</option>
                   {alive.map((p) => {
-                    const check = isValidNomination(nominator.playerId, p.id, winnerId, taken);
+                    const check = isValidNomination(nominator.playerId, p.id, winnerId, taken, aphroditeBlockedId, aresImmuneId);
                     return (
                       <option key={p.id} value={p.id} disabled={!check.ok && p.id !== currentNominee}>
                         {p.display_name}{!check.ok && p.id !== currentNominee ? ` (${check.error})` : ""}

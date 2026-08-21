@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { makeDb } from "../../lib/dbAdapter";
-import { KEY_ROUND, KEY_EXILE, KEY_FINALE } from "../../lib/gameState";
+import { KEY_ROUND, KEY_EXILE, KEY_FINALE, KEY_SETTINGS, DEFAULT_SETTINGS } from "../../lib/gameState";
+import { powerFor } from "../../lib/characterPowers";
 
 // ============================================================
 // The Power of Khaos "draw" — replaces the old host-side Fan of Cards
@@ -43,7 +44,7 @@ export default async function handler(req, res) {
 
   // RLS-gated read: only returns a row for the caller's own player row in
   // this game, confirming both membership and giving us their player id.
-  const { data: me } = await userClient.from("players").select("id, alive, approved").eq("game_id", gameId).eq("user_id", userData.user.id).maybeSingle();
+  const { data: me } = await userClient.from("players").select("id, alive, approved, alias, power_state").eq("game_id", gameId).eq("user_id", userData.user.id).maybeSingle();
   if (!me || !me.approved) return res.status(403).json({ error: "Not an approved player in this game." });
 
   const adminClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -81,9 +82,30 @@ export default async function handler(req, res) {
 
   const picksKey = `pb:chaos-picks:${context}`;
   const picks = (await db.get(gameId, picksKey)) || {};
-  if (picks[me.id] !== undefined) return res.status(400).json({ error: "You've already made your pick." });
 
-  await db.update(gameId, picksKey, (fresh) => ({ ...(fresh || {}), [me.id]: buttonIndex }));
+  // Hestia's character power (see lib/characterPowers.js): two draws
+  // instead of one, improving her odds of becoming the holder — not
+  // two nullify picks once already holding it (that's a different
+  // reading the season's host confirmed against when this was built).
+  // Determined server-side from settings + this player's own row, same
+  // as everything else here — never trusted from the request body,
+  // since a forged "I'm Hestia" claim from the client would otherwise
+  // just be a free second pick for anyone.
+  const settingsRaw = await db.get(gameId, KEY_SETTINGS);
+  const settings = { ...DEFAULT_SETTINGS, ...(settingsRaw || {}) };
+  const isHestia = powerFor(me, settings) === "Hestia";
+
+  let pickSlot = me.id; // where THIS pick gets recorded — usually just the player's own id
+  if (picks[me.id] !== undefined) {
+    const hestiaSlot = `${me.id}:hestia2`;
+    if (isHestia && picks[hestiaSlot] === undefined) {
+      pickSlot = hestiaSlot;
+    } else {
+      return res.status(400).json({ error: "You've already made your pick." });
+    }
+  }
+
+  await db.update(gameId, picksKey, (fresh) => ({ ...(fresh || {}), [pickSlot]: buttonIndex }));
 
   let won = false;
   if (!state.chaosHolderId) {

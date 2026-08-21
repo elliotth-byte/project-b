@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { Btn, Card, Badge, DurationInput } from "./ui";
+import { Btn, Card, Badge } from "./ui";
 import { storageSet, storageUpdate, subscribeGameState } from "../lib/gameStorage";
-import { KEY_CHALLENGE, KEY_ROUND } from "../lib/gameState";
+import { KEY_CHALLENGE, KEY_ROUND, KEY_CHALLENGE_HISTORY } from "../lib/gameState";
 import { placementsComplete } from "../lib/challengeLogic";
 import { GAME_REGISTRY, gameConfigWithDefaults } from "../lib/challengeGames";
 import { subscribeScores, scoresToPlacements, resetPlayerAttempt } from "../lib/challengeScores";
@@ -15,6 +15,8 @@ import { initMasquerade } from "../lib/games/masqueradeData";
 import { initCloseToTwenty } from "../lib/games/closeToTwentyData";
 import { initTorched } from "../lib/games/torchedData";
 import { initChains, subscribeChains } from "../lib/games/chainsData";
+import { pickRandomChallenge, hephaestusDrawKey, randomPickKey } from "../lib/challengeSelection";
+import { powerFor } from "../lib/characterPowers";
 import ParticipantPicker from "./ParticipantPicker";
 import CopyMessage from "./CopyMessage";
 import { requestAdvance } from "../lib/advanceNow";
@@ -43,12 +45,14 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   // picker showing nothing highlighted at all on first load, since it's
   // no longer one of the rendered options.
   const [gameType, setGameType] = useState(Object.keys(GAME_REGISTRY).find((k) => k !== "manual"));
-  const [durationSec, setDurationSec] = useState(settings?.challengeDurationSec || 900);
   const [mazeSize, setMazeSize] = useState(GAME_REGISTRY.maze2d.config.size);
   const [busy, setBusy] = useState(false);
   const [plinkoBracket, setPlinkoBracket] = useState(null);
   const [chainsState, setChainsState] = useState(null);
   const [resettingId, setResettingId] = useState(null);
+  const [challengeHistory, setChallengeHistory] = useState([]);
+  const [randomPickState, setRandomPickState] = useState(null);
+  const [hephaestusDraw, setHephaestusDraw] = useState(null);
 
   const resetAttempt = async (playerId, playerName) => {
     if (!confirm(`Reset ${playerName}'s attempt at this challenge? Their score and any in-progress clock are cleared — they get a completely fresh run next time they open this challenge. Takes effect the next time their screen reloads, not necessarily instantly if they're mid-game right now.`)) return;
@@ -82,6 +86,48 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   }, [gameId, round?.round]);
 
   useEffect(() => {
+    const unsubscribe = subscribeGameState(gameId, KEY_CHALLENGE_HISTORY, (v) => setChallengeHistory(v || []));
+    return unsubscribe;
+  }, [gameId]);
+
+  useEffect(() => {
+    if (!round?.round) return;
+    const unsubscribe = subscribeGameState(gameId, randomPickKey(round.round), setRandomPickState);
+    return unsubscribe;
+  }, [gameId, round?.round]);
+
+  useEffect(() => {
+    if (!round?.round) return;
+    const unsubscribe = subscribeGameState(gameId, hephaestusDrawKey(round.round), setHephaestusDraw);
+    return unsubscribe;
+  }, [gameId, round?.round]);
+
+  // Random challenge selection (see lib/challengeSelection.js) — the
+  // simple, no-Hephaestus case auto-triggers the moment the setup screen
+  // loads, no host button needed (nothing for a host to deliberately
+  // "kick off" here, it's just a straight random pick). Hephaestus's
+  // two-option draw, further down, is deliberately host-triggered
+  // instead — that one puts a choice in front of another player, so the
+  // host controls WHEN that happens rather than it firing the instant
+  // the round begins.
+  const hephaestusPlayer = (players || []).find((p) => p.alive && p.approved && powerFor(p, settings) === "Hephaestus");
+  useEffect(() => {
+    if (settings?.challengeSelectionMode !== "random" || hephaestusPlayer || !round?.round || challenge?.active || randomPickState) return;
+    storageUpdate(gameId, randomPickKey(round.round), (fresh) => (fresh ? fresh : { gameType: pickRandomChallenge(challengeHistory) }));
+  }, [settings?.challengeSelectionMode, hephaestusPlayer, round?.round, challenge?.active, randomPickState, gameId, challengeHistory]);
+
+  // Keeps gameType (the state everything else in this component — maze
+  // size, duration, the start button — already reads from) in sync with
+  // whichever random-mode resolution actually applies, so the rest of
+  // the setup flow works completely unchanged regardless of selection
+  // mode.
+  useEffect(() => {
+    if (settings?.challengeSelectionMode !== "random") return;
+    if (hephaestusDraw?.chosen) setGameType(hephaestusDraw.chosen);
+    else if (!hephaestusPlayer && randomPickState?.gameType) setGameType(randomPickState.gameType);
+  }, [settings?.challengeSelectionMode, hephaestusDraw?.chosen, hephaestusPlayer, randomPickState?.gameType]);
+
+  useEffect(() => {
     const unsubscribe = subscribeReentry(gameId, setReentry);
     return unsubscribe;
   }, [gameId]);
@@ -112,6 +158,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   };
 
   const startChallenge = async () => {
+    if (randomModeNotReady) return; // defense-in-depth alongside the disabled Start Battle button — gameType isn't finalized yet
     setBusy(true);
     const { participants } = computeParticipants(config, { alive: alivePicker });
     const participantIds = participants.map((p) => p.id);
@@ -134,7 +181,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     // or a lock-in-gated reveal forced to stop mid-way (possibly even
     // before it's really begun) has no clean resolution the way a
     // scored game does.
-    const endsAt = (settings?.infiniteTime || gameType === "masquerade" || gameType === "torched" || gameType === "chains") ? null : now + durationSec * 1000;
+    const endsAt = (settings?.infiniteTime || gameType === "masquerade" || gameType === "torched" || gameType === "chains") ? null : now + (settings?.challengeDurationSec || 900) * 1000;
     const configOverrides = MAZE_TYPES.includes(gameType) ? { size: mazeSize } : undefined;
     await storageSet(gameId, KEY_CHALLENGE, {
       round: round.round, active: true, startedAt: now, endsAt,
@@ -212,6 +259,14 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   const complete = challenge
     ? (isDigital ? true : placementsComplete(challenge.placements, participants.length))
     : false;
+  // Random challenge selection isn't "ready to start" until whichever
+  // resolution applies has actually landed — Hephaestus hasn't chosen
+  // yet, or (no Hephaestus this round) the straight random pick hasn't
+  // come back yet. gameType itself stays whatever it was left at from a
+  // prior manual-mode session until one of those resolves and the sync
+  // effect above updates it, so this can't just check gameType alone.
+  const randomModeNotReady = settings?.challengeSelectionMode === "random"
+    && (hephaestusPlayer ? !hephaestusDraw?.chosen : !randomPickState?.gameType);
 
   if (!challenge?.active) {
     return (
@@ -221,20 +276,57 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
           Pick a challenge — each one plays out live on each player's own screen and scores itself.
         </p>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 6, marginBottom: 10 }}>
-          {Object.entries(GAME_REGISTRY).filter(([key]) => key !== "manual").map(([key, g]) => (
-            <button key={key} onClick={() => pickGameType(key)} style={{
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-              padding: "10px 8px", borderRadius: 8, cursor: "pointer",
-              background: gameType === key ? "rgba(255,45,149,0.15)" : "#0d0618",
-              border: `1px solid ${gameType === key ? "#ff2d95" : "#3d1f5c"}`,
-              color: gameType === key ? "#ff2d95" : "#a68fd6",
-            }}>
-              <span style={{ fontSize: 20 }}>{g.icon}</span>
-              <span style={{ fontSize: 11, fontWeight: 600, textAlign: "center" }}>{g.label}</span>
-            </button>
-          ))}
-        </div>
+        {settings?.challengeSelectionMode === "random" ? (
+          <div style={{ marginBottom: 10 }}>
+            {hephaestusPlayer ? (
+              !hephaestusDraw ? (
+                <div style={{ background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: 14, textAlign: "center" }}>
+                  <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>
+                    🔥 <strong style={{ color: "#f5f0ff" }}>{hephaestusPlayer.display_name}</strong> holds Hephaestus's power this round — their two options are drawn automatically, then the battle starts the moment they choose.
+                  </p>
+                </div>
+              ) : !hephaestusDraw.chosen ? (
+                <div style={{ background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: 14, textAlign: "center" }}>
+                  <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>
+                    Waiting on {hephaestusPlayer.display_name} to choose between{" "}
+                    <strong style={{ color: "#f5f0ff" }}>
+                      {hephaestusDraw.options.map((k) => `${GAME_REGISTRY[k].icon} ${GAME_REGISTRY[k].label}`).join(" and ")}
+                    </strong>. The battle starts automatically the moment they pick.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: 14, textAlign: "center" }}>
+                  <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>
+                    🔥 {hephaestusPlayer.display_name} chose <strong style={{ color: "#f5f0ff" }}>{GAME_REGISTRY[gameType].icon} {GAME_REGISTRY[gameType].label}</strong> — starting automatically...
+                  </p>
+                </div>
+              )
+            ) : randomPickState?.gameType ? (
+              <div style={{ background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: 14, textAlign: "center" }}>
+                <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>
+                  🎲 Randomly selected: <strong style={{ color: "#f5f0ff" }}>{GAME_REGISTRY[gameType].icon} {GAME_REGISTRY[gameType].label}</strong> — starting automatically...
+                </p>
+              </div>
+            ) : (
+              <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic", textAlign: "center" }}>🎲 Rolling...</p>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 6, marginBottom: 10 }}>
+            {Object.entries(GAME_REGISTRY).filter(([key]) => key !== "manual").map(([key, g]) => (
+              <button key={key} onClick={() => pickGameType(key)} style={{
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                padding: "10px 8px", borderRadius: 8, cursor: "pointer",
+                background: gameType === key ? "rgba(255,45,149,0.15)" : "#0d0618",
+                border: `1px solid ${gameType === key ? "#ff2d95" : "#3d1f5c"}`,
+                color: gameType === key ? "#ff2d95" : "#a68fd6",
+              }}>
+                <span style={{ fontSize: 20 }}>{g.icon}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, textAlign: "center" }}>{g.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <p style={{ fontSize: 11.5, color: "#6b4f99", margin: "0 0 14px", fontStyle: "italic" }}>{GAME_REGISTRY[gameType].blurb}</p>
 
         {MAZE_TYPES.includes(gameType) && (
@@ -290,13 +382,18 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
         ) : gameType === "chains" ? (
           <p style={{ color: "#ff2d95", fontSize: 12, margin: "0 0 12px" }}>∞ Chains always runs until every player has locked in — no duration to set.</p>
         ) : (
-          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
-            <label style={{ fontSize: 12, color: "#a68fd6" }}>Duration:</label>
-            <DurationInput valueSec={durationSec} onChange={setDurationSec} />
-          </div>
+          <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px" }}>
+            Duration: {Math.round((settings?.challengeDurationSec || 900) / 60)} min <span style={{ color: "#6b4f99", fontStyle: "italic" }}>(set in Admin → Round Lengths)</span>
+          </p>
         )}
 
-        <Btn onClick={startChallenge} disabled={busy}>{busy ? "Starting..." : "Start Battle"}</Btn>
+        {settings?.challengeSelectionMode === "random" ? (
+          <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic", textAlign: "center", margin: 0 }}>
+            ⚙️ Starts automatically once the game type's resolved — nothing to click here.
+          </p>
+        ) : (
+          <Btn onClick={startChallenge} disabled={busy}>{busy ? "Starting..." : "Start Battle"}</Btn>
+        )}
       </Card>
     );
   }

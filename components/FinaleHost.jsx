@@ -3,6 +3,7 @@ import { Btn, Card, Badge, ChaosStatusBadge } from "./ui";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_FINALE, KEY_ROUND } from "../lib/gameState";
 import { computeFinaleOutcome } from "../lib/exileLogic";
+import { filterCancelledVote } from "../lib/characterPowers";
 import { FINALE_CONTEXT, subscribeChaosSecret } from "../lib/chaosSecrets";
 import { FINALE_DRAW_CONTEXT, chaosPicksKey } from "../lib/chaosDraw";
 import { subscribeFinaleQa, isJuryEligible } from "../lib/finaleQaData";
@@ -56,7 +57,10 @@ export default function FinaleHost({ gameId, players, round }) {
   const nullifiedId = chaosSecret?.nomineeId || null;
   const byId = {};
   finale.finalists.forEach((f) => (byId[f.playerId] = f.name));
-  const voteRows = Object.entries(votes).map(([voterId, v]) => ({ voterId, targetId: v.targetId, reason: v.reason }));
+  const voteRows = filterCancelledVote(
+    Object.entries(votes).map(([voterId, v]) => ({ voterId, targetId: v.targetId, reason: v.reason })),
+    finale.artemisCancelledVoterId
+  );
   const finalistIds = finale.finalists.map((f) => f.playerId);
   const outcome = computeFinaleOutcome(voteRows, nullifiedId, finalistIds, finale.tieBreakChoiceId);
   // Same fix as ExileVoteHost.jsx: outcome.needsTieBreak is a pure function

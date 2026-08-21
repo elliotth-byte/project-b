@@ -11,6 +11,8 @@ import ExileVotePlayer from "../components/ExileVotePlayer";
 import FinalePlayer from "../components/FinalePlayer";
 import CeremonyPlayer from "../components/CeremonyPlayer";
 import ChaosPowerPlayer from "../components/ChaosPowerPlayer";
+import AthenaTrigger from "../components/AthenaTrigger";
+import HermesReveal from "../components/HermesReveal";
 import ConfessionalPlayer from "../components/ConfessionalPlayer";
 import MusicPlayer from "../components/MusicPlayer";
 import HelpPanel from "../components/HelpPanel";
@@ -20,6 +22,14 @@ import { hasSeenNavTour } from "../lib/navTour";
 import ChatPanel from "../components/ChatPanel";
 import PlayerAvatarUpload from "../components/PlayerAvatarUpload";
 import PlayerMemoryWall from "../components/PlayerMemoryWall";
+import AphroditePicker from "../components/AphroditePicker";
+import PoseidonTrigger from "../components/PoseidonTrigger";
+import AresTarget from "../components/AresTarget";
+import ArtemisTrigger from "../components/ArtemisTrigger";
+import HeraTrigger from "../components/HeraTrigger";
+import DionysusSwap from "../components/DionysusSwap";
+import HephaestusChoice from "../components/HephaestusChoice";
+import { powerFor } from "../lib/characterPowers";
 import RoundRevealGate from "../components/RoundRevealGate";
 import HomeLink from "../components/HomeLink";
 import LogoutButton from "../components/LogoutButton";
@@ -223,13 +233,13 @@ export default function PlayPage() {
     (async () => {
       const { data: existing } = await supabase
         .from("players")
-        .select("id, display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset")
+        .select("id, display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state")
         .eq("game_id", gameId)
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (existing) {
-        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, approved: existing.approved, color: existing.color, alias: existing.alias, avatarUrl: existing.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(existing.game_prefs || {}) }, battleBanRound: existing.battle_ban_round, torchedPreset: existing.torched_preset });
+        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, approved: existing.approved, color: existing.color, alias: existing.alias, avatarUrl: existing.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(existing.game_prefs || {}) }, battleBanRound: existing.battle_ban_round, torchedPreset: existing.torched_preset, powerState: existing.power_state });
         setJoined(true);
         return;
       }
@@ -260,12 +270,12 @@ export default function PlayPage() {
       const { data: created, error } = await supabase
         .from("players")
         .insert({ game_id: gameId, user_id: session.user.id, display_name: displayNameFromUser(user), approved: false })
-        .select("id, display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset")
+        .select("id, display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state")
         .single();
       if (error) {
         setJoinError(`Couldn't join this game: ${error.message}${error.code ? ` [code=${error.code}]` : ""}${error.details ? ` — ${error.details}` : ""} (user_id=${session.user.id})`);
       } else {
-        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, approved: created.approved, color: created.color, alias: created.alias, avatarUrl: created.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(created.game_prefs || {}) }, battleBanRound: created.battle_ban_round, torchedPreset: created.torched_preset });
+        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, approved: created.approved, color: created.color, alias: created.alias, avatarUrl: created.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(created.game_prefs || {}) }, battleBanRound: created.battle_ban_round, torchedPreset: created.torched_preset, powerState: created.power_state });
         setJoined(true);
         // Fire-and-forget — a host notification failing to send should
         // never block the join itself, which already succeeded. Uses
@@ -286,8 +296,8 @@ export default function PlayPage() {
   useEffect(() => {
     if (!myPlayer?.id) return;
     const load = async () => {
-      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset").eq("id", myPlayer.id).maybeSingle();
-      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, approved: data.approved, color: data.color, alias: data.alias, avatarUrl: data.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(data.game_prefs || {}) }, battleBanRound: data.battle_ban_round, torchedPreset: data.torched_preset }));
+      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state").eq("id", myPlayer.id).maybeSingle();
+      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, approved: data.approved, color: data.color, alias: data.alias, avatarUrl: data.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(data.game_prefs || {}) }, battleBanRound: data.battle_ban_round, torchedPreset: data.torched_preset, powerState: data.power_state }));
     };
     const channel = supabase
       .channel(`self-player-${myPlayer.id}`)
@@ -316,7 +326,7 @@ export default function PlayPage() {
   // including to themselves, right down to what shows up in "Playing
   // as..." up top and what name their own chat/confessional posts carry.
   const effectivePlayerName = settings?.aliasEnabled && myPlayer?.alias && round?.phase !== PHASES.ENDED ? myPlayer.alias : playerName;
-  const player = myPlayer ? { id: myPlayer.id, name: effectivePlayerName, gamePrefs: myPlayer.gamePrefs || DEFAULT_GAME_PREFS, battleBanRound: myPlayer.battleBanRound, torchedPreset: myPlayer.torchedPreset } : null;
+  const player = myPlayer ? { id: myPlayer.id, name: effectivePlayerName, gamePrefs: myPlayer.gamePrefs || DEFAULT_GAME_PREFS, battleBanRound: myPlayer.battleBanRound, torchedPreset: myPlayer.torchedPreset, powerState: myPlayer.powerState, alias: myPlayer.alias } : null;
 
   // Who Said It pulls its quiz straight from Panopticon chat history, and
   // Close to 20 needs every bank kept a total mystery until the reveal
@@ -498,6 +508,15 @@ export default function PlayPage() {
                     </div>
                   )}
                 </div>
+                {round?.round === 1 && powerFor(player, settings) === "Aphrodite" && (
+                  <AphroditePicker gameId={gameId} player={player} players={identityAllPlayers} settings={settings} />
+                )}
+                {round && powerFor(player, settings) === "Poseidon" && (
+                  <PoseidonTrigger player={player} round={round} />
+                )}
+                {round && powerFor(player, settings) === "Ares" && (
+                  <AresTarget gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
+                )}
                 {(!round || round.phase === PHASES.LOBBY) && (
                   <Card style={{ marginBottom: 20, textAlign: "center" }}>
                     <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: 0 }}>
@@ -506,7 +525,10 @@ export default function PlayPage() {
                   </Card>
                 )}
                 {round?.phase === PHASES.CHALLENGE && (
-                  <ChallengeErrorBoundary label="Battle"><ChallengePlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} settings={settings} /></ChallengeErrorBoundary>
+                  <>
+                    <ChallengeErrorBoundary label="Hephaestus's Choice"><HephaestusChoice gameId={gameId} round={round} player={player} settings={settings} /></ChallengeErrorBoundary>
+                    <ChallengeErrorBoundary label="Battle"><ChallengePlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} settings={settings} /></ChallengeErrorBoundary>
+                  </>
                 )}
                 {round?.phase === PHASES.FATES && (
                   <ChallengeErrorBoundary label="Fates Ceremony"><FatesPlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} settings={settings} /></ChallengeErrorBoundary>
@@ -514,12 +536,21 @@ export default function PlayPage() {
                 {round?.phase === PHASES.EXILE && !exiled && (
                   <ChallengeErrorBoundary label="Exile Vote">
                     <ChaosPowerPlayer gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
+                    <AthenaTrigger gameId={gameId} round={round} player={player} settings={settings} />
+                    <HermesReveal gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
+                    <ArtemisTrigger gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
+                    <HeraTrigger gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
+                    <DionysusSwap gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
                     <ExileVotePlayer gameId={gameId} player={player} round={round} players={identityAllPlayers} settings={settings} />
                   </ChallengeErrorBoundary>
                 )}
                 {round?.phase === PHASES.FINALE && (
                   <ChallengeErrorBoundary label="Finale">
                     <ChaosPowerPlayer gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
+                    <AthenaTrigger gameId={gameId} round={round} player={player} settings={settings} />
+                    <HermesReveal gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
+                    <ArtemisTrigger gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
+                    <HeraTrigger gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
                     <FinalePlayer gameId={gameId} player={player} round={round} players={identityAllPlayers} settings={settings} />
                   </ChallengeErrorBoundary>
                 )}
@@ -546,7 +577,7 @@ export default function PlayPage() {
 
             {tab === "chat" && settings?.chatEnabled && !chatBlockedByChallenge && (
               <ChallengeErrorBoundary label="Chat">
-                <ChatPanel gameId={gameId} player={player} players={identityAllPlayers} realName={myPlayer.name} isExiled={exiled} />
+                <ChatPanel gameId={gameId} player={player} players={identityAllPlayers} realName={myPlayer.name} isExiled={exiled} round={round} settings={settings} />
               </ChallengeErrorBoundary>
             )}
 

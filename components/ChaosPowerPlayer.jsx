@@ -6,6 +6,7 @@ import { computeEliminateOutcome, computeSaveOutcome, computeFinaleOutcome } fro
 import { exileContext, FINALE_CONTEXT, setChaosNullify, subscribeChaosSecret } from "../lib/chaosSecrets";
 import { exileDrawContext, FINALE_DRAW_CONTEXT, submitChaosDrawPick, chaosPicksKey } from "../lib/chaosDraw";
 import { chaosCardLabel } from "../lib/chaosCardNames";
+import { powerFor, filterCancelledVote } from "../lib/characterPowers";
 import MemoryWall from "./MemoryWall";
 
 // ─── The Power of Khaos ───
@@ -45,6 +46,18 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
   // moment they actually became the Power of Khaos holder, right when
   // they'd need to act on it.
   const [pendingPick, setPendingPick] = useState(null); // candidate selected but not yet locked in — reason is required before it actually submits
+  // Athena's character power (see lib/characterPowers.js): forces the
+  // holder to swap their current pick for a different one — the holder
+  // chooses the replacement themselves (confirmed against the season's
+  // host: "Power of Chaos chooses", not Athena picking for them).
+  // forcedFromId captures whatever the holder's pick WAS at the moment
+  // Athena's flag first turns true, so the picker below can specifically
+  // exclude re-selecting that same one — this has to live in local
+  // state, not anywhere public, since the holder's actual pick is a
+  // secret even Athena herself can never see (chaos_secrets' RLS only
+  // ever lets the real holder or the host read it — see
+  // lib/chaosSecrets.js).
+  const [forcedFromId, setForcedFromId] = useState(null);
 
   useEffect(() => {
     if (!key) return;
@@ -78,6 +91,19 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
     return unsubscribe;
   }, [gameId, drawContext]);
 
+  // Athena's forced swap (see forcedFromId's own declaration above for
+  // the full reasoning) — captures the holder's pick the INSTANT the
+  // flag turns true, not on every render, since myPick itself is about
+  // to change the moment they actually comply and pick someone else.
+  useEffect(() => {
+    if (state?.athenaForceSwapPending && myPick?.nomineeId && !forcedFromId) {
+      setForcedFromId(myPick.nomineeId);
+    }
+    if (!state?.athenaForceSwapPending && forcedFromId) {
+      setForcedFromId(null); // cleared elsewhere (successful swap) or the round moved on — stay in sync either way
+    }
+  }, [state?.athenaForceSwapPending, myPick?.nomineeId, forcedFromId]);
+
   if (!key || !state) return null;
 
   const me = (players || []).find((p) => p.id === player?.id);
@@ -89,6 +115,22 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
   // not truthiness.
   const myDrawPick = drawPicks[player?.id];
   const hasPicked = myDrawPick !== undefined;
+  // Hestia's character power (see lib/characterPowers.js): two draws
+  // instead of one, improving her odds of winning the draw. Tracked
+  // under a SEPARATE key (":hestia2") in the same flat drawPicks object
+  // rather than changing myDrawPick's own shape — deliberately, so
+  // triedIndices below (which just reads every value in the whole
+  // object) picks up her second pick automatically, and nobody else's
+  // single-pick logic has to change to accommodate this at all.
+  const isHestia = powerFor(player, settings) === "Hestia";
+  const myHestiaSecondPick = drawPicks[`${player?.id}:hestia2`];
+  // If she's not Hestia, one pick is everyone's whole allotment, same as
+  // always. If she IS Hestia, she's not truly finished until she's used
+  // both — note this only matters at all while iAmHolder is still
+  // false, since winning on either pick routes her out of this whole
+  // branch into the Stage 2 holder view below regardless of which pick
+  // it was.
+  const trulyDone = hasPicked && (!isHestia || myHestiaSecondPick !== undefined);
   const drawOpen = !state.chaosHolderId && state.votingOpen;
   const holderName = state.chaosHolderId ? (players || []).find((p) => p.id === state.chaosHolderId)?.display_name : null;
   const poolSize = isExile
@@ -107,7 +149,7 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
         <Card style={{ marginBottom: 20, textAlign: "center" }}>
           <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#ff2d95", marginBottom: 6 }}>🃏 Power of Khaos</div>
           <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>
-            {holderName ? `${holderName} claimed it this round.` : hasPicked ? "Already made their pick." : drawOpen ? "Hasn't picked yet." : "The draw has closed."}
+            {holderName ? `${holderName} claimed it this round.` : trulyDone ? "Already made their pick." : drawOpen ? "Hasn't picked yet." : "The draw has closed."}
           </p>
         </Card>
       );
@@ -125,11 +167,15 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
       );
     }
 
-    if (hasPicked) {
+    if (trulyDone) {
       return (
         <Card style={{ marginBottom: 20, textAlign: "center" }}>
           <div style={{ fontSize: 28, marginBottom: 6 }}>🃏</div>
-          <p style={{ color: "#f5f0ff", fontSize: 14, margin: 0 }}>You picked {chaosCardLabel(myDrawPick)} — {justWon ? "🎉 you claimed it!" : "hang tight."}</p>
+          <p style={{ color: "#f5f0ff", fontSize: 14, margin: 0 }}>
+            {isHestia
+              ? `You picked ${chaosCardLabel(myDrawPick)} and ${chaosCardLabel(myHestiaSecondPick)} — ${justWon ? "🎉 you claimed it!" : "hang tight."}`
+              : `You picked ${chaosCardLabel(myDrawPick)} — ${justWon ? "🎉 you claimed it!" : "hang tight."}`}
+          </p>
         </Card>
       );
     }
@@ -152,7 +198,11 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
           Khaos himself and his power lies. Can you guess where?
         </p>
         <p style={{ color: "#a68fd6", fontSize: 13, margin: "0 0 18px" }}>
-          {poolSize} relics, one Power of Khaos. Pick one — you get one shot.
+          {isHestia && hasPicked
+            ? `🔥 Hestia's power: one more pick.`
+            : isHestia
+              ? `${poolSize} relics, one Power of Khaos. Hestia's power: you get two shots, not one.`
+              : `${poolSize} relics, one Power of Khaos. Pick one — you get one shot.`}
           {triedIndices.size > 0 && ` Already tried (and wrong): ${[...triedIndices].sort((a, b) => a - b).map((i) => chaosCardLabel(i)).join(", ")}.`}
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 10 }}>
@@ -194,7 +244,10 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
 
   const candidates = isExile ? state.nominees : state.finalists;
   const nomineeIds = candidates.map((c) => c.playerId);
-  const voteRows = Object.entries(votes).map(([voterId, v]) => ({ voterId, targetId: v.targetId }));
+  const voteRows = filterCancelledVote(
+    Object.entries(votes).map(([voterId, v]) => ({ voterId, targetId: v.targetId })),
+    state.artemisCancelledVoterId
+  );
   const myPickId = myPick?.nomineeId || null;
 
   const confirmPick = async () => {
@@ -210,7 +263,15 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
   const changePick = async (nomineeId) => {
     if (!reasonDraft.trim()) { alert("Add a reason before changing your pick."); return; }
     const ok = await setChaosNullify(gameId, context, nomineeId, reasonDraft);
-    if (!ok) alert("Couldn't lock that in — try again.");
+    if (!ok) { alert("Couldn't lock that in — try again."); return; }
+    // Athena's forced swap is satisfied the moment the holder picks
+    // ANYTHING other than whatever they had when she triggered it — this
+    // is the only place that clears the public flag, so it can only ever
+    // be cleared by an actual different pick, never by the holder just
+    // re-confirming their original choice.
+    if (forcedFromId && nomineeId !== forcedFromId) {
+      await storageUpdate(gameId, key, (fresh) => (fresh ? { ...fresh, athenaForceSwapPending: false } : fresh));
+    }
   };
 
   const saveReason = async () => {
@@ -276,6 +337,11 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
           {state.votingOpen && (
             <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 8, fontStyle: "italic" }}>You can still change your mind while voting's open.</p>
           )}
+          {forcedFromId && (
+            <p style={{ color: "#ff2d95", fontSize: 12, marginTop: 8, fontWeight: 700 }}>
+              🦉 Athena has forced a swap — pick someone different before this can lock back in.
+            </p>
+          )}
           <Card style={{ marginTop: 12, textAlign: "left" }}>
             <label style={{ display: "block", fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
               Why? (required — shown when votes are revealed)
@@ -294,7 +360,7 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
           </Card>
           {state.votingOpen && (
             <div style={{ marginTop: 12 }}>
-              <MemoryWall candidates={candidates} players={players} selectedId={myPickId} onSelect={changePick} hideNameLabels={hideAvatarNameLabels} />
+              <MemoryWall candidates={candidates} players={players} selectedId={myPickId} onSelect={changePick} hideNameLabels={hideAvatarNameLabels} disabledIds={forcedFromId ? [forcedFromId] : []} />
             </div>
           )}
         </div>
