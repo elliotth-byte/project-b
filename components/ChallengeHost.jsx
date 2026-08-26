@@ -62,7 +62,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   const resetAttempt = async (playerId, playerName) => {
     if (!confirm(`Reset ${playerName}'s attempt at this challenge? Their score and any in-progress clock are cleared — they get a completely fresh run next time they open this challenge. Takes effect the next time their screen reloads, not necessarily instantly if they're mid-game right now.`)) return;
     setResettingId(playerId);
-    const res = await resetPlayerAttempt(gameId, round.round, playerId);
+    const res = await resetPlayerAttempt(gameId, round.round, challenge?.startedAt, playerId);
     setResettingId(null);
     if (!res.ok) alert("Couldn't reset that attempt — try again.");
   };

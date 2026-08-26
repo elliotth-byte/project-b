@@ -27,7 +27,7 @@ export default function RedLightGreenLightPlayer({ gameId, challenge, round, pla
   // list) is set the moment THIS player's own screen actually loads, and
   // is what scoring is based on now instead.
   const startedAt = challenge?.startedAt || null;
-  const myStartTime = usePersistedStart(gameId, round.round, player.id);
+  const myStartTime = usePersistedStart(gameId, round.round, challenge?.startedAt, player.id);
   const { timeUp } = useCountdown(challenge?.endsAt);
   const totalMs = challenge?.endsAt && startedAt ? challenge.endsAt - startedAt : 5 * 60 * 1000;
   const [schedule] = useState(() => generateLightSchedule(startedAt || 1, totalMs));

@@ -17,7 +17,7 @@ export default function TavoPlayer({ gameId, round, challenge, player }) {
   const { timeUp } = useCountdown(challenge?.endsAt);
   const seed = (challenge?.startedAt || 1) + (player?.id ? player.id.length : 0);
   const [level] = useState(() => generateLevel(seed));
-  const startTime = usePersistedStart(gameId, round.round, player.id);
+  const startTime = usePersistedStart(gameId, round.round, challenge?.startedAt, player.id);
   const [state, setState] = useState(level.state);
   const [history, setHistory] = useState([]);
   const [moveCount, setMoveCount] = useState(0);

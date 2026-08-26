@@ -21,7 +21,7 @@ export default function SlidingPuzzlePlayer({ gameId, challenge, round, player }
   // challenge began had that whole gap baked into their reported solve
   // time before they ever touched a tile).
   const startedAt = challenge?.startedAt || null;
-  const myStartTime = usePersistedStart(gameId, round.round, player.id);
+  const myStartTime = usePersistedStart(gameId, round.round, challenge?.startedAt, player.id);
   const { timeUp } = useCountdown(challenge?.endsAt);
   const [board, setBoard] = useState(() => generateScramble(startedAt || 1));
   const [moves, setMoves] = useState(0);

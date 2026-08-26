@@ -13,7 +13,7 @@ export default function HuePlayer({ gameId, round, challenge, player }) {
   const { timeUp } = useCountdown(challenge?.endsAt);
   const seed = (challenge?.startedAt || 1) + (player?.id ? player.id.length : 0);
   const [target] = useState(() => generateTargetColor(seed));
-  const startTime = usePersistedStart(gameId, round.round, player.id);
+  const startTime = usePersistedStart(gameId, round.round, challenge?.startedAt, player.id);
   const [mix, setMix] = useState({ r: 128, g: 128, b: 128 });
   const [done, setDone] = useState(false);
   const [finalResult, setFinalResult] = useState(null);

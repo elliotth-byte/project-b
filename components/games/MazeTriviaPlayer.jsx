@@ -49,7 +49,7 @@ export default function MazeTriviaPlayer({ gameId, round, challenge, player }) {
   const [shortcut, setShortcut] = useState(() => buildShortcut(start, gems[0]));
   const [gateState, setGateState] = useState("locked"); // "locked" | "answering" | "open" | "failed"
   const [selected, setSelected] = useState(null);
-  const startTime = usePersistedStart(gameId, round.round, player.id);
+  const startTime = usePersistedStart(gameId, round.round, challenge?.startedAt, player.id);
   const [finishMs, setFinishMs] = useState(null);
   const reported = useRef(false);
 

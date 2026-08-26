@@ -151,7 +151,7 @@ export default function LabyrinthPlayer({ gameId, round, challenge, player }) {
     return count;
   }, [maze, GRID_SIZE]);
 
-  const startTime = usePersistedStart(gameId, round.round, player.id);
+  const startTime = usePersistedStart(gameId, round.round, challenge?.startedAt, player.id);
   const [caught, setCaught] = useState(false);
   const [cleared, setCleared] = useState(false);
   const reported = useRef(false);

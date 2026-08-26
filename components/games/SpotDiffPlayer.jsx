@@ -18,7 +18,7 @@ export default function SpotDiffPlayer({ gameId, round, challenge, player }) {
   // Persisted (not just local) so a wrong-click penalty / found-count score
   // stays comparable across a remount — otherwise navigating away and back
   // would quietly reset the elapsed-time component of the score.
-  const startTime = usePersistedStart(gameId, round.round, player.id);
+  const startTime = usePersistedStart(gameId, round.round, challenge?.startedAt, player.id);
   const [penaltyMs, setPenaltyMs] = useState(0);
   const [flash, setFlash] = useState(false); // brief red flash on a wrong click
   const [done, setDone] = useState(false);

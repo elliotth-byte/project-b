@@ -103,7 +103,7 @@ export default function OraclesSealPlayer({ gameId, round, challenge, player }) 
   const [finished, setFinished] = useState(false);
   const svgRef = useRef(null);
   const reported = useRef(false);
-  const startTime = usePersistedStart(gameId, round.round, player.id);
+  const startTime = usePersistedStart(gameId, round.round, challenge?.startedAt, player.id);
   const gameOver = shattered || finished;
 
   const toLocalPoint = (clientX, clientY) => {

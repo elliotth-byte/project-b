@@ -28,7 +28,7 @@ export default function StroopPlayer({ gameId, challenge, round, player }) {
   // without losing anything: the wall itself is still identical for
   // everyone (seeded from the shared start above), only the CLOCK
   // measuring how fast someone solves it is now personal.
-  const myStartTime = usePersistedStart(gameId, round.round, player.id);
+  const myStartTime = usePersistedStart(gameId, round.round, challenge?.startedAt, player.id);
   const [cleared, setCleared] = useState(new Set());
   const [penaltyMs, setPenaltyMs] = useState(0);
   const [flash, setFlash] = useState(null); // { idx, correct } | null

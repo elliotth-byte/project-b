@@ -129,7 +129,7 @@ export default function Match3Player({ gameId, round, challenge, player }) {
 
   useEffect(() => {
     let cancelled = false;
-    peekSession(gameId, round.round, player.id).then((existingStart) => {
+    peekSession(gameId, round.round, challenge?.startedAt, player.id).then((existingStart) => {
       if (cancelled) return;
       if (existingStart) {
         setStartedAt(existingStart);
@@ -138,10 +138,10 @@ export default function Match3Player({ gameId, round, challenge, player }) {
       setCheckedExisting(true);
     });
     return () => { cancelled = true; };
-  }, [gameId, round.round, player.id]);
+  }, [gameId, round.round, challenge?.startedAt, player.id]);
 
   const handleStart = async () => {
-    const now = await getOrStartSession(gameId, round.round, player.id);
+    const now = await getOrStartSession(gameId, round.round, challenge?.startedAt, player.id);
     setStartedAt(now);
     setLocalEndsAt(now + MATCH3_DURATION_MS);
   };

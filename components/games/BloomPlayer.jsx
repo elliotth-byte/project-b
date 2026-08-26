@@ -15,7 +15,7 @@ export default function BloomPlayer({ gameId, round, challenge, player }) {
   const { timeUp } = useCountdown(challenge?.endsAt);
   const seed = (challenge?.startedAt || 1) + (player?.id ? player.id.length : 0);
   const [board] = useState(() => generateBoard(seed));
-  const startTime = usePersistedStart(gameId, round.round, player.id);
+  const startTime = usePersistedStart(gameId, round.round, challenge?.startedAt, player.id);
   const [cells, setCells] = useState(board.cells);
   const [patchIndices, setPatchIndices] = useState([board.centerIndex]);
   const [sweepCount, setSweepCount] = useState(0);

@@ -17,7 +17,7 @@ export default function OperatorPlayer({ gameId, round, challenge, player }) {
   const { timeUp } = useCountdown(challenge?.endsAt);
   const seed = (challenge?.startedAt || 1) + (player?.id ? player.id.length : 0);
   const [puzzle] = useState(() => generatePuzzle(seed));
-  const startTime = usePersistedStart(gameId, round.round, player.id);
+  const startTime = usePersistedStart(gameId, round.round, challenge?.startedAt, player.id);
   const [tiles, setTiles] = useState(() => puzzle.numbers.map((value, i) => ({ id: i, value })));
   const [history, setHistory] = useState([]); // snapshots of `tiles` for undo
   const [selectedId, setSelectedId] = useState(null);

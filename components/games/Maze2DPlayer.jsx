@@ -54,7 +54,7 @@ export default function Maze2DPlayer({ gameId, round, challenge, player }) {
   // Persisted (not just local) so the elapsed-time score this reports
   // reflects genuine total time since this player's FIRST attempt this
   // round, not just time since their most recent remount.
-  const startTime = usePersistedStart(gameId, round.round, player.id);
+  const startTime = usePersistedStart(gameId, round.round, challenge?.startedAt, player.id);
   const [finishMs, setFinishMs] = useState(null);
   const goal = { r: GRID_SIZE - 2, c: GRID_SIZE - 2 };
   const reported = useRef(false);

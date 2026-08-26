@@ -10,7 +10,7 @@ export default function WordScramblePlayer({ gameId, round, challenge, player })
   const [solved, setSolved] = useState(new Set());
   // Persisted (not just local) so a navigate-away-and-back doesn't reset
   // the elapsed-time clock this game's score is based on.
-  const startTime = usePersistedStart(gameId, round.round, player.id);
+  const startTime = usePersistedStart(gameId, round.round, challenge?.startedAt, player.id);
   const [finishMs, setFinishMs] = useState(null);
   const [, setTick] = useState(0);
   const lettersRef = useRef([]);

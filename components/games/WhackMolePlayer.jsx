@@ -18,7 +18,7 @@ export default function WhackMolePlayer({ gameId, round, challenge, player }) {
   // rather than challenge?.endsAt. That clock's start time is persisted
   // (see usePersistedStart) so navigating away mid-game and coming back
   // doesn't hand the player a fresh 90 seconds.
-  const startedAt = usePersistedStart(gameId, round.round, player.id);
+  const startedAt = usePersistedStart(gameId, round.round, challenge?.startedAt, player.id);
   const localEndsAt = startedAt ? startedAt + DURATION_MS : null;
   const { remainingSec, timeUp } = useCountdown(localEndsAt);
   const [score, setScore] = useState(0);

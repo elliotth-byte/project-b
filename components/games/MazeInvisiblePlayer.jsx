@@ -46,7 +46,7 @@ export default function MazeInvisiblePlayer({ gameId, round, challenge, player }
   const [mode, setMode] = useState("move"); // "move" | "view"
   const [penaltyMs, setPenaltyMs] = useState(0);
   const [bumpFlash, setBumpFlash] = useState(false);
-  const startTime = usePersistedStart(gameId, round.round, player.id);
+  const startTime = usePersistedStart(gameId, round.round, challenge?.startedAt, player.id);
   const [finishMs, setFinishMs] = useState(null);
   const reported = useRef(false);
 
