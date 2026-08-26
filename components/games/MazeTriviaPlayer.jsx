@@ -125,7 +125,7 @@ export default function MazeTriviaPlayer({ gameId, round, challenge, player }) {
   useEffect(() => {
     if (!startTime || !allGemsDone || reported.current) return;
     reported.current = true;
-    const time = Date.now() - startTime;
+    const time = Math.max(0, Date.now() - startTime); // clamped -- see RedLightGreenLightPlayer.jsx for why a device clock drifting mid-session must never send this negative
     setFinishMs(time);
     reportScore(gameId, round.round, player.id, player.name, time, { final: true });
   }, [allGemsDone, startTime]); // eslint-disable-line react-hooks/exhaustive-deps

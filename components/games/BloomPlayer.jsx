@@ -27,7 +27,7 @@ export default function BloomPlayer({ gameId, round, challenge, player }) {
     if (reportedRef.current || !startTime) return;
     reportedRef.current = true;
     setDone(true);
-    const elapsedMs = Date.now() - startTime;
+    const elapsedMs = Math.max(0, Date.now() - startTime); // clamped -- a device clock drifting mid-session must never send this negative (see RedLightGreenLightPlayer.jsx for the full story on why this matters: it INFLATES a score instead of just corrupting it the usual way)
     // Higher is better (rank: score-desc). Fewer sweeps always wins —
     // the constant just needs to comfortably dwarf any realistic sweep
     // count, with elapsed time only breaking an exact sweep-count tie.

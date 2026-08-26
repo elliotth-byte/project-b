@@ -50,7 +50,7 @@ export default function WhackMolePlayer({ gameId, round, challenge, player }) {
     }
   }, [timeUp]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const elapsed = startedAt ? Date.now() - startedAt : 0;
+  const elapsed = startedAt ? Math.max(0, Date.now() - startedAt) : 0; // clamped -- a negative value here would show the wrong (or no) moles active, not corrupt the score itself (score is the raw whack count, not time-based), but it's never a meaningful value regardless
   // Several events can be active at once (different holes, possibly
   // different types) — that's "multiple mole types at the same time".
   const activeByHole = {};

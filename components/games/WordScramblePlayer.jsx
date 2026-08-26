@@ -43,7 +43,7 @@ export default function WordScramblePlayer({ gameId, round, challenge, player })
 
   useEffect(() => {
     if (solved.size === words.length && !finishMs && startTime) {
-      const time = Date.now() - startTime;
+      const time = Math.max(0, Date.now() - startTime); // clamped -- see RedLightGreenLightPlayer.jsx for why a device clock drifting mid-session must never send this negative
       setFinishMs(time);
       reportScore(gameId, round.round, player.id, player.name, time, { final: true });
     }
@@ -65,7 +65,7 @@ export default function WordScramblePlayer({ gameId, round, challenge, player })
   }
 
   const visibleLetters = lettersRef.current.filter((l) => !solved.has(l.wi));
-  const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
+  const elapsedSec = Math.floor(Math.max(0, Date.now() - startTime) / 1000);
   const timerLabel = `${Math.floor(elapsedSec / 60)}:${String(elapsedSec % 60).padStart(2, "0")}`;
 
   return (

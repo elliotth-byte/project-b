@@ -85,7 +85,7 @@ function distanceToSegment(px, py, x1, y1, x2, y2) {
 // the registry entry). Shattering ranks by progress: how many waypoints
 // were reached before it broke.
 function placementFor(finished, elapsedMs, waypointsReached) {
-  if (finished) return 1000000 - Math.floor(elapsedMs / 10); // faster finish = higher value, never negative for any realistic completion time
+  if (finished) return 1000000 - Math.floor(elapsedMs / 10); // faster finish = higher value -- relies on the caller clamping elapsedMs to non-negative (a device clock drifting mid-session can otherwise send this negative, which would INFLATE the value past 1,000,000 instead of just being wrong the usual way)
   return waypointsReached;
 }
 
@@ -169,7 +169,7 @@ export default function OraclesSealPlayer({ gameId, round, challenge, player }) 
     if (!startTime || reported.current) return;
     if (gameOver) {
       reported.current = true;
-      reportScore(gameId, round.round, player.id, player.name, placementFor(finished, Date.now() - startTime, targetIndex - 1), { final: true });
+      reportScore(gameId, round.round, player.id, player.name, placementFor(finished, Math.max(0, Date.now() - startTime), targetIndex - 1), { final: true });
     }
   }, [gameOver, startTime]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -178,7 +178,7 @@ export default function OraclesSealPlayer({ gameId, round, challenge, player }) 
       <GameResultCard
         icon={finished ? "🏺" : "💥"}
         title={finished ? "Seal Carved!" : "The Tablet Shattered"}
-        valueLabel={finished ? `${((Date.now() - startTime) / 1000).toFixed(2)}s` : `${targetIndex - 1} of ${points.length} points reached`}
+        valueLabel={finished ? `${(Math.max(0, Date.now() - startTime) / 1000).toFixed(2)}s` : `${targetIndex - 1} of ${points.length} points reached`}
       />
     );
   }

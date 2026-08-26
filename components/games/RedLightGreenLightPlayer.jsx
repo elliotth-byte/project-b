@@ -60,7 +60,14 @@ export default function RedLightGreenLightPlayer({ gameId, challenge, round, pla
   const isWarning = isGreen && current.endMs - elapsedMs <= WARNING_WINDOW_MS;
   // Personal clock — this player's own elapsed time, used ONLY for
   // scoring (see finishedAt above and the reportScore call below).
-  const myElapsedMs = myStartTime ? Date.now() - myStartTime : 0;
+  // Clamped to never go below zero — a device's own clock can drift or
+  // auto-correct mid-session (rare, but real — this is exactly what
+  // produced an inflated score bigger than FINISH_BASE itself for one
+  // player: their finish-time subtraction went negative, which
+  // INCREASES the reported value instead of decreasing it). Elapsed
+  // time genuinely can't be negative in reality, so clamping here
+  // closes that off regardless of why the clock moved.
+  const myElapsedMs = myStartTime ? Math.max(0, Date.now() - myStartTime) : 0;
 
   const tap = () => {
     if (done) return;

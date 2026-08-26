@@ -51,7 +51,7 @@ export default function SpotDiffPlayer({ gameId, round, challenge, player }) {
 
   const reportComposite = (found, final, penalty = penaltyMs) => {
     if (!startTime) return;
-    const elapsed = Date.now() - startTime + penalty;
+    const elapsed = Math.max(0, Date.now() - startTime) + penalty; // clamped before adding the penalty -- see RedLightGreenLightPlayer.jsx for why a device clock drifting mid-session must never send this negative
     const value = found * 1_000_000 - elapsed; // more found always beats fewer; faster (incl. wrong-click penalties) breaks ties within equal found-count
     reportScore(gameId, round.round, player.id, player.name, value, { final, foundCount: found });
   };

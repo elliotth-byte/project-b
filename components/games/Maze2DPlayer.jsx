@@ -98,7 +98,7 @@ export default function Maze2DPlayer({ gameId, round, challenge, player }) {
     if (!startTime) return;
     if (pos.r === goal.r && pos.c === goal.c && !reported.current) {
       reported.current = true;
-      const time = Date.now() - startTime;
+      const time = Math.max(0, Date.now() - startTime); // clamped -- see RedLightGreenLightPlayer.jsx for why a device clock drifting mid-session must never send this negative
       setFinishMs(time);
       reportScore(gameId, round.round, player.id, player.name, time, { final: true });
     }

@@ -43,7 +43,12 @@ export default function SlidingPuzzlePlayer({ gameId, challenge, round, player }
     setBoard(next);
     setMoves((m) => m + 1);
     if (isSolved(next)) {
-      setFinishedMs(Date.now() - myStartTime);
+      // Clamped to never go negative — same reasoning as
+      // RedLightGreenLightPlayer.jsx's identical fix: a device's own
+      // clock drifting or auto-correcting mid-session can otherwise
+      // send this negative, which INFLATES the reported score instead
+      // of just making it wrong in the usual direction.
+      setFinishedMs(Math.max(0, Date.now() - myStartTime));
       setDone(true);
     }
   };
@@ -64,7 +69,7 @@ export default function SlidingPuzzlePlayer({ gameId, challenge, round, player }
     reportScore(gameId, round.round, player.id, player.name, value, { final: true });
   }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const elapsedSec = myStartTime ? ((Date.now() - myStartTime) / 1000).toFixed(1) : "0.0";
+  const elapsedSec = myStartTime ? (Math.max(0, Date.now() - myStartTime) / 1000).toFixed(1) : "0.0";
 
   if (done) {
     return finishedMs != null

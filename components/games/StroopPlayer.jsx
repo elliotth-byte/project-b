@@ -63,7 +63,13 @@ export default function StroopPlayer({ gameId, challenge, round, player }) {
         const next = new Set(c);
         next.add(currentIdx);
         if (next.size >= WALL_SIZE) {
-          const elapsed = Date.now() - myStartTime + penaltyMs;
+          // Clamped to never go negative before adding the mistake
+          // penalty — same reasoning as RedLightGreenLightPlayer.jsx's
+          // identical fix (a device clock drifting mid-session can
+          // otherwise inflate the score instead of just corrupting it
+          // the usual way). penaltyMs itself is always >= 0 already, so
+          // only the raw elapsed portion needs the clamp.
+          const elapsed = Math.max(0, Date.now() - myStartTime) + penaltyMs;
           setFinalMs(elapsed);
           setDone(true);
         }
@@ -87,7 +93,7 @@ export default function StroopPlayer({ gameId, challenge, round, player }) {
     reportScore(gameId, round.round, player.id, player.name, score, { final: true });
   }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const elapsedDisplay = myStartTime ? ((Date.now() - myStartTime + penaltyMs) / 1000).toFixed(1) : "0.0";
+  const elapsedDisplay = myStartTime ? ((Math.max(0, Date.now() - myStartTime) + penaltyMs) / 1000).toFixed(1) : "0.0";
 
   if (done) {
     return finalMs != null

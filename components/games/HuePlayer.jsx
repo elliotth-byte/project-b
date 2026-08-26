@@ -22,7 +22,7 @@ export default function HuePlayer({ gameId, round, challenge, player }) {
   const submit = () => {
     if (reportedRef.current || !startTime) return;
     reportedRef.current = true;
-    const elapsedMs = Date.now() - startTime;
+    const elapsedMs = Math.max(0, Date.now() - startTime); // clamped -- a device clock drifting mid-session must never send this negative (see RedLightGreenLightPlayer.jsx for the full story on why this matters: it INFLATES a score instead of just corrupting it the usual way)
     const totalDurationMs = challenge?.endsAt && challenge?.startedAt ? challenge.endsAt - challenge.startedAt : null;
     const result = computeHueScore(target, mix, elapsedMs, totalDurationMs);
     setFinalResult(result);

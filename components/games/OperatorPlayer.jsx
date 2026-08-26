@@ -32,7 +32,7 @@ export default function OperatorPlayer({ gameId, round, challenge, player }) {
     reportedRef.current = true;
     setSolved(didSolve);
     setDone(true);
-    const elapsedMs = Date.now() - startTime;
+    const elapsedMs = Math.max(0, Date.now() - startTime); // clamped -- a device clock drifting mid-session must never send this negative (see RedLightGreenLightPlayer.jsx for the full story on why this matters: it INFLATES a score instead of just corrupting it the usual way)
     // Higher is better (rank: score-desc, matching every other timed
     // game) — an unsolved board scores 0 outright, never competing with
     // a genuine solve. Among solves, faster wins: a huge constant minus

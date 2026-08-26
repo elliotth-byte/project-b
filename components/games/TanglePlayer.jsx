@@ -30,7 +30,7 @@ export default function TanglePlayer({ gameId, round, challenge, player }) {
     if (reportedRef.current || !startTime) return;
     reportedRef.current = true;
     setDone(true);
-    const elapsedMs = Date.now() - startTime;
+    const elapsedMs = Math.max(0, Date.now() - startTime); // clamped -- a device clock drifting mid-session must never send this negative (see RedLightGreenLightPlayer.jsx for the full story on why this matters: it INFLATES a score instead of just corrupting it the usual way)
     // "Your time is your score — the faster you untangle, the
     // better" — purely speed-based, no secondary bonus of any kind,
     // matching the game's own rules exactly rather than inventing an
