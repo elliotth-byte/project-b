@@ -94,7 +94,7 @@ export default function PlayerMemoryWall({ players, hideNameLabels = false, winn
                   position: "absolute", top: 6, right: 6, background: "rgba(5,1,15,0.85)",
                   borderRadius: 6, padding: "2px 6px", fontSize: 9, color: "#a68fd6", fontWeight: 700,
                 }}>
-                  OUT
+                  {p.elimination_type === "removed_inactivity" ? "INACTIVE" : "OUT"}
                 </div>
               )}
               {glowOverlay}

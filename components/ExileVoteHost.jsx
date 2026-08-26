@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Btn, Card, Badge, ChaosStatusBadge } from "./ui";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_EXILE } from "../lib/gameState";
-import { computeEliminateOutcome, computeSaveOutcome, buildRevealOrder } from "../lib/exileLogic";
+import { computeEliminateOutcome, computeSaveOutcome, buildRevealOrder, tallySoFar } from "../lib/exileLogic";
 import { filterCancelledVote } from "../lib/characterPowers";
 import { exileContext, subscribeChaosSecret } from "../lib/chaosSecrets";
 import { exileDrawContext, chaosPicksKey } from "../lib/chaosDraw";
@@ -272,6 +272,22 @@ export default function ExileVoteHost({ gameId, players, round }) {
             <Btn onClick={finishNow} disabled={busy || tieBreakUnresolved}>{busy ? "Working..." : "Finalize Exile & Continue"}</Btn>
           ) : (
             <div>
+              <div style={{ background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "10px 12px", marginBottom: 10 }}>
+                <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+                  Overall Vote Tally ({revealIndex + 1}/{revealOrder.length} revealed)
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {(() => {
+                    const tally = tallySoFar(revealOrder.slice(0, revealIndex + 1), nomineeIds);
+                    return nomineeIds.map((id) => (
+                      <div key={id} style={{ display: "flex", alignItems: "center", gap: 6, background: "#1a0a2e", borderRadius: 6, padding: "4px 10px" }}>
+                        <span style={{ fontSize: 12, color: "#f5f0ff", fontWeight: 700 }}>{byId[id] || "?"}</span>
+                        <span style={{ fontSize: 13, color: "#ff3860", fontWeight: 800, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>{tally[id]}</span>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
               <div style={{ display: "grid", gap: 8, marginBottom: 10 }}>
                 {revealOrder.slice(0, revealIndex + 1).map((row, i) => (
                   <div key={row.voterId} style={{ fontSize: 13, color: "#f5f0ff", background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "8px 12px", opacity: i === revealIndex ? 1 : 0.6 }}>

@@ -29,6 +29,7 @@ import ArtemisTrigger from "../components/ArtemisTrigger";
 import HeraTrigger from "../components/HeraTrigger";
 import DionysusSwap from "../components/DionysusSwap";
 import HephaestusChoice from "../components/HephaestusChoice";
+import JuryPreferencePanel from "../components/JuryPreferencePanel";
 import { powerFor } from "../lib/characterPowers";
 import RoundRevealGate from "../components/RoundRevealGate";
 import HomeLink from "../components/HomeLink";
@@ -46,6 +47,7 @@ import { resolveIdentities, identityComplete } from "../lib/playerIdentity";
 import { resolveAvatars } from "../lib/avatarIdentity";
 import { DEFAULT_GAME_PREFS } from "../lib/gamePrefs";
 import { useHasUnreadChat } from "../lib/useChatUnread";
+import { useNeedsAction } from "../lib/useNeedsAction";
 import { useRoundWatcher } from "../lib/useRoundWatcher";
 
 const BASE_TABS = [
@@ -73,6 +75,7 @@ export default function PlayPage() {
   const [revealAck, setRevealAck] = useState({});
   const [settings, setSettings] = useState(null);
   const [showNavTour, setShowNavTour] = useState(false);
+  const [radioPortalNode, setRadioPortalNode] = useState(null);
 
   useRoundWatcher(gameId);
 
@@ -82,6 +85,10 @@ export default function PlayPage() {
   // exist yet at this point in the component) rather than being tucked
   // in next to where its result is actually used.
   const hasUnreadChat = useHasUnreadChat(gameId, myPlayer?.id, !!(joined && myPlayer?.approved && settings?.chatEnabled));
+  // Same reasoning, same placement requirement — powers the badge dot
+  // on the "🎲 Game" tab (see pages/play.jsx's own tab-button rendering
+  // further down) for "you need to vote or compete in a Battle."
+  const needsAction = useNeedsAction(gameId, round, myPlayer, settings);
 
 
   // Once the game ends there's nothing left to do on the Game tab — default
@@ -233,13 +240,13 @@ export default function PlayPage() {
     (async () => {
       const { data: existing } = await supabase
         .from("players")
-        .select("id, display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state")
+        .select("id, display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes")
         .eq("game_id", gameId)
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (existing) {
-        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, approved: existing.approved, color: existing.color, alias: existing.alias, avatarUrl: existing.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(existing.game_prefs || {}) }, battleBanRound: existing.battle_ban_round, torchedPreset: existing.torched_preset, powerState: existing.power_state });
+        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, approved: existing.approved, color: existing.color, alias: existing.alias, avatarUrl: existing.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(existing.game_prefs || {}) }, battleBanRound: existing.battle_ban_round, torchedPreset: existing.torched_preset, powerState: existing.power_state, inactivityStrikes: existing.inactivity_strikes });
         setJoined(true);
         return;
       }
@@ -270,12 +277,12 @@ export default function PlayPage() {
       const { data: created, error } = await supabase
         .from("players")
         .insert({ game_id: gameId, user_id: session.user.id, display_name: displayNameFromUser(user), approved: false })
-        .select("id, display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state")
+        .select("id, display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes")
         .single();
       if (error) {
         setJoinError(`Couldn't join this game: ${error.message}${error.code ? ` [code=${error.code}]` : ""}${error.details ? ` — ${error.details}` : ""} (user_id=${session.user.id})`);
       } else {
-        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, approved: created.approved, color: created.color, alias: created.alias, avatarUrl: created.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(created.game_prefs || {}) }, battleBanRound: created.battle_ban_round, torchedPreset: created.torched_preset, powerState: created.power_state });
+        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, approved: created.approved, color: created.color, alias: created.alias, avatarUrl: created.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(created.game_prefs || {}) }, battleBanRound: created.battle_ban_round, torchedPreset: created.torched_preset, powerState: created.power_state, inactivityStrikes: created.inactivity_strikes });
         setJoined(true);
         // Fire-and-forget — a host notification failing to send should
         // never block the join itself, which already succeeded. Uses
@@ -296,8 +303,8 @@ export default function PlayPage() {
   useEffect(() => {
     if (!myPlayer?.id) return;
     const load = async () => {
-      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state").eq("id", myPlayer.id).maybeSingle();
-      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, approved: data.approved, color: data.color, alias: data.alias, avatarUrl: data.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(data.game_prefs || {}) }, battleBanRound: data.battle_ban_round, torchedPreset: data.torched_preset, powerState: data.power_state }));
+      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes").eq("id", myPlayer.id).maybeSingle();
+      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, approved: data.approved, color: data.color, alias: data.alias, avatarUrl: data.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(data.game_prefs || {}) }, battleBanRound: data.battle_ban_round, torchedPreset: data.torched_preset, powerState: data.power_state, inactivityStrikes: data.inactivity_strikes }));
     };
     const channel = supabase
       .channel(`self-player-${myPlayer.id}`)
@@ -326,7 +333,7 @@ export default function PlayPage() {
   // including to themselves, right down to what shows up in "Playing
   // as..." up top and what name their own chat/confessional posts carry.
   const effectivePlayerName = settings?.aliasEnabled && myPlayer?.alias && round?.phase !== PHASES.ENDED ? myPlayer.alias : playerName;
-  const player = myPlayer ? { id: myPlayer.id, name: effectivePlayerName, gamePrefs: myPlayer.gamePrefs || DEFAULT_GAME_PREFS, battleBanRound: myPlayer.battleBanRound, torchedPreset: myPlayer.torchedPreset, powerState: myPlayer.powerState, alias: myPlayer.alias } : null;
+  const player = myPlayer ? { id: myPlayer.id, name: effectivePlayerName, gamePrefs: myPlayer.gamePrefs || DEFAULT_GAME_PREFS, battleBanRound: myPlayer.battleBanRound, torchedPreset: myPlayer.torchedPreset, powerState: myPlayer.powerState, alias: myPlayer.alias, inactivityStrikes: myPlayer.inactivityStrikes } : null;
 
   // Who Said It pulls its quiz straight from Panopticon chat history, and
   // Close to 20 needs every bank kept a total mystery until the reveal
@@ -353,9 +360,19 @@ export default function PlayPage() {
   );
   const exiled = joined && myPlayer && myPlayer.alive === false;
   const quitByChoice = exiled && myPlayer.eliminationType === "quit";
+  const removedForInactivity = exiled && myPlayer.eliminationType === "removed_inactivity";
   const approved = joined && !!myPlayer?.approved;
   const gameEnded = round?.phase === PHASES.ENDED;
   const needsIdentity = joined && myPlayer && !identityComplete(myPlayer, settings);
+  // Once the game's over, the whole point of keeping exiled players
+  // separated from the main chat (protecting the still-competing
+  // players from anything an exiled player might reveal or pressure
+  // them with) no longer applies — everyone gets the main Panopticon
+  // room together from here on. Deliberately a separate variable from
+  // `exiled` itself, not a change to it — other logic above (quit/
+  // inactivity-removal labeling) still needs the player's real,
+  // unconditional status regardless of whether the game has ended.
+  const chatTreatsAsExiled = exiled && !gameEnded;
 
   // Once a round's Exile Vote has actually landed in history, this
   // player's whole screen locks into RoundRevealGate until they've
@@ -372,7 +389,7 @@ export default function PlayPage() {
     if (!confirm(`Are you sure you want to ${verb}? This can't be undone.`)) return;
     setQuitBusy(true);
     const { error } = approved
-      ? await quitOrRemoveApprovedPlayer(myPlayer.id)
+      ? await quitOrRemoveApprovedPlayer(myPlayer.id, round?.round ?? null)
       : await removePendingPlayer(myPlayer.id);
     setQuitBusy(false);
     if (error) { alert("Couldn't leave: " + error.message); return; }
@@ -448,9 +465,9 @@ export default function PlayPage() {
             background: "linear-gradient(160deg, #200a1a 0%, #120612 100%)",
             border: "2px solid #ff3860", borderRadius: 12, boxShadow: "0 0 24px rgba(255,56,96,0.25)",
           }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>{quitByChoice ? "🚪" : "💀"}</div>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>{quitByChoice ? "🚪" : removedForInactivity ? "⏳" : "💀"}</div>
             <p style={{ color: "#f5f0ff", fontSize: 17, fontWeight: 600, margin: 0, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
-              {quitByChoice ? "You've left this game." : "You have been exiled."}
+              {quitByChoice ? "You've left this game." : removedForInactivity ? "You were removed for inactivity." : "You have been exiled."}
             </p>
           </div>
         )}
@@ -476,6 +493,9 @@ export default function PlayPage() {
                   {t.key === "chat" && hasUnreadChat && tab !== "chat" && !chatBlockedByChallenge && (
                     <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: "#ff3860" }} />
                   )}
+                  {t.key === "game" && needsAction && tab !== "game" && (
+                    <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: "#ff3860" }} />
+                  )}
                 </button>
               ))}
             </div>
@@ -490,6 +510,9 @@ export default function PlayPage() {
                   />
                 )}
                 <div style={{ marginBottom: 16 }}><RoundTimerBanner round={round} /></div>
+                <ChallengeErrorBoundary label="Jury Preference List">
+                  <JuryPreferencePanel gameId={gameId} myPlayer={myPlayer} players={identityAllPlayers} round={round} />
+                </ChallengeErrorBoundary>
                 <div style={{ marginBottom: 16 }}>
                   <button
                     onClick={() => setShowMemoryWall(!showMemoryWall)}
@@ -577,7 +600,7 @@ export default function PlayPage() {
 
             {tab === "chat" && settings?.chatEnabled && !chatBlockedByChallenge && (
               <ChallengeErrorBoundary label="Chat">
-                <ChatPanel gameId={gameId} player={player} players={identityAllPlayers} realName={myPlayer.name} isExiled={exiled} round={round} settings={settings} />
+                <ChatPanel gameId={gameId} player={player} players={identityAllPlayers} realName={myPlayer.name} isExiled={chatTreatsAsExiled} round={round} settings={settings} />
               </ChallengeErrorBoundary>
             )}
 
@@ -602,12 +625,13 @@ export default function PlayPage() {
                 onReplayTour={() => setShowNavTour(true)}
                 onQuit={approved && myPlayer.alive !== false && !gameEnded ? handleQuit : undefined}
                 quitBusy={quitBusy}
+                musicPortalRef={setRadioPortalNode}
               />
             )}
           </>
         )}
       </div>
-      {approved && <MusicPlayer gameId={gameId} isHost={false} />}
+      {approved && <MusicPlayer gameId={gameId} isHost={false} portalTarget={radioPortalNode} />}
       {showNavTour && (
         <NavTourOverlay
           visibleTabKeys={visibleTabs.map((t) => t.key)}

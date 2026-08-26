@@ -160,12 +160,27 @@ export default function MasqueradePlayer({ gameId, round, challenge, player, pla
 
       {turn.phase === "revealed" && (
         <div>
-          <p style={{ fontSize: 14, color: "#f5f0ff", margin: "0 0 6px" }}>
-            {turn.targetDrankPoison ? `☠️ ${byName(turn.targetId)} drank the poison!` : `🍷 ${byName(turn.targetId)} was safe.`}
-          </p>
-          <p style={{ fontSize: 14, color: "#f5f0ff", margin: 0 }}>
-            {turn.activeDrankPoison ? `☠️ ${byName(turn.activePlayerId)} drank the poison!` : `🍷 ${byName(turn.activePlayerId)} was safe.`}
-          </p>
+          {turn.timedOut ? (
+            // Server-side turn timeout (see roundEngine.js's
+            // autoTimeoutMasquerade) — nothing was actually drunk, so
+            // the normal poison-reveal text below would be actively
+            // misleading here (targetDrankPoison/activeDrankPoison are
+            // both null, which reads as falsy and would incorrectly
+            // show "was safe" for both players in the SAME turn where
+            // one of them just got eliminated).
+            <p style={{ fontSize: 14, color: "#f5f0ff", margin: 0 }}>
+              ⏱ {byName(turn.timedOutPlayerId)} took too long to {turn.timedOutPlayerId === turn.activePlayerId ? "choose" : "respond"} and was eliminated.
+            </p>
+          ) : (
+            <>
+              <p style={{ fontSize: 14, color: "#f5f0ff", margin: "0 0 6px" }}>
+                {turn.targetDrankPoison ? `☠️ ${byName(turn.targetId)} drank the poison!` : `🍷 ${byName(turn.targetId)} was safe.`}
+              </p>
+              <p style={{ fontSize: 14, color: "#f5f0ff", margin: 0 }}>
+                {turn.activeDrankPoison ? `☠️ ${byName(turn.activePlayerId)} drank the poison!` : `🍷 ${byName(turn.activePlayerId)} was safe.`}
+              </p>
+            </>
+          )}
         </div>
       )}
     </Card>

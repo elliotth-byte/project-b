@@ -4,7 +4,7 @@ import { storageSet, storageUpdate, subscribeGameState } from "../lib/gameStorag
 import { KEY_CHALLENGE, KEY_ROUND, KEY_CHALLENGE_HISTORY } from "../lib/gameState";
 import { placementsComplete } from "../lib/challengeLogic";
 import { GAME_REGISTRY, gameConfigWithDefaults } from "../lib/challengeGames";
-import { subscribeScores, scoresToPlacements, resetPlayerAttempt } from "../lib/challengeScores";
+import { subscribeScores, scoresToPlacements, resetPlayerAttempt, overridePlayerScore } from "../lib/challengeScores";
 import { subscribeReentry, getReentry } from "../lib/reentryData";
 import { REENTRY_STATUS } from "../lib/reentryLogic";
 import { formatDurationHours } from "../lib/fatesLogic";
@@ -15,6 +15,7 @@ import { initMasquerade } from "../lib/games/masqueradeData";
 import { initCloseToTwenty } from "../lib/games/closeToTwentyData";
 import { initTorched } from "../lib/games/torchedData";
 import { initChains, subscribeChains } from "../lib/games/chainsData";
+import { initScavengerHunt, subscribeScavengerHunt, OFFERING_TYPES as SCAVENGER_OFFERING_TYPES } from "../lib/games/scavengerHuntData";
 import { pickRandomChallenge, hephaestusDrawKey, randomPickKey } from "../lib/challengeSelection";
 import { powerFor } from "../lib/characterPowers";
 import ParticipantPicker from "./ParticipantPicker";
@@ -49,10 +50,14 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   const [busy, setBusy] = useState(false);
   const [plinkoBracket, setPlinkoBracket] = useState(null);
   const [chainsState, setChainsState] = useState(null);
+  const [scavengerState, setScavengerState] = useState(null);
   const [resettingId, setResettingId] = useState(null);
   const [challengeHistory, setChallengeHistory] = useState([]);
   const [randomPickState, setRandomPickState] = useState(null);
   const [hephaestusDraw, setHephaestusDraw] = useState(null);
+  const [editingScoreId, setEditingScoreId] = useState(null); // playerId currently showing the edit-score input, or null
+  const [scoreDraft, setScoreDraft] = useState("");
+  const [savingScoreId, setSavingScoreId] = useState(null);
 
   const resetAttempt = async (playerId, playerName) => {
     if (!confirm(`Reset ${playerName}'s attempt at this challenge? Their score and any in-progress clock are cleared — they get a completely fresh run next time they open this challenge. Takes effect the next time their screen reloads, not necessarily instantly if they're mid-game right now.`)) return;
@@ -60,6 +65,28 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     const res = await resetPlayerAttempt(gameId, round.round, playerId);
     setResettingId(null);
     if (!res.ok) alert("Couldn't reset that attempt — try again.");
+  };
+
+  const startEditingScore = (playerId, currentValue) => {
+    setEditingScoreId(playerId);
+    setScoreDraft(currentValue != null ? String(currentValue) : "");
+  };
+
+  // A direct correction to an already-finalized score — for a bad
+  // number that made it into the record somehow (a scoring formula
+  // edge case, a game reporting the wrong thing), not a way to redo
+  // someone's attempt. Confirms before writing since, unlike Reset
+  // (which just clears a slot for a fresh attempt), this replaces the
+  // actual recorded result and can change round outcomes.
+  const saveScoreOverride = async (playerId, playerName) => {
+    const parsed = Number(scoreDraft);
+    if (scoreDraft.trim() === "" || Number.isNaN(parsed)) { alert("Enter a number."); return; }
+    if (!confirm(`Set ${playerName}'s score to exactly ${parsed}? This directly overwrites their recorded result and will be flagged as host-edited wherever it's shown.`)) return;
+    setSavingScoreId(playerId);
+    const res = await overridePlayerScore(gameId, round.round, playerId, playerName, parsed);
+    setSavingScoreId(null);
+    if (!res.ok) { alert("Couldn't save that score — try again."); return; }
+    setEditingScoreId(null);
   };
 
   useEffect(() => {
@@ -82,6 +109,12 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   useEffect(() => {
     if (!round?.round) return;
     const unsubscribe = subscribeChains(gameId, round.round, setChainsState);
+    return unsubscribe;
+  }, [gameId, round?.round]);
+
+  useEffect(() => {
+    if (!round?.round) return;
+    const unsubscribe = subscribeScavengerHunt(gameId, round.round, setScavengerState);
     return unsubscribe;
   }, [gameId, round?.round]);
 
@@ -210,6 +243,9 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     }
     if (gameType === "chains") {
       await initChains(gameId, round.round, participants);
+    }
+    if (gameType === "scavengerhunt") {
+      await initScavengerHunt(gameId, round.round, participants, now);
     }
     await storageUpdate(gameId, KEY_ROUND, (fresh) => ({ ...(fresh || {}), phaseStartedAt: now, phaseEndsAt: endsAt }));
     setBusy(false);
@@ -504,6 +540,28 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
         </div>
       )}
 
+      {challenge?.gameType === "scavengerhunt" && challenge.active && scavengerState && !scavengerState.gameOver && (
+        <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+            🏺 Scavenger Hunt — Round {scavengerState.roundIndex} · {scavengerState.finishedOrder.length} of 3 returned to Olympus
+          </div>
+          <div style={{ display: "grid", gap: 4 }}>
+            {Object.entries(scavengerState.players).map(([pid, p]) => {
+              const name = players.find((pl) => pl.id === pid)?.display_name || "?";
+              const distinctTypes = new Set(p.inventory).size;
+              const locationLabel = p.finishedRound != null ? "🏛 Olympus"
+                : p.currentLocation == null ? "choosing a starting temple..."
+                : scavengerState.temples[p.currentLocation]?.name || "?";
+              return (
+                <p key={pid} style={{ fontSize: 12, color: p.finishedRound != null ? "#00ff9d" : "#f5f0ff", margin: 0 }}>
+                  {p.nextLocation != null || p.finishedRound != null ? "✓" : "⋯"} {name} — {distinctTypes}/{SCAVENGER_OFFERING_TYPES.length} · {locationLabel}
+                </p>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {isDigital ? (
         <div style={{ display: "grid", gap: 10, marginBottom: 12 }}>
           {finishedRanking.length > 0 && (
@@ -514,13 +572,44 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
               <div style={{ display: "grid", gap: 6 }}>
                 {finishedRanking.map((r) => {
                   const isReentrant = challenge.reentryAttemptIds?.includes(r.playerId);
+                  const currentScoreObj = scores[r.playerId];
+                  if (editingScoreId === r.playerId) {
+                    return (
+                      <div key={r.playerId} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0d0618", borderRadius: 6, padding: "6px 10px", border: "1px solid #ff3860" }}>
+                        <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff" }}>{r.name}</span>
+                        <input
+                          type="number" value={scoreDraft} onChange={(e) => setScoreDraft(e.target.value)} autoFocus
+                          style={{ width: 110, background: "#150a28", border: "1px solid #3d1f5c", borderRadius: 6, padding: "4px 8px", color: "#f5f0ff", fontSize: 12 }}
+                        />
+                        <button
+                          onClick={() => saveScoreOverride(r.playerId, r.name)}
+                          disabled={savingScoreId === r.playerId}
+                          style={{ background: "#ff3860", border: "none", borderRadius: 6, color: "#05010f", fontSize: 10, fontWeight: 700, padding: "4px 10px", cursor: "pointer" }}
+                        >
+                          {savingScoreId === r.playerId ? "..." : "Save"}
+                        </button>
+                        <button
+                          onClick={() => setEditingScoreId(null)}
+                          style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, color: "#a68fd6", fontSize: 10, padding: "4px 10px", cursor: "pointer" }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    );
+                  }
                   return (
                     <div key={r.playerId} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0d0618", borderRadius: 6, padding: "6px 10px" }}>
                       <Badge color={r.place === 1 ? "#ff2d95" : "#a68fd6"}>#{r.place}</Badge>
                       <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff" }}>
                         {r.name}{isReentrant && <span style={{ color: "#ff3860", fontSize: 11 }}> (re-entry attempt)</span>}
                       </span>
-                      <span style={{ fontSize: 12, color: "#a68fd6" }}>{scoreLabel(scores[r.playerId])} ✓</span>
+                      <span style={{ fontSize: 12, color: currentScoreObj?.hostOverridden ? "#ff3860" : "#a68fd6" }}>{scoreLabel(currentScoreObj)} ✓</span>
+                      <button
+                        onClick={() => startEditingScore(r.playerId, currentScoreObj?.value)}
+                        style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, color: "#a68fd6", fontSize: 10, padding: "3px 8px", cursor: "pointer" }}
+                      >
+                        ✎ Edit
+                      </button>
                       <button
                         onClick={() => resetAttempt(r.playerId, r.name)}
                         disabled={resettingId === r.playerId}

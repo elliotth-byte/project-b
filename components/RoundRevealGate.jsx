@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Card, Btn, Badge } from "./ui";
-import { buildRevealOrder } from "../lib/exileLogic";
+import { buildRevealOrder, tallySoFar } from "../lib/exileLogic";
 import { markRevealAcknowledged } from "../lib/revealAck";
 
 // ─── Round Reveal Gate ───
@@ -86,8 +86,27 @@ export default function RoundRevealGate({ gameId, player, players, entry, readOn
               {byId[step.vote.targetId] || "?"}
             </p>
             {step.vote.reason && (
-              <p style={{ color: "#a68fd6", fontSize: 12, fontStyle: "italic", margin: 0 }}>"{step.vote.reason}"</p>
+              <p style={{ color: "#a68fd6", fontSize: 12, fontStyle: "italic", margin: "0 0 12px" }}>"{step.vote.reason}"</p>
             )}
+            <div style={{ borderTop: "1px solid #3d1f5c", paddingTop: 10, marginTop: 4 }}>
+              <div style={{ fontSize: 10, color: "#6b4f99", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>Overall Vote Tally</div>
+              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 6 }}>
+                {(() => {
+                  // stepIndex 0 is the intro, so the vote currently being
+                  // shown is voteOrder[stepIndex - 1] — the votes revealed
+                  // "so far" (including this one) are the first stepIndex
+                  // entries of voteOrder.
+                  const nomineeIds = (entry.nominees || []).map((n) => n.playerId);
+                  const tally = tallySoFar(voteOrder.slice(0, stepIndex), nomineeIds);
+                  return nomineeIds.map((id) => (
+                    <div key={id} style={{ display: "flex", alignItems: "center", gap: 5, background: "#0d0618", borderRadius: 6, padding: "3px 8px" }}>
+                      <span style={{ fontSize: 11, color: "#f5f0ff", fontWeight: 700 }}>{byId[id] || "?"}</span>
+                      <span style={{ fontSize: 12, color: "#ff3860", fontWeight: 800, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>{tally[id]}</span>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
           </>
         )}
 

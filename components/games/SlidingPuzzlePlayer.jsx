@@ -2,13 +2,26 @@ import { useState, useEffect, useRef } from "react";
 import { Card, Badge } from "../ui";
 import GameResultCard from "./GameResultCard";
 import { useCountdown } from "./useCountdown";
+import { usePersistedStart } from "./usePersistedStart";
 import { reportScore } from "../../lib/challengeScores";
 import { SIZE, generateScramble, isSolved, correctCount, trySlide } from "../../lib/games/slidingPuzzleData";
 
-const FINISH_BASE = 10000000; // reported score tier for anyone who solves it — always beats anyone who doesn't, faster solves score higher within this tier
+const FINISH_BASE = 100000000000; // reported score tier for anyone who solves it — always beats anyone who doesn't, faster solves score higher within this tier. Same fix as RedLightGreenLightPlayer.jsx (see its own comment for the full story): was 10,000,000 (~2.78 hours of real wall-clock time before going negative), raised to ~3,170 years, paired with the Math.max(1, ...) floor below as the actual hard guarantee.
 
 export default function SlidingPuzzlePlayer({ gameId, challenge, round, player }) {
-  const startedAt = challenge?.startedAt || null; // shared reference point — same reasoning as Stroop/Red Light Green Light, a late page-load shouldn't grant extra time
+  // startedAt (the challenge's shared, host-triggered start) is used
+  // ONLY as the seed for generateScramble below, so everyone gets the
+  // same starting board — there's no real-time synchronized element
+  // here the way Red Light Green Light's light schedule has, so
+  // there's no reason for anything else to be tied to the shared clock.
+  // Timing/scoring is based entirely on myStartTime instead (see
+  // RedLightGreenLightPlayer.jsx's own comment for the full story on
+  // why this matters: the previous version used startedAt for BOTH,
+  // which meant a player who opened this screen minutes after the
+  // challenge began had that whole gap baked into their reported solve
+  // time before they ever touched a tile).
+  const startedAt = challenge?.startedAt || null;
+  const myStartTime = usePersistedStart(gameId, round.round, player.id);
   const { timeUp } = useCountdown(challenge?.endsAt);
   const [board, setBoard] = useState(() => generateScramble(startedAt || 1));
   const [moves, setMoves] = useState(0);
@@ -18,10 +31,10 @@ export default function SlidingPuzzlePlayer({ gameId, challenge, round, player }
   const [, forceTick] = useState(0);
 
   useEffect(() => {
-    if (!startedAt || done) return;
+    if (!myStartTime || done) return;
     const interval = window.setInterval(() => forceTick((t) => t + 1), 250);
     return () => window.clearInterval(interval);
-  }, [startedAt, done]);
+  }, [myStartTime, done]);
 
   const slide = (idx) => {
     if (done) return;
@@ -30,7 +43,7 @@ export default function SlidingPuzzlePlayer({ gameId, challenge, round, player }
     setBoard(next);
     setMoves((m) => m + 1);
     if (isSolved(next)) {
-      setFinishedMs(Date.now() - startedAt);
+      setFinishedMs(Date.now() - myStartTime);
       setDone(true);
     }
   };
@@ -42,11 +55,16 @@ export default function SlidingPuzzlePlayer({ gameId, challenge, round, player }
   useEffect(() => {
     if (!done || reportedRef.current) return;
     reportedRef.current = true;
-    const value = finishedMs != null ? FINISH_BASE - finishedMs : correctCount(board);
+    // Math.max floors above SIZE*SIZE-1 (the max possible correctCount,
+    // 15 tiles on a 4x4 board), not just 1 — same reasoning as
+    // RedLightGreenLightPlayer.jsx's identical fix: a solver's score
+    // must always exceed the highest possible unsolved-progress score,
+    // even in the floor case.
+    const value = finishedMs != null ? Math.max(SIZE * SIZE, FINISH_BASE - finishedMs) : correctCount(board);
     reportScore(gameId, round.round, player.id, player.name, value, { final: true });
   }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const elapsedSec = startedAt ? ((Date.now() - startedAt) / 1000).toFixed(1) : "0.0";
+  const elapsedSec = myStartTime ? ((Date.now() - myStartTime) / 1000).toFixed(1) : "0.0";
 
   if (done) {
     return finishedMs != null
@@ -54,7 +72,7 @@ export default function SlidingPuzzlePlayer({ gameId, challenge, round, player }
       : <GameResultCard icon="🧩" title="Time's Up" valueLabel={`${correctCount(board)}/${SIZE * SIZE - 1} tiles placed`} />;
   }
 
-  if (!startedAt) {
+  if (!startedAt || !myStartTime) {
     return <Card style={{ marginBottom: 20, textAlign: "center" }}><p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic" }}>Loading...</p></Card>;
   }
 

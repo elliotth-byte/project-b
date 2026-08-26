@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card, Badge } from "../ui";
 import GameResultCard from "./GameResultCard";
 import { useCountdown } from "./useCountdown";
+import { usePersistedStart } from "./usePersistedStart";
 import { reportScore } from "../../lib/challengeScores";
 import { COLORS, generateWall } from "../../lib/games/stroopData";
 
@@ -13,11 +14,21 @@ export default function StroopPlayer({ gameId, challenge, round, player }) {
   const seed = challenge?.startedAt || 1; // same wall for everyone — a "race" only means something if it's the same wall
   const [wall] = useState(() => generateWall(seed, WALL_SIZE));
   const { timeUp } = useCountdown(challenge?.endsAt);
-  // Elapsed time is measured from the SHARED challenge start, not from
-  // whenever this component happens to mount — a player who loads the
-  // page a few seconds late shouldn't get their own personal head start
-  // on the clock. Everyone's "elapsed" is relative to the same moment.
-  const startedAt = challenge?.startedAt || null;
+  // Timing is based on myStartTime (this player's own, persisted start),
+  // not the shared challenge start — see RedLightGreenLightPlayer.jsx's
+  // own comment for the full story on why. The previous version here
+  // deliberately used the shared clock, reasoning that a late page-load
+  // "shouldn't grant extra time" — but that assumed lateness would only
+  // ever mean a few seconds of natural loading delay. In practice a
+  // player can open this screen minutes, even hours, after the
+  // challenge actually started (waiting on something else in the app,
+  // stepping away, anything), and the shared-clock version baked that
+  // whole gap into their reported time before they'd solved a single
+  // tile — exactly the bug a real report caught. myStartTime fixes that
+  // without losing anything: the wall itself is still identical for
+  // everyone (seeded from the shared start above), only the CLOCK
+  // measuring how fast someone solves it is now personal.
+  const myStartTime = usePersistedStart(gameId, round.round, player.id);
   const [cleared, setCleared] = useState(new Set());
   const [penaltyMs, setPenaltyMs] = useState(0);
   const [flash, setFlash] = useState(null); // { idx, correct } | null
@@ -35,10 +46,10 @@ export default function StroopPlayer({ gameId, challenge, round, player }) {
   const currentIdx = wall.findIndex((_, i) => !cleared.has(i));
 
   useEffect(() => {
-    if (!startedAt || done) return;
+    if (!myStartTime || done) return;
     const interval = window.setInterval(() => forceTick((t) => t + 1), 250);
     return () => window.clearInterval(interval);
-  }, [startedAt, done]);
+  }, [myStartTime, done]);
 
   const answerColor = (colorName) => {
     if (currentIdx === -1 || done) return;
@@ -52,7 +63,7 @@ export default function StroopPlayer({ gameId, challenge, round, player }) {
         const next = new Set(c);
         next.add(currentIdx);
         if (next.size >= WALL_SIZE) {
-          const elapsed = Date.now() - startedAt + penaltyMs;
+          const elapsed = Date.now() - myStartTime + penaltyMs;
           setFinalMs(elapsed);
           setDone(true);
         }
@@ -76,12 +87,16 @@ export default function StroopPlayer({ gameId, challenge, round, player }) {
     reportScore(gameId, round.round, player.id, player.name, score, { final: true });
   }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const elapsedDisplay = startedAt ? ((Date.now() - startedAt + penaltyMs) / 1000).toFixed(1) : "0.0";
+  const elapsedDisplay = myStartTime ? ((Date.now() - myStartTime + penaltyMs) / 1000).toFixed(1) : "0.0";
 
   if (done) {
     return finalMs != null
       ? <GameResultCard icon="🌈" title="Wall Cleared!" valueLabel={`${(finalMs / 1000).toFixed(1)}s`} />
       : <GameResultCard icon="🌈" title="Time's Up" valueLabel={`${cleared.size}/${WALL_SIZE} cleared`} />;
+  }
+
+  if (!myStartTime) {
+    return <Card style={{ marginBottom: 20, textAlign: "center" }}><p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic" }}>Loading...</p></Card>;
   }
 
   return (

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card, Btn, Badge } from "./ui";
 import { buildVotingGrid, votingGridToCSV } from "../lib/votingSpreadsheet";
 
@@ -31,9 +32,19 @@ function HeaderRow({ label, byColumn, columns, color = "#a68fd6" }) {
 // nomination), Nominees, that round's vote count, who won (and used) the
 // Power of Khaos, then who was Exiled. Each player's own row is tagged
 // with a status badge — Winner, Exiled (with which round), or
-// Left/Removed — so it's clear at a glance what happened to them, not
-// just that their votes stop appearing.
-export default function VotingHistorySpreadsheet({ exileHistory, finaleState, players, gameName, challengeHistory }) {
+// Left/Removed (also with which round now — see
+// lib/votingSpreadsheet.js) — so it's clear at a glance what happened
+// to them, not just that their votes stop appearing.
+//
+// Every name in this grid (vote targets, nominees, everything) is
+// alias-only when alias mode is active — even for the host, who
+// normally sees real name and alias combined everywhere else (see
+// lib/playerIdentity.js). isHost + the toggle below are the ONE
+// exception: only the host can reveal the real name, and only right on
+// the player row itself — see lib/votingSpreadsheet.js's own header
+// comment on why that's deliberately not spread into every cell.
+export default function VotingHistorySpreadsheet({ exileHistory, finaleState, players, gameName, challengeHistory, isHost = false }) {
+  const [showRealNames, setShowRealNames] = useState(false);
   const grid = buildVotingGrid(exileHistory, finaleState, players, challengeHistory);
   if (grid.columns.length === 0) return null;
 
@@ -54,7 +65,14 @@ export default function VotingHistorySpreadsheet({ exileHistory, finaleState, pl
     <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
         <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🗳 Voting History</h3>
-        <Btn small onClick={download}>⬇ Download CSV</Btn>
+        <div style={{ display: "flex", gap: 8 }}>
+          {isHost && (
+            <Btn small variant={showRealNames ? "primary" : "ghost"} onClick={() => setShowRealNames(!showRealNames)}>
+              {showRealNames ? "🙈 Hide real names" : "👁 Show real names"}
+            </Btn>
+          )}
+          <Btn small onClick={download}>⬇ Download CSV</Btn>
+        </div>
       </div>
       <div style={{ fontSize: 10, color: "#6b4f99", marginBottom: 10 }}><s style={{ textDecorationColor: "#ff3860" }}>Struck-through</s> votes were nullified by the Power of Khaos.</div>
       <div style={{ overflowX: "auto" }}>
@@ -82,6 +100,9 @@ export default function VotingHistorySpreadsheet({ exileHistory, finaleState, pl
               <tr key={r.playerId} style={{ borderBottom: "1px solid #150a28" }}>
                 <td style={{ padding: "6px 10px", whiteSpace: "nowrap", position: "sticky", left: 0, background: "#1a0a2e" }}>
                   <span style={{ color: "#f5f0ff", fontWeight: 700 }}>{r.name}</span>
+                  {isHost && showRealNames && r.realName !== r.name && (
+                    <span style={{ color: "#6b4f99", fontWeight: 400, fontSize: 11, marginLeft: 4 }}>({r.realName})</span>
+                  )}
                   {r.status && <span style={{ marginLeft: 6 }}><Badge color={r.status.color}>{r.status.label}</Badge></span>}
                 </td>
                 {r.cells.map((cell, i) => (

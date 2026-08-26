@@ -2,14 +2,32 @@ import { useState, useEffect, useRef } from "react";
 import { Card, Badge } from "../ui";
 import GameResultCard from "./GameResultCard";
 import { useCountdown } from "./useCountdown";
+import { usePersistedStart } from "./usePersistedStart";
 import { reportScore } from "../../lib/challengeScores";
 import { generateLightSchedule, lightAt, TARGET_SCORE, STARTING_LIVES } from "../../lib/games/redLightGreenLightData";
 
-const FINISH_BASE = 10000000; // reported score tier for anyone who reaches 100 — always beats anyone who doesn't, faster finishers score higher within this tier
+const FINISH_BASE = 100000000000; // reported score tier for anyone who reaches 100 — always beats anyone who doesn't, faster finishers score higher within this tier. 100 billion ms (~3,170 years) — was 10,000,000 (~2.78 hours), which is exactly why Daniel's score went negative: any challenge left open longer than that in real wall-clock time (an overnight Battle, a slow re-entry decision holding it open) pushed elapsedMs past the base entirely. Math.max(1, ...) below is the actual hard guarantee against a negative score ever happening again — this increase just makes hitting that floor (and everyone who does tying at 1) comically unlikely instead of a real possibility.
 const WARNING_WINDOW_MS = 600; // how long before a green segment ends that the yellow warning kicks in — purely visual, tapping here is still counted as green/safe
 
 export default function RedLightGreenLightPlayer({ gameId, challenge, round, player }) {
-  const startedAt = challenge?.startedAt || null; // shared reference point — same reasoning as the Stroop wall, a late page-load shouldn't grant extra time
+  // TWO separate clocks, deliberately not one — this distinction is the
+  // actual fix for the "later players get an insanely high time" bug:
+  // startedAt (the challenge's shared, host-triggered start) drives ONLY
+  // the light schedule itself, so everyone watches the same real-time
+  // red/green sequence together, exactly like the real childhood game
+  // has one caller for everyone — that part was correct and stays as-is.
+  // The previous version ALSO used this same shared clock for scoring
+  // (finishedAt), which is what actually broke: a player who opens this
+  // screen minutes (or, per the report that caught this, literally
+  // hours) after the challenge started had that whole gap already baked
+  // into their reported time before they ever tapped once, even though
+  // they personally played just as fast as anyone else. myStartTime
+  // (usePersistedStart, the same per-player pattern already proven by
+  // several other games here — see this hook's own file for the full
+  // list) is set the moment THIS player's own screen actually loads, and
+  // is what scoring is based on now instead.
+  const startedAt = challenge?.startedAt || null;
+  const myStartTime = usePersistedStart(gameId, round.round, player.id);
   const { timeUp } = useCountdown(challenge?.endsAt);
   const totalMs = challenge?.endsAt && startedAt ? challenge.endsAt - startedAt : 5 * 60 * 1000;
   const [schedule] = useState(() => generateLightSchedule(startedAt || 1, totalMs));
@@ -18,7 +36,7 @@ export default function RedLightGreenLightPlayer({ gameId, challenge, round, pla
   const [lives, setLives] = useState(STARTING_LIVES);
   const [flash, setFlash] = useState(null); // "safe" | "caught" | null
   const [done, setDone] = useState(false);
-  const [finishedAt, setFinishedAt] = useState(null); // elapsed ms at the moment score hit 100, if it did
+  const [finishedAt, setFinishedAt] = useState(null); // PERSONAL elapsed ms (from myStartTime) at the moment score hit 100, if it did — not the shared clock
   const reportedRef = useRef(false);
   const [, forceTick] = useState(0);
 
@@ -28,6 +46,10 @@ export default function RedLightGreenLightPlayer({ gameId, challenge, round, pla
     return () => window.clearInterval(interval);
   }, [startedAt, done]);
 
+  // Shared clock — determines what light EVERYONE sees right now, in
+  // real-time sync. Deliberately still tied to startedAt, not
+  // myStartTime — this part of the original design was correct and
+  // isn't what caused the reported bug.
   const elapsedMs = startedAt ? Date.now() - startedAt : 0;
   const current = lightAt(schedule, elapsedMs);
   const isGreen = current?.type === "green";
@@ -36,6 +58,9 @@ export default function RedLightGreenLightPlayer({ gameId, challenge, round, pla
   // here still scores normally), just a visual cue that red is coming so
   // it doesn't feel like an instant, unpredictable switch.
   const isWarning = isGreen && current.endMs - elapsedMs <= WARNING_WINDOW_MS;
+  // Personal clock — this player's own elapsed time, used ONLY for
+  // scoring (see finishedAt above and the reportScore call below).
+  const myElapsedMs = myStartTime ? Date.now() - myStartTime : 0;
 
   const tap = () => {
     if (done) return;
@@ -45,7 +70,7 @@ export default function RedLightGreenLightPlayer({ gameId, challenge, round, pla
       setScore((s) => {
         const next = s + 1;
         if (next >= TARGET_SCORE) {
-          setFinishedAt(elapsedMs);
+          setFinishedAt(myElapsedMs);
           setDone(true);
         }
         return next;
@@ -68,7 +93,13 @@ export default function RedLightGreenLightPlayer({ gameId, challenge, round, pla
   useEffect(() => {
     if (!done || reportedRef.current) return;
     reportedRef.current = true;
-    const value = finishedAt != null ? FINISH_BASE - finishedAt : score;
+    // Math.max floors at TARGET_SCORE + 1, not just 1 — a finisher's
+    // score must always exceed the highest possible partial-progress
+    // score (capped at TARGET_SCORE - 1, since reaching TARGET_SCORE
+    // itself IS finishing), so even in the floor case, finishing still
+    // outright beats anyone who didn't, exactly as FINISH_BASE's own
+    // comment above promises.
+    const value = finishedAt != null ? Math.max(TARGET_SCORE + 1, FINISH_BASE - finishedAt) : score;
     reportScore(gameId, round.round, player.id, player.name, value, { final: true });
   }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -83,7 +114,7 @@ export default function RedLightGreenLightPlayer({ gameId, challenge, round, pla
       : <GameResultCard icon="🚦" title={lives <= 0 ? "Eliminated" : "Time's Up"} valueLabel={`${score}/${TARGET_SCORE}`} />;
   }
 
-  if (!startedAt) {
+  if (!startedAt || !myStartTime) {
     return <Card style={{ marginBottom: 20, textAlign: "center" }}><p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic" }}>Loading...</p></Card>;
   }
 

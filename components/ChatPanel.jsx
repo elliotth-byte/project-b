@@ -10,7 +10,7 @@ import {
 import { colorFor } from "../lib/playerColors";
 import { isPoseidonDmBlockActive, heraChatBlockActive } from "../lib/characterPowers";
 import { subscribeGameState } from "../lib/gameStorage";
-import { KEY_EXILE, KEY_FINALE } from "../lib/gameState";
+import { KEY_EXILE, KEY_FINALE, PHASES } from "../lib/gameState";
 import { supabase } from "../lib/supabaseClient";
 
 // Fire-and-forget — a push notification failing to send should never
@@ -442,7 +442,16 @@ function MessagesView({ gameId, player, players, byId, openThread, setOpenThread
   // side, never able to newly reach across it, matching how the main
   // Group chat itself disappears entirely once a player's exiled rather
   // than just going read-only.
-  const others = players.filter((p) => p.id !== player.id && p.approved && (isExiled ? p.alive === false : p.alive !== false));
+  //
+  // Once the game's over, this restriction is lifted entirely rather
+  // than just re-pointed — unlike the isExiled prop itself (which
+  // pages/play.jsx already forces false post-game), BOTH sides of this
+  // particular check are restrictive, so simply falling to the "alive"
+  // branch would wrongly still exclude other exiled players from a
+  // post-game exiled player's own DM candidates. gameEnded bypasses the
+  // alive-based split entirely instead.
+  const gameEnded = round?.phase === PHASES.ENDED;
+  const others = players.filter((p) => p.id !== player.id && p.approved && (gameEnded || (isExiled ? p.alive === false : p.alive !== false)));
 
   return (
     <div>

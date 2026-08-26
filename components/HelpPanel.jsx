@@ -25,7 +25,7 @@ const PRESET_MARKER_LENGTH = 3; // mirrors torchedData.js's MARKER_LENGTH, just 
 // Game Preferences — player-level settings (see lib/gamePrefs.js) that
 // every game respects — and Notifications, opt-in only (see
 // lib/pushNotifications.js).
-export default function HelpPanel({ gameId, player, onPrefsChanged, onReplayTour, onQuit, quitBusy, readOnly = false }) {
+export default function HelpPanel({ gameId, player, onPrefsChanged, onReplayTour, onQuit, quitBusy, readOnly = false, musicPortalRef }) {
   const [prefs, setPrefs] = useState(player?.gamePrefs || {});
   const [saving, setSaving] = useState(false);
   const [openSections, setOpenSections] = useState(new Set());
@@ -118,6 +118,12 @@ export default function HelpPanel({ gameId, player, onPrefsChanged, onReplayTour
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
+      {/* The music player's actual controls (see MusicPlayer.jsx) get
+          portaled into this div — MusicPlayer itself stays mounted
+          outside this tab entirely (see pages/play.jsx), so the audio
+          engine keeps running even when this isn't the active tab. */}
+      <div ref={musicPortalRef} />
+
       <Card>
         <div style={{ fontSize: 12, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
           📖 Rules
@@ -159,6 +165,21 @@ export default function HelpPanel({ gameId, player, onPrefsChanged, onReplayTour
           })}
         </div>
       </Card>
+
+      {player && (
+        <Card style={player.inactivityStrikes > 0 ? { borderColor: "rgba(255,56,96,0.4)" } : {}}>
+          <div style={{ fontSize: 12, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+            ⚠️ Inactivity Strikes
+          </div>
+          <p style={{ fontSize: 20, fontWeight: 800, color: player.inactivityStrikes > 0 ? "#ff3860" : "#f5f0ff", margin: "0 0 6px" }}>
+            {player.inactivityStrikes || 0} / 3
+          </p>
+          <p style={{ fontSize: 12, color: "#a68fd6", margin: 0, lineHeight: 1.5 }}>
+            Missing a nomination, a Power of Khaos decision, a vote, or a Battle you were expected to compete in adds one — 3 removes
+            you from the game. One strike comes off automatically every 3 rounds.
+          </p>
+        </Card>
+      )}
 
       {onQuit && !readOnly && (
         <Card style={{ borderColor: "rgba(255,56,96,0.4)", textAlign: "center" }}>

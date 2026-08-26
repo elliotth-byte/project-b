@@ -122,6 +122,7 @@ export default function PlayerViewer({ gameId, targetPlayer, allPlayers, round, 
   const player = { id: targetPlayer.id, name: targetPlayer.display_name };
   const exiled = targetPlayer.alive === false;
   const quitByChoice = exiled && targetPlayer.elimination_type === "quit";
+  const removedForInactivity = exiled && targetPlayer.elimination_type === "removed_inactivity";
   const gameEnded = round?.phase === PHASES.ENDED;
   // Full identityComplete check (color AND, if alias mode is on, an
   // alias) — not just the color check this used to have, which meant a
@@ -192,9 +193,9 @@ export default function PlayerViewer({ gameId, targetPlayer, allPlayers, round, 
           background: "linear-gradient(160deg, #200a1a 0%, #120612 100%)",
           border: "2px solid #ff3860", borderRadius: 12, boxShadow: "0 0 24px rgba(255,56,96,0.25)",
         }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>{quitByChoice ? "🚪" : "💀"}</div>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>{quitByChoice ? "🚪" : removedForInactivity ? "⏳" : "💀"}</div>
           <p style={{ color: "#f5f0ff", fontSize: 17, fontWeight: 600, margin: 0, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
-            {quitByChoice ? "Left this game." : "Has been exiled."}
+            {quitByChoice ? "Left this game." : removedForInactivity ? "Removed for inactivity." : "Has been exiled."}
           </p>
         </div>
       )}

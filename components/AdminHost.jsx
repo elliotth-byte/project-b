@@ -98,9 +98,17 @@ export default function AdminHost({ gameId, players, round }) {
   // rejectPlayer above, this doesn't delete their row (see
   // lib/playerRemoval.js for why): it marks them out with
   // elimination_type "quit", the same as a self-serve quit.
+  // Host shield (see lib/inactivity.js) — a simple on/off per player,
+  // no confirmation needed since it's fully reversible and low-stakes
+  // either direction, unlike remove/restore above.
+  const toggleShield = async (p) => {
+    const { error } = await supabase.from("players").update({ inactivity_shielded: !p.inactivity_shielded }).eq("id", p.id);
+    if (error) alert("Couldn't update shield: " + error.message);
+  };
+
   const removeApprovedPlayer = async (p) => {
     if (!confirm(`Remove ${p.display_name} from this game? They'll be marked out (like an exile, but with no re-entry attempt) rather than deleted, so past rounds still show their name correctly.`)) return;
-    const { error } = await quitOrRemoveApprovedPlayer(p.id);
+    const { error } = await quitOrRemoveApprovedPlayer(p.id, round?.round ?? null);
     if (error) alert("Couldn't remove: " + error.message);
   };
 
@@ -268,6 +276,7 @@ export default function AdminHost({ gameId, players, round }) {
 
     await storageUpdate(gameId, KEY_ROUND, (fresh) => ({
       ...(fresh || {}), round: roundNum, phase: PHASES.CHALLENGE, phaseStartedAt: null, phaseEndsAt: null,
+      roundStartedAt: Date.now(), // see lib/gameState.js's startSeason for why this exists separately from phaseStartedAt
       finalFour: false, doubleElimination: false,
     }));
 
@@ -400,7 +409,9 @@ export default function AdminHost({ gameId, players, round }) {
                       <Btn small variant="ghost" onClick={() => removeApprovedPlayer(p)}>Remove</Btn>
                     ) : (
                       <>
-                        <span style={{ fontSize: 11, color: "#6b4f99" }}>({p.elimination_type === "quit" ? "left" : "exiled"})</span>
+                        <span style={{ fontSize: 11, color: "#6b4f99" }}>
+                          ({p.elimination_type === "quit" ? "left" : p.elimination_type === "removed_inactivity" ? "removed — inactivity" : "exiled"})
+                        </span>
                         <Btn small variant="ghost" onClick={() => restorePlayer(p)}>Restore</Btn>
                       </>
                     )}
@@ -422,6 +433,32 @@ export default function AdminHost({ gameId, players, round }) {
                 <p style={{ color: "#ff3860", fontSize: 12, margin: "4px 0 0" }}>{resetError}</p>
               )}
               {players.length === 0 && <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No players have joined yet.</p>}
+            </div>
+          </Card>
+
+          <Card>
+            <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🛡 Inactivity</h3>
+            <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+              Strikes and instant removal for missed nominations, Power of Khaos decisions, votes, and challenges — see the Help tab for
+              exactly how this works. Shield a player to make them fully immune to all of it (no strikes, ever, and exempt from instant
+              removal) while the shield's on — the game itself still auto-picks a nominee or Khaos decision on their behalf either way,
+              only the punishment is what the shield removes.
+            </p>
+            <div style={{ display: "grid", gap: 6 }}>
+              {players.filter((p) => p.approved).map((p) => (
+                <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0d0618", borderRadius: 6, padding: "6px 12px", gap: 8 }}>
+                  <span style={{ fontSize: 13, color: "#f5f0ff" }}>{p.display_name}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 11, color: p.inactivity_strikes > 0 ? "#ff3860" : "#6b4f99", fontWeight: 600 }}>
+                      {p.inactivity_strikes > 0 ? `⚠️ ${p.inactivity_strikes}/3 strikes` : "No strikes"}
+                    </span>
+                    <Btn small variant={p.inactivity_shielded ? "primary" : "ghost"} onClick={() => toggleShield(p)}>
+                      {p.inactivity_shielded ? "🛡 Shielded" : "Shield"}
+                    </Btn>
+                  </div>
+                </div>
+              ))}
+              {players.filter((p) => p.approved).length === 0 && <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No approved players yet.</p>}
             </div>
           </Card>
 

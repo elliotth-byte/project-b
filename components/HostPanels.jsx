@@ -19,6 +19,7 @@ import RoundTimerBanner from "./RoundTimerBanner";
 import HostAnnouncementBox from "./HostAnnouncementBox";
 import { postSystemAnnouncement } from "../lib/announcements";
 import PlayerViewer from "./PlayerViewer";
+import ChallengeTestLab from "./ChallengeTestLab";
 import PlayerMemoryWall from "./PlayerMemoryWall";
 
 const BASE_TABS = [
@@ -27,6 +28,7 @@ const BASE_TABS = [
   { key: "chat", label: "💬 Chat" },
   { key: "history", label: "📜 History" },
   { key: "viewas", label: "👁️ View as Player" },
+  { key: "testlab", label: "🧪 Test Lab" },
   { key: "admin", label: "🛠 Admin" },
 ];
 
@@ -243,6 +245,12 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
               />
             )}
           </div>
+        </ChallengeErrorBoundary>
+      )}
+
+      {tab === "testlab" && (
+        <ChallengeErrorBoundary label="Test Lab">
+          <ChallengeTestLab gameId={gameId} />
         </ChallengeErrorBoundary>
       )}
 

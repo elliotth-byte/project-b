@@ -519,8 +519,8 @@ export default function HostPage() {
                   inviteCoHost={inviteCoHost}
                   removeCoHost={removeCoHost}
                 />
-                {/* The radio's actual controls (see MusicPlayer.jsx) get
-                    portaled into this div — MusicPlayer itself stays
+                {/* The music player's actual controls (see MusicPlayer.jsx)
+                    get portaled into this div — MusicPlayer itself stays
                     mounted below, outside HostPanels, so the audio engine
                     keeps running even when this tab isn't the active one. */}
                 <div ref={setRadioPortalNode} />

@@ -123,7 +123,7 @@ export default function HistoryTab({ gameId, players, gameName, round }) {
       </div>
 
       {showVotingSheet && (
-        <VotingHistorySpreadsheet exileHistory={exileHistory} finaleState={finale} players={players} gameName={gameName} challengeHistory={challengeHistory} />
+        <VotingHistorySpreadsheet exileHistory={exileHistory} finaleState={finale} players={players} gameName={gameName} challengeHistory={challengeHistory} isHost />
       )}
 
       {pages.length > 1 && (

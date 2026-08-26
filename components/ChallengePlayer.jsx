@@ -37,9 +37,15 @@ import TorchedPlayer from "./games/TorchedPlayer";
 import ChainsPlayer from "./games/ChainsPlayer";
 import LabyrinthPlayer from "./games/LabyrinthPlayer";
 import OraclesSealPlayer from "./games/OraclesSealPlayer";
+import ScavengerHuntPlayer from "./games/ScavengerHuntPlayer";
+import HuePlayer from "./games/HuePlayer";
+import OperatorPlayer from "./games/OperatorPlayer";
+import TavoPlayer from "./games/TavoPlayer";
+import TanglePlayer from "./games/TanglePlayer";
+import BloomPlayer from "./games/BloomPlayer";
 import GameResultCard from "./games/GameResultCard";
 
-const GAME_COMPONENTS = {
+export const GAME_COMPONENTS = {
   match3: Match3Player,
   frogger: FroggerPlayer,
   wordscramble: WordScramblePlayer,
@@ -69,6 +75,12 @@ const GAME_COMPONENTS = {
   chains: ChainsPlayer,
   labyrinth: LabyrinthPlayer,
   oraclesseal: OraclesSealPlayer,
+  scavengerhunt: ScavengerHuntPlayer,
+  hue: HuePlayer,
+  operator: OperatorPlayer,
+  tavo: TavoPlayer,
+  tangle: TanglePlayer,
+  bloom: BloomPlayer,
 };
 
 export default function ChallengePlayer({ gameId, player, players, round, settings, readOnly = false }) {
