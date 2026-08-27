@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import HomeLink from "../components/HomeLink";
 import { supabase } from "../lib/supabaseClient";
 import { checkIsPlatformAdmin, searchPeople } from "../lib/adminModeration";
-import { upsertProfile } from "../lib/profiles";
-import { removeProfilePhoto } from "../lib/profilePhotoUpload";
+import { upsertProfile, fetchSeasonHistory } from "../lib/profiles";
+import { removeProfilePhoto, uploadProfilePhoto } from "../lib/profilePhotoUpload";
 
 // ─── Platform Admin ───
 // A genuinely new privilege tier, separate from any individual
@@ -17,12 +17,16 @@ import { removeProfilePhoto } from "../lib/profilePhotoUpload";
 export default function AdminPage() {
   const [user, setUser] = useState(undefined);
   const [isAdmin, setIsAdmin] = useState(undefined); // undefined = not checked, null = checked and NOT an admin
+  const [adminCheckError, setAdminCheckError] = useState(null); // non-null means the CHECK ITSELF failed — a real bug, distinct from a legitimate "you're not an admin"
   const [query, setQuery] = useState("");
   const [results, setResults] = useState(null);
   const [searching, setSearching] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [nameDraft, setNameDraft] = useState("");
   const [actionBusy, setActionBusy] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState("");
+  const [history, setHistory] = useState(null); // season history for whichever person is currently open, null = not loaded yet
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user || null));
@@ -32,7 +36,10 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!user) return;
-    checkIsPlatformAdmin().then((ok) => setIsAdmin(ok ? true : null));
+    checkIsPlatformAdmin().then(({ isAdmin: ok, error }) => {
+      setIsAdmin(ok ? true : null);
+      setAdminCheckError(error);
+    });
   }, [user]);
 
   const runSearch = async (e) => {
@@ -44,8 +51,14 @@ export default function AdminPage() {
   };
 
   const startEditing = (person) => {
+    // Same person clicked again -- collapse it, matching how a normal
+    // disclosure toggle behaves, rather than re-fetching for no reason.
+    if (editingId === person.userId) { setEditingId(null); return; }
     setEditingId(person.userId);
     setNameDraft(person.profileDisplayName || person.matchedName || "");
+    setHistory(null);
+    setPhotoError("");
+    fetchSeasonHistory(person.userId).then(setHistory);
   };
 
   const saveOverride = async (userId) => {
@@ -56,7 +69,6 @@ export default function AdminPage() {
     setActionBusy(false);
     if (res.ok) {
       setResults((rs) => rs.map((r) => (r.userId === userId ? { ...r, profileDisplayName: trimmed } : r)));
-      setEditingId(null);
     }
   };
 
@@ -67,9 +79,32 @@ export default function AdminPage() {
     if (res.ok) setResults((rs) => rs.map((r) => (r.userId === userId ? { ...r, photoUrl: null } : r)));
   };
 
+  const handleAdminPhotoUpload = async (userId, e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // lets choosing the SAME file again re-fire onChange
+    if (!file) return;
+    setPhotoError("");
+    setUploadingPhoto(true);
+    const res = await uploadProfilePhoto(userId, file);
+    setUploadingPhoto(false);
+    if (!res.ok) { setPhotoError(res.error || "Couldn't upload that photo — try again."); return; }
+    setResults((rs) => rs.map((r) => (r.userId === userId ? { ...r, photoUrl: res.url } : r)));
+  };
+
   if (user === undefined || isAdmin === undefined) return <div style={pageStyle}><p>Loading...</p></div>;
   if (!user) return <div style={pageStyle}><p>You need to be logged in. <a href="/login" style={{ color: "#ff2d95" }}>Log in</a></p></div>;
-  if (isAdmin === null) return <div style={pageStyle}><p>You don't have access to this page.</p></div>;
+  if (isAdmin === null) {
+    return (
+      <div style={pageStyle}>
+        <p>You don't have access to this page.</p>
+        {adminCheckError && (
+          <p style={{ color: "#ff3860", fontSize: 12, marginTop: 8 }}>
+            The access check itself failed, which is different from a real "no" — this usually means sql/add-profiles.sql or sql/add-profiles-admin.sql hasn't been run yet: {adminCheckError}
+          </p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={pageStyle}>
@@ -98,7 +133,10 @@ export default function AdminPage() {
         <div style={{ display: "grid", gap: 12 }}>
           {(results || []).map((person) => (
             <div key={person.userId} style={cardStyle}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: editingId === person.userId ? 12 : 0 }}>
+              <div
+                onClick={() => startEditing(person)}
+                style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: editingId === person.userId ? 12 : 0, cursor: "pointer" }}
+              >
                 <div style={{
                   width: 44, height: 44, borderRadius: "50%", overflow: "hidden", flexShrink: 0,
                   background: "#0d0618", border: "1px solid #3d1f5c",
@@ -114,31 +152,54 @@ export default function AdminPage() {
                     <div style={{ fontSize: 11, color: "#6b4f99" }}>Played most recently as: {person.matchedName}</div>
                   )}
                 </div>
-                {editingId !== person.userId && (
-                  <button onClick={() => startEditing(person)} style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, padding: "5px 10px", color: "#a68fd6", fontSize: 11, cursor: "pointer" }}>
-                    ✎ Edit
-                  </button>
-                )}
+                <span style={{ color: "#6b4f99", fontSize: 12 }}>{editingId === person.userId ? "▾" : "▸"}</span>
               </div>
 
               {editingId === person.userId && (
                 <div>
-                  <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
                     <input
                       type="text" value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} maxLength={40}
                       style={{ flex: 1, background: "#0d0618", border: "1px solid #ff3860", borderRadius: 6, padding: "8px 10px", color: "#f5f0ff", fontSize: 13 }}
                     />
                     <button onClick={() => saveOverride(person.userId)} disabled={actionBusy} style={{ background: "#ff3860", border: "none", borderRadius: 6, color: "#05010f", fontSize: 11, fontWeight: 700, padding: "8px 12px", cursor: "pointer" }}>
-                      {actionBusy ? "..." : "Save"}
-                    </button>
-                    <button onClick={() => setEditingId(null)} style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, color: "#a68fd6", fontSize: 11, padding: "8px 12px", cursor: "pointer" }}>
-                      Cancel
+                      {actionBusy ? "..." : "Save name"}
                     </button>
                   </div>
-                  {person.photoUrl && (
-                    <button onClick={() => clearPhoto(person.userId)} disabled={actionBusy} style={{ background: "none", border: "1px solid #ff3860", borderRadius: 6, color: "#ff3860", fontSize: 11, padding: "6px 10px", cursor: "pointer" }}>
-                      {actionBusy ? "..." : "Remove their photo"}
-                    </button>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                    <label style={{
+                      display: "inline-block", padding: "6px 12px", borderRadius: 6, border: "1px solid #3d1f5c",
+                      color: "#a68fd6", fontSize: 11, cursor: uploadingPhoto ? "default" : "pointer",
+                    }}>
+                      {uploadingPhoto ? "..." : (person.photoUrl ? "Replace their photo" : "Upload a photo for them")}
+                      <input type="file" accept="image/*" onChange={(e) => handleAdminPhotoUpload(person.userId, e)} disabled={uploadingPhoto} style={{ display: "none" }} />
+                    </label>
+                    {person.photoUrl && (
+                      <button onClick={() => clearPhoto(person.userId)} disabled={actionBusy} style={{ background: "none", border: "1px solid #ff3860", borderRadius: 6, color: "#ff3860", fontSize: 11, padding: "6px 12px", cursor: "pointer" }}>
+                        {actionBusy ? "..." : "Remove"}
+                      </button>
+                    )}
+                  </div>
+                  {photoError && <p style={{ color: "#ff3860", fontSize: 11, marginBottom: 12 }}>{photoError}</p>}
+
+                  <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+                    🏛 Season History
+                  </div>
+                  {history === null ? (
+                    <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>Loading...</p>
+                  ) : history.length === 0 ? (
+                    <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No completed seasons.</p>
+                  ) : (
+                    <div style={{ display: "grid", gap: 6 }}>
+                      {history.map((s) => (
+                        <div key={s.gameId} style={{ background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "8px 10px", fontSize: 12 }}>
+                          <span style={{ color: "#f5f0ff", fontWeight: 700 }}>{s.seasonName}</span>
+                          <span style={{ color: "#a68fd6" }}> — {s.character ? `played as ${s.character}` : "played"} — </span>
+                          <span style={{ color: "#ff2d95", fontWeight: 600 }}>{s.placement}</span>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               )}
