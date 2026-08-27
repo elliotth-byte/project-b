@@ -22,6 +22,18 @@ export default function App({ Component, pageProps }) {
           margin: 0;
           background: #05010f;
           -webkit-tap-highlight-color: transparent;
+          /* The actual fix for horizontal page scrolling: clips
+             anything that would otherwise force the whole page wider
+             than the viewport (a long unbroken player name, a raw URL,
+             any string with no natural break point). This only affects
+             the PAGE-level scroll — an element with its own explicit
+             overflowX: "auto" (the host's tab bar in HostPanels.jsx,
+             the voting history table in VotingHistorySpreadsheet.jsx)
+             keeps scrolling exactly as it does today; CSS overflow is
+             scoped per-element, not inherited in a way that would
+             override a child's own setting. */
+          overflow-x: hidden;
+          max-width: 100vw;
         }
         ::selection { background: #ff2d95; color: #05010f; }
         ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -30,6 +42,19 @@ export default function App({ Component, pageProps }) {
         ::-webkit-scrollbar-thumb:hover { background: #ff2d95; }
         input, select, textarea, button { font-family: inherit; }
         input::placeholder, textarea::placeholder { color: #6b4f99; }
+        /* Paired with the overflow-x: hidden above — without this, a
+           genuinely unbroken string (long alias, raw URL, a run of
+           characters with no space) would just get silently clipped
+           at the edge instead of wrapping onto a new line, hiding
+           content rather than showing all of it. word-break: break-word
+           is the fallback for browsers that don't fully honor
+           overflow-wrap on its own. Left off pre/code (if this app ever
+           adds any) since breaking mid-token there would be actively
+           wrong, not just unusual. */
+        p, span, div, h1, h2, h3, h4, a, li, label, button {
+          overflow-wrap: break-word;
+          word-break: break-word;
+        }
         /* touch-action: manipulation is the actual fix for the
            tap-registers-as-zoom problem — it's what tells the browser
            "this is a real tappable control, don't wait to see if it's

@@ -16,6 +16,7 @@ import HermesReveal from "../components/HermesReveal";
 import ConfessionalPlayer from "../components/ConfessionalPlayer";
 import MusicPlayer from "../components/MusicPlayer";
 import HelpPanel from "../components/HelpPanel";
+import OptionsPanel from "../components/OptionsPanel";
 import UpdateBanner from "../components/UpdateBanner";
 import NavTourOverlay from "../components/NavTourOverlay";
 import { hasSeenNavTour } from "../lib/navTour";
@@ -30,6 +31,7 @@ import HeraTrigger from "../components/HeraTrigger";
 import DionysusSwap from "../components/DionysusSwap";
 import HephaestusChoice from "../components/HephaestusChoice";
 import JuryPreferencePanel from "../components/JuryPreferencePanel";
+import OnboardingPreferences from "../components/OnboardingPreferences";
 import { powerFor } from "../lib/characterPowers";
 import RoundRevealGate from "../components/RoundRevealGate";
 import HomeLink from "../components/HomeLink";
@@ -56,6 +58,7 @@ const BASE_TABS = [
   { key: "confessional", label: "🎥 Confessional" },
   { key: "chat", label: "💬 Chat" },
   { key: "help", label: "❓ Help" },
+  { key: "options", label: "⚙️ Options" },
 ];
 
 export default function PlayPage() {
@@ -364,6 +367,12 @@ export default function PlayPage() {
   const approved = joined && !!myPlayer?.approved;
   const gameEnded = round?.phase === PHASES.ENDED;
   const needsIdentity = joined && myPlayer && !identityComplete(myPlayer, settings);
+  // Shown once, right after identity is picked and before the "waiting
+  // for host approval" screen — see components/OnboardingPreferences.jsx
+  // for the full reasoning. Gated off once approved (an approved player
+  // never needs to see this again, even if they somehow never completed
+  // it — better to let them into the game than trap them here).
+  const needsOnboardingPrefs = joined && myPlayer && !needsIdentity && !approved && !myPlayer.gamePrefs?.onboardingComplete;
   // Once the game's over, the whole point of keeping exiled players
   // separated from the main chat (protecting the still-competing
   // players from anything an exiled player might reveal or pressure
@@ -434,7 +443,14 @@ export default function PlayPage() {
           />
         )}
 
-        {joined && myPlayer && !needsIdentity && !myPlayer.approved && (
+        {joined && myPlayer && needsOnboardingPrefs && (
+          <OnboardingPreferences
+            gameId={gameId} player={myPlayer}
+            onComplete={(gamePrefs) => setMyPlayer((p) => p && ({ ...p, gamePrefs }))}
+          />
+        )}
+
+        {joined && myPlayer && !needsIdentity && !needsOnboardingPrefs && !myPlayer.approved && (
           <div style={{
             marginBottom: 20, textAlign: "center", padding: "28px 20px",
             background: "linear-gradient(160deg, #1a0a2e 0%, #1a0a2e 100%)",
@@ -619,10 +635,16 @@ export default function PlayPage() {
 
             {tab === "help" && (
               <HelpPanel
+                player={player}
+                onReplayTour={() => setShowNavTour(true)}
+              />
+            )}
+
+            {tab === "options" && (
+              <OptionsPanel
                 gameId={gameId}
                 player={player}
                 onPrefsChanged={(gamePrefs) => setMyPlayer((p) => p && ({ ...p, gamePrefs }))}
-                onReplayTour={() => setShowNavTour(true)}
                 onQuit={approved && myPlayer.alive !== false && !gameEnded ? handleQuit : undefined}
                 quitBusy={quitBusy}
                 musicPortalRef={setRadioPortalNode}

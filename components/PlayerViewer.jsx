@@ -9,6 +9,7 @@ import ChaosPowerPlayer from "./ChaosPowerPlayer";
 import ConfessionalPlayer from "./ConfessionalPlayer";
 import ChatPanel from "./ChatPanel";
 import HelpPanel from "./HelpPanel";
+import OptionsPanel from "./OptionsPanel";
 import RoundRevealGate from "./RoundRevealGate";
 import ChallengeErrorBoundary from "./ChallengeErrorBoundary";
 import RoundTimerBanner from "./RoundTimerBanner";
@@ -27,6 +28,7 @@ const TABS = [
   { key: "confessional", label: "🎥 Confessional" },
   { key: "chat", label: "💬 Chat" },
   { key: "help", label: "❓ Help" },
+  { key: "options", label: "⚙️ Options" },
 ];
 
 // ─── Host: View as Player ───
@@ -315,7 +317,11 @@ export default function PlayerViewer({ gameId, targetPlayer, allPlayers, round, 
           )}
 
           {tab === "help" && (
-            <HelpPanel gameId={gameId} player={player} readOnly />
+            <HelpPanel player={player} />
+          )}
+
+          {tab === "options" && (
+            <OptionsPanel gameId={gameId} player={player} readOnly />
           )}
         </>
       )}

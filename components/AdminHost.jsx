@@ -398,7 +398,7 @@ export default function AdminHost({ gameId, players, round }) {
                       onChange={(e) => setNames({ ...names, [p.id]: e.target.value })}
                       style={{ flex: 1, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 10px", color: "#f5f0ff", fontSize: 13 }}
                     />
-                    {p.alias && <span style={{ fontSize: 11, color: "#a68fd6", whiteSpace: "nowrap" }} title="Their alias — only you see both">🏛 {p.alias}</span>}
+                    {p.alias && <span style={{ fontSize: 11, color: "#a68fd6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 90 }} title={`Their alias — only you see both: ${p.alias}`}>🏛 {p.alias}</span>}
                     <Btn small onClick={() => saveName(p)} disabled={saving[p.id] || nameFor(p) === p.display_name}>
                       {saving[p.id] ? "Saving..." : "Save"}
                     </Btn>

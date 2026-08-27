@@ -21,6 +21,7 @@ export default function Home() {
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <Link href={withGame("/signup")} style={linkBtn}>👤 New player — Create account</Link>
           <Link href={withGame("/login")} style={linkBtn}>⚔️ Returning player — Log in</Link>
+          <Link href="/profile" style={linkBtn}>🪪 My Profile</Link>
           <Link href="/host" style={{ ...linkBtn, borderColor: "#ff2d95", color: "#ff2d95" }}>👑 I'm the Host</Link>
         </div>
       </div>
