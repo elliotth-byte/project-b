@@ -81,6 +81,13 @@ export default function ProfilePage() {
                 ? <img src={profile.photo_url} alt="Your profile photo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 : <span style={{ fontSize: 32, color: "#3d1f5c" }}>👤</span>}
             </div>
+            {/* The actual saved value, separate from the editable input
+                below — makes a Save visibly take effect right here,
+                rather than the input just continuing to show whatever
+                was last typed whether or not it was ever saved. */}
+            <h2 style={{ fontSize: 18, color: "#f5f0ff", margin: "0 0 12px", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
+              {profile?.display_name || "No display name set"}
+            </h2>
             <label style={{
               display: "inline-block", padding: "6px 14px", borderRadius: 8, border: "1px solid #3d1f5c",
               color: "#a68fd6", fontSize: 12, cursor: uploadingPhoto ? "default" : "pointer",
