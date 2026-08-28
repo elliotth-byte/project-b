@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import HomeLink from "../components/HomeLink";
 import { supabase } from "../lib/supabaseClient";
-import { checkIsPlatformAdmin, searchPeople } from "../lib/adminModeration";
+import { checkIsPlatformAdmin, searchPeople, fetchOpenReports, markReportReviewed } from "../lib/adminModeration";
 import { upsertProfile, fetchSeasonHistory } from "../lib/profiles";
 import { removeProfilePhoto, uploadProfilePhoto } from "../lib/profilePhotoUpload";
 
@@ -27,6 +27,8 @@ export default function AdminPage() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoError, setPhotoError] = useState("");
   const [history, setHistory] = useState(null); // season history for whichever person is currently open, null = not loaded yet
+  const [reports, setReports] = useState(null);
+  const [reviewingBusy, setReviewingBusy] = useState(null); // reportId currently being marked reviewed, or null
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user || null));
@@ -41,6 +43,18 @@ export default function AdminPage() {
       setAdminCheckError(error);
     });
   }, [user]);
+
+  useEffect(() => {
+    if (isAdmin !== true) return;
+    fetchOpenReports().then(setReports);
+  }, [isAdmin]);
+
+  const reviewReport = async (reportId) => {
+    setReviewingBusy(reportId);
+    const res = await markReportReviewed(reportId);
+    setReviewingBusy(null);
+    if (res.ok) setReports((rs) => rs.filter((r) => r.reportId !== reportId));
+  };
 
   const runSearch = async (e) => {
     e.preventDefault();
@@ -111,6 +125,36 @@ export default function AdminPage() {
       <div style={{ maxWidth: 480, width: "100%", margin: "0 auto" }}>
         <div style={{ marginBottom: 20 }}><HomeLink /></div>
         <h1 style={{ fontSize: 20, marginBottom: 16 }}>🛡 Platform Admin</h1>
+
+        <div style={{ ...cardStyle, marginBottom: 20 }}>
+          <div style={{ fontSize: 12, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+            🚩 Open Reports {reports && reports.length > 0 && `(${reports.length})`}
+          </div>
+          {reports === null ? (
+            <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>Loading...</p>
+          ) : reports.length === 0 ? (
+            <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>Nothing open right now.</p>
+          ) : (
+            <div style={{ display: "grid", gap: 10 }}>
+              {reports.map((r) => (
+                <div key={r.reportId} style={{ background: "#0d0618", border: "1px solid #ff3860", borderRadius: 8, padding: "10px 12px" }}>
+                  <p style={{ fontSize: 12, color: "#f5f0ff", margin: "0 0 6px" }}>
+                    <strong>{r.senderName || "Unknown"}</strong> wrote: "{r.messageBody}"
+                  </p>
+                  <p style={{ fontSize: 11, color: "#a68fd6", margin: "0 0 8px" }}>
+                    Reported by <strong>{r.reporterName || "Unknown"}</strong> — "{r.reason}"
+                  </p>
+                  <button
+                    onClick={() => reviewReport(r.reportId)} disabled={reviewingBusy === r.reportId}
+                    style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, color: "#a68fd6", fontSize: 11, padding: "5px 10px", cursor: "pointer" }}
+                  >
+                    {reviewingBusy === r.reportId ? "..." : "Mark reviewed"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <form onSubmit={runSearch} style={{ display: "flex", gap: 8, marginBottom: 20 }}>
           <input
