@@ -49,7 +49,15 @@ export default function ChatHostPanel({ gameId, players }) {
       if (active) setThreadMessages(msgs);
     };
     load();
-    const interval = setInterval(load, 4000);
+    // A more modest reduction than the 45-second fix applied elsewhere
+    // in this app for the same egress problem — unlike those, this
+    // specific view (an already-open DM thread) has no realtime
+    // subscription backing it at all, so this poll is the ONLY thing
+    // keeping it updated, not a safety net for missed events. Worth a
+    // real realtime subscription here eventually (matching the pattern
+    // lib/profileDms.js already uses), but that's a bigger change than
+    // an urgent egress fix should risk right now.
+    const interval = setInterval(load, 10000);
     return () => { active = false; clearInterval(interval); };
   }, [openThreadId]);
 

@@ -56,7 +56,7 @@ function groupReactions(reactions, myPlayerId) {
   return Object.values(byEmoji);
 }
 
-function MessageBubble({ mine, name, nameColor, avatarUrl, body, time, reactions, myPlayerId, onToggleReaction, readOnly = false }) {
+function MessageBubble({ mine, name, nameColor, avatarUrl, body, time, reactions, myPlayerId, onToggleReaction, readOnly = false, isFinalWords = false }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [customOpen, setCustomOpen] = useState(false);
   const [customEmoji, setCustomEmoji] = useState("");
@@ -87,13 +87,20 @@ function MessageBubble({ mine, name, nameColor, avatarUrl, body, time, reactions
       )}
       <div style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start", maxWidth: "78%" }}>
         {!mine && <div style={{ fontSize: 10, color: nameColor || "#a68fd6", fontWeight: 700, marginBottom: 2, marginLeft: 4 }}>{name}</div>}
+        {isFinalWords && (
+          <div style={{ fontSize: 10, color: "#ff3860", fontWeight: 800, letterSpacing: 0.5, marginBottom: 3, textTransform: "uppercase" }}>
+            🎤 Final Words{!mine && ` from ${name}`}
+          </div>
+        )}
         <div
           onClick={() => { if (readOnly) return; setPickerOpen((v) => { if (v) { setCustomOpen(false); setCustomEmoji(""); } return !v; }); }}
           style={{
-            background: mine ? "linear-gradient(135deg, #ff2d95, #b829ff)" : "#0d0618",
-            border: mine ? "none" : `1px solid ${nameColor ? nameColor + "55" : "#3d1f5c"}`, color: mine ? "#05010f" : "#f5f0ff",
+            background: isFinalWords ? "linear-gradient(160deg, #2a0a12, #1a0612)" : mine ? "linear-gradient(135deg, #ff2d95, #b829ff)" : "#0d0618",
+            border: isFinalWords ? "1px solid #ff3860" : mine ? "none" : `1px solid ${nameColor ? nameColor + "55" : "#3d1f5c"}`,
+            color: isFinalWords ? "#f5f0ff" : mine ? "#05010f" : "#f5f0ff",
             borderRadius: 14, padding: "8px 12px", fontSize: 13, wordBreak: "break-word",
             cursor: readOnly ? "default" : "pointer",
+            boxShadow: isFinalWords ? "0 0 16px rgba(255,56,96,0.3)" : "none",
           }}
         >
           {body}
@@ -283,7 +290,7 @@ function GroupChatView({ gameId, player, players, realName, onRead, readOnly = f
       <MessageBubble
         mine={m.senderId === player.id} name={m.senderName} nameColor={colorFor(players, m.senderId)}
         avatarUrl={(players || []).find((p) => p.id === m.senderId)?.effectiveAvatarUrl} body={m.body} time={m.createdAt}
-        reactions={m.reactions} myPlayerId={player.id} readOnly={readOnly}
+        reactions={m.reactions} myPlayerId={player.id} readOnly={readOnly} isFinalWords={m.isFinalWords}
         onToggleReaction={(emoji) => toggleGroupReaction(gameId, m.id, player.id, emoji)}
       />
     ),

@@ -14,6 +14,47 @@ import { AVATAR_COLLECTIONS } from "../lib/avatarCollections";
 import { uploadAvatar, removeAvatar } from "../lib/avatarUpload";
 import { CHARACTER_POWERS, powerFor, assignRandomPowers } from "../lib/characterPowers";
 
+// ─── Season Length Presets ───
+// A quick way to fill in all three phase durations at once, rather than
+// tuning Battle/Fates/Exile Vote separately from scratch. "12-Hour
+// Round" is exact and unambiguous — it directly sets each round's own
+// pace, no estimation involved. Blitz and Marathon are different in
+// kind: they target a WHOLE SEASON'S length, which this app has no
+// fixed number of rounds for (a season runs until enough players are
+// eliminated, which depends entirely on how many people are playing) —
+// so hitting an exact total isn't actually possible. Both assume a
+// season of roughly 10 rounds (a middle-of-the-road estimate, not a
+// guarantee) to turn "the whole season in 2 hours" into a concrete
+// per-round number; an actual season with very different player count
+// will run faster or slower than the label suggests. Framed to the host
+// as a starting pace, not a promise, for exactly that reason.
+const SEASON_LENGTH_PRESETS = [
+  {
+    key: "12hour",
+    icon: "🕛",
+    label: "12-Hour Round",
+    summary: "Each round takes about half a day",
+    detail: "Battle 8h, Fates 2h, Exile Vote 2h — exact, per round, no estimation involved.",
+    patch: { challengeDurationSec: 8 * 3600, fatesDurationSec: 2 * 3600, voteDurationSec: 2 * 3600, infiniteTime: false },
+  },
+  {
+    key: "blitz",
+    icon: "⚡",
+    label: "2-Hour Blitz",
+    summary: "Whole season in one sitting",
+    detail: "Battle 8min, Fates 2min, Exile Vote 2min per round — hits 2 hours total assuming ~10 rounds.",
+    patch: { challengeDurationSec: 8 * 60, fatesDurationSec: 2 * 60, voteDurationSec: 2 * 60, infiniteTime: false },
+  },
+  {
+    key: "marathon",
+    icon: "🐌",
+    label: "7-Day Marathon",
+    summary: "A relaxed, week-long season",
+    detail: "Battle 10h, Fates 3h, Exile Vote 3h per round — roughly a week total assuming ~10 rounds.",
+    patch: { challengeDurationSec: 10 * 3600, fatesDurationSec: 3 * 3600, voteDurationSec: 3 * 3600, infiniteTime: false },
+  },
+];
+
 export default function AdminHost({ gameId, players, round }) {
   const [names, setNames] = useState({});
   const [saving, setSaving] = useState({});
@@ -517,6 +558,35 @@ export default function AdminHost({ gameId, players, round }) {
               Default timer for each phase. When a phase's timer runs out, the game automatically moves to the next phase and posts
               an update in-app — as long as the host has finished entering whatever that phase needed (results, nominations, etc.).
             </p>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, color: "#6b4f99", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+                Season Length Presets
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+                {SEASON_LENGTH_PRESETS.map((preset) => (
+                  <button
+                    key={preset.key}
+                    onClick={() => saveSettings(preset.patch)}
+                    title={preset.detail}
+                    style={{
+                      padding: "8px 14px", borderRadius: 8, cursor: "pointer", textAlign: "left",
+                      background: "#0d0618", border: "1px solid #3d1f5c", color: "#f5f0ff",
+                    }}
+                  >
+                    <div style={{ fontSize: 12.5, fontWeight: 700 }}>{preset.icon} {preset.label}</div>
+                    <div style={{ fontSize: 10.5, color: "#a68fd6" }}>{preset.summary}</div>
+                  </button>
+                ))}
+              </div>
+              <p style={{ fontSize: 10.5, color: "#6b4f99", margin: 0, fontStyle: "italic" }}>
+                Fills in Battle/Fates/Exile Vote below and turns off Infinite Time — you can still fine-tune any of the three
+                afterward. The Blitz and Marathon presets target a WHOLE season of that length, assuming a season runs about 10
+                rounds — your actual season could run shorter or longer depending on how many people are playing and how often
+                someone's exiled, so treat these as a starting pace to aim for, not an exact guarantee.
+              </p>
+            </div>
+
             <div style={{ display: "grid", gap: 10 }}>
               {[
                 { key: "challengeDurationSec", label: "Battle" },

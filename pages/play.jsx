@@ -16,6 +16,8 @@ import HermesReveal from "../components/HermesReveal";
 import ConfessionalPlayer from "../components/ConfessionalPlayer";
 import MusicPlayer from "../components/MusicPlayer";
 import HelpPanel from "../components/HelpPanel";
+import FinalWordsPrompt from "../components/FinalWordsPrompt";
+import { hasResolvedFinalWords } from "../lib/finalWords";
 import OptionsPanel from "../components/OptionsPanel";
 import UpdateBanner from "../components/UpdateBanner";
 import NavTourOverlay from "../components/NavTourOverlay";
@@ -76,6 +78,7 @@ export default function PlayPage() {
   const [quitBusy, setQuitBusy] = useState(false);
   const [exileHistory, setExileHistory] = useState([]);
   const [revealAck, setRevealAck] = useState({});
+  const [finalWordsResolved, setFinalWordsResolved] = useState(true); // defaults true so the prompt never flashes on screen before the check below completes
   const [settings, setSettings] = useState(null);
   const [showNavTour, setShowNavTour] = useState(false);
   const [radioPortalNode, setRadioPortalNode] = useState(null);
@@ -209,7 +212,8 @@ export default function PlayPage() {
       .channel(`players-play:${gameId}:${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "players", filter: `game_id=eq.${gameId}` }, load)
       .subscribe();
-    const pollInterval = window.setInterval(load, 6000);
+    // Same egress fix as lib/gameStorage.js's identical pattern -- this realtime subscription is the primary update mechanism; this poll only guards against a missed/dropped event, which doesn't need sub-10-second detection.
+    const pollInterval = window.setInterval(load, 45000);
     return () => { window.clearInterval(pollInterval); supabase.removeChannel(channel); };
   }, [gameId]);
 
@@ -243,13 +247,13 @@ export default function PlayPage() {
     (async () => {
       const { data: existing } = await supabase
         .from("players")
-        .select("id, display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes")
+        .select("id, display_name, alive, elimination_type, elimination_round, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes")
         .eq("game_id", gameId)
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (existing) {
-        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, approved: existing.approved, color: existing.color, alias: existing.alias, avatarUrl: existing.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(existing.game_prefs || {}) }, battleBanRound: existing.battle_ban_round, torchedPreset: existing.torched_preset, powerState: existing.power_state, inactivityStrikes: existing.inactivity_strikes });
+        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, eliminationRound: existing.elimination_round, approved: existing.approved, color: existing.color, alias: existing.alias, avatarUrl: existing.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(existing.game_prefs || {}) }, battleBanRound: existing.battle_ban_round, torchedPreset: existing.torched_preset, powerState: existing.power_state, inactivityStrikes: existing.inactivity_strikes });
         setJoined(true);
         return;
       }
@@ -280,12 +284,12 @@ export default function PlayPage() {
       const { data: created, error } = await supabase
         .from("players")
         .insert({ game_id: gameId, user_id: session.user.id, display_name: displayNameFromUser(user), approved: false })
-        .select("id, display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes")
+        .select("id, display_name, alive, elimination_type, elimination_round, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes")
         .single();
       if (error) {
         setJoinError(`Couldn't join this game: ${error.message}${error.code ? ` [code=${error.code}]` : ""}${error.details ? ` — ${error.details}` : ""} (user_id=${session.user.id})`);
       } else {
-        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, approved: created.approved, color: created.color, alias: created.alias, avatarUrl: created.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(created.game_prefs || {}) }, battleBanRound: created.battle_ban_round, torchedPreset: created.torched_preset, powerState: created.power_state, inactivityStrikes: created.inactivity_strikes });
+        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, eliminationRound: created.elimination_round, approved: created.approved, color: created.color, alias: created.alias, avatarUrl: created.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(created.game_prefs || {}) }, battleBanRound: created.battle_ban_round, torchedPreset: created.torched_preset, powerState: created.power_state, inactivityStrikes: created.inactivity_strikes });
         setJoined(true);
         // Fire-and-forget — a host notification failing to send should
         // never block the join itself, which already succeeded. Uses
@@ -301,19 +305,34 @@ export default function PlayPage() {
     })();
   }, [user, gameId]);
 
+  // Checked once whenever a fresh exile shows up (not subscribed —
+  // this status only ever changes for THIS player, from THIS same
+  // session, when they submit or skip below; no other device or
+  // player could change it out from under this tab, so a one-time
+  // check is genuinely sufficient here, not a missing safety net).
+  useEffect(() => {
+    if (!gameId || !myPlayer?.id || myPlayer.alive !== false || myPlayer.eliminationRound == null) return;
+    let cancelled = false;
+    hasResolvedFinalWords(gameId, myPlayer.id, myPlayer.eliminationRound).then((resolved) => {
+      if (!cancelled) setFinalWordsResolved(resolved);
+    });
+    return () => { cancelled = true; };
+  }, [gameId, myPlayer?.id, myPlayer?.alive, myPlayer?.eliminationRound]);
+
   // Live subscription to this player's own row — a host rename, exile, or
   // return reaches this screen the instant it happens.
   useEffect(() => {
     if (!myPlayer?.id) return;
     const load = async () => {
-      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes").eq("id", myPlayer.id).maybeSingle();
-      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, approved: data.approved, color: data.color, alias: data.alias, avatarUrl: data.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(data.game_prefs || {}) }, battleBanRound: data.battle_ban_round, torchedPreset: data.torched_preset, powerState: data.power_state, inactivityStrikes: data.inactivity_strikes }));
+      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, elimination_round, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes").eq("id", myPlayer.id).maybeSingle();
+      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, eliminationRound: data.elimination_round, approved: data.approved, color: data.color, alias: data.alias, avatarUrl: data.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(data.game_prefs || {}) }, battleBanRound: data.battle_ban_round, torchedPreset: data.torched_preset, powerState: data.power_state, inactivityStrikes: data.inactivity_strikes }));
     };
     const channel = supabase
       .channel(`self-player-${myPlayer.id}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "players", filter: `id=eq.${myPlayer.id}` }, load)
       .subscribe();
-    const pollInterval = window.setInterval(load, 6000);
+    // Same egress fix as above and throughout this app -- the realtime subscription is the primary update mechanism; this poll is only a safety net for a missed event.
+    const pollInterval = window.setInterval(load, 45000);
     return () => { window.clearInterval(pollInterval); supabase.removeChannel(channel); };
   }, [myPlayer?.id]);
 
@@ -364,6 +383,10 @@ export default function PlayPage() {
   const exiled = joined && myPlayer && myPlayer.alive === false;
   const quitByChoice = exiled && myPlayer.eliminationType === "quit";
   const removedForInactivity = exiled && myPlayer.eliminationType === "removed_inactivity";
+  // Scoped to a genuine exile-by-vote specifically — someone who quit or
+  // was removed for inactivity didn't get voted out in the dramatic
+  // sense this is modeling, so neither gets a "final words" moment.
+  const needsFinalWords = exiled && !quitByChoice && !removedForInactivity && myPlayer.eliminationRound != null && !finalWordsResolved;
   const approved = joined && !!myPlayer?.approved;
   const gameEnded = round?.phase === PHASES.ENDED;
   const needsIdentity = joined && myPlayer && !identityComplete(myPlayer, settings);
@@ -486,6 +509,14 @@ export default function PlayPage() {
               {quitByChoice ? "You've left this game." : removedForInactivity ? "You were removed for inactivity." : "You have been exiled."}
             </p>
           </div>
+        )}
+
+        {needsFinalWords && approved && !gameEnded && !pendingReveal && (
+          <FinalWordsPrompt
+            gameId={gameId} player={{ id: player.id, name: player.name, realName: myPlayer.name }}
+            eliminationRound={myPlayer.eliminationRound}
+            onResolved={() => setFinalWordsResolved(true)}
+          />
         )}
 
         {pendingReveal && (

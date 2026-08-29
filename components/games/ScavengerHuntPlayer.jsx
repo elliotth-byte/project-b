@@ -147,7 +147,7 @@ export default function ScavengerHuntPlayer({ gameId, round, player, players }) 
                   key={item.id}
                   onClick={() => !taken && !me.takenThisRound && takeItem(gameId, round.round, player.id, item.id)}
                   disabled={taken || me.takenThisRound}
-                  title={taken ? item.type : "Take this item"}
+                  title={taken ? `Taken: ${item.type}` : `Take this ${item.type}`}
                   style={{
                     aspectRatio: "1", borderRadius: 10, cursor: (taken || me.takenThisRound) ? "default" : "pointer",
                     background: isMine ? "rgba(255,45,149,0.15)" : taken ? "#1a0a2e" : "#0d0618",
@@ -156,7 +156,7 @@ export default function ScavengerHuntPlayer({ gameId, round, player, players }) 
                     opacity: taken && !isMine ? 0.5 : 1,
                   }}
                 >
-                  {taken ? item.type : "🎁"}
+                  {item.type}
                 </button>
               );
             })}

@@ -12,10 +12,16 @@ import { Card, Badge } from "./ui";
 // of the current round.phase (lib/musicEngine.js's own PHASE_TRACKS map),
 // which is ALREADY synced for every client via subscribeRound — the same
 // mechanism the rest of this app already relies on for phase changes —
-// so there's nothing left to broadcast or coordinate. Nobody picks
-// anything anymore; host and player get the identical experience and
-// the identical controls (just play/pause and volume), which is why this
-// component no longer branches meaningfully on isHost at all.
+// so there's nothing left to broadcast or coordinate. Host and player
+// get the identical phase-driven experience by default.
+//
+// One host-only exception: a preview control letting the host jump to
+// and hear any of the 5 tracks on demand, regardless of the game's
+// actual current phase — purely a "what does the finale track sound
+// like" convenience. This never reaches players in any way, since
+// music is generated locally per-browser (via Tone.js) and never
+// broadcast — previewing only changes what plays in the host's own
+// browser tab.
 //
 // Still mounted persistently outside the tab-switching part of the page
 // (see pages/play.jsx and pages/host.jsx) so the audio engine keeps
@@ -29,6 +35,13 @@ export default function MusicPlayer({ gameId, isHost = false, portalTarget = nul
   const [volume, setVolume] = useState(0.4);
   const [phase, setPhase] = useState(null);
   const [audioError, setAudioError] = useState(null);
+  // Host-only override: null means "follow the current phase" (the
+  // normal behavior for everyone). A track id here means the host has
+  // deliberately chosen to preview that track regardless of what phase
+  // the game is actually in — this never affects any player, since
+  // music is generated locally per-browser and never broadcast; it's
+  // purely a "let the host hear what X sounds like right now" tool.
+  const [previewTrack, setPreviewTrack] = useState(null);
   const engineRef = useRef(null);
 
   useEffect(() => {
@@ -38,6 +51,8 @@ export default function MusicPlayer({ gameId, isHost = false, portalTarget = nul
   }, [gameId]);
 
   const track = PHASE_TRACKS[phase] || "lobby";
+  const isPreviewing = isHost && previewTrack != null;
+  const effectiveTrack = isPreviewing ? previewTrack : track;
 
   const disposeEngine = () => {
     Tone.getTransport().stop();
@@ -60,7 +75,7 @@ export default function MusicPlayer({ gameId, isHost = false, portalTarget = nul
         throw new Error("Your browser blocked audio from starting — try the ▶ button again.");
       }
       disposeEngine();
-      engineRef.current = buildEngine(selectedTrack || track);
+      engineRef.current = buildEngine(selectedTrack || effectiveTrack);
       engineRef.current.masterVol.volume.value = -30 + volume * 30;
       Tone.getTransport().start();
       setPlaying(true);
@@ -76,6 +91,23 @@ export default function MusicPlayer({ gameId, isHost = false, portalTarget = nul
     setPlaying(false);
   };
 
+  // Host-only: jump straight to a specific track and start playing it
+  // immediately — previewing is about hearing it right now, not just
+  // selecting it and having to separately hit play.
+  const previewSpecificTrack = (trackId) => {
+    setPreviewTrack(trackId);
+    startMusic(trackId);
+  };
+
+  // Returns to normal phase-following behavior. If already playing,
+  // switches immediately to whatever the CURRENT phase's track
+  // actually is, rather than leaving the just-previewed track running
+  // under a now-misleading "follows the phase" label.
+  const returnToAutoFollow = () => {
+    setPreviewTrack(null);
+    if (playing) startMusic(track);
+  };
+
   useEffect(() => {
     if (engineRef.current) {
       engineRef.current.masterVol.volume.value = -30 + volume * 30;
@@ -87,18 +119,21 @@ export default function MusicPlayer({ gameId, isHost = false, portalTarget = nul
   // The phase (and therefore the track) can change out from under a
   // client that's already playing — swap the engine over to the new
   // track automatically rather than leaving the old phase's music
-  // playing into the next phase.
-  const prevTrackRef = useRef(track);
+  // playing into the next phase. Skipped entirely while a host is
+  // previewing a specific track on purpose — a phase change shouldn't
+  // yank them out of the track they deliberately chose to listen to.
+  const prevTrackRef = useRef(effectiveTrack);
   useEffect(() => {
-    if (track !== prevTrackRef.current && playing) {
-      startMusic(track);
+    if (isPreviewing) { prevTrackRef.current = effectiveTrack; return; }
+    if (effectiveTrack !== prevTrackRef.current && playing) {
+      startMusic(effectiveTrack);
     }
-    prevTrackRef.current = track;
-  }, [track]); // eslint-disable-line react-hooks/exhaustive-deps
+    prevTrackRef.current = effectiveTrack;
+  }, [effectiveTrack, isPreviewing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!portalTarget) return null;
 
-  const currentTrack = TRACKS.find((t) => t.id === track) || TRACKS[0];
+  const currentTrack = TRACKS.find((t) => t.id === effectiveTrack) || TRACKS[0];
 
   return createPortal(
     <Card>
@@ -121,10 +156,47 @@ export default function MusicPlayer({ gameId, isHost = false, portalTarget = nul
         </button>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <Badge>{currentTrack.icon} {currentTrack.label}</Badge>
-        <span style={{ fontSize: 11, color: "#6b4f99", fontStyle: "italic" }}>follows the current phase automatically</span>
+        <span style={{ fontSize: 11, color: isPreviewing ? "#ff2d95" : "#6b4f99", fontStyle: "italic" }}>
+          {isPreviewing ? "previewing — not the live phase, players hear their own phase's track as normal" : "follows the current phase automatically"}
+        </span>
       </div>
+
+      {isHost && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 10, color: "#6b4f99", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+            Preview any track (host only — nothing this changes is visible to players)
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {TRACKS.map((t) => {
+              const active = isPreviewing && previewTrack === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => previewSpecificTrack(t.id)}
+                  style={{
+                    padding: "5px 10px", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: 700,
+                    background: active ? "rgba(255,45,149,0.2)" : "#0d0618",
+                    border: `1px solid ${active ? "#ff2d95" : "#3d1f5c"}`,
+                    color: active ? "#ff2d95" : "#a68fd6",
+                  }}
+                >
+                  {t.icon} {t.label}
+                </button>
+              );
+            })}
+            {isPreviewing && (
+              <button
+                onClick={returnToAutoFollow}
+                style={{ padding: "5px 10px", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: 700, background: "none", border: "1px solid #3d1f5c", color: "#6b4f99" }}
+              >
+                ↩ Back to Auto
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <input
         type="range" min="0" max="1" step="0.05" value={volume}

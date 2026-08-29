@@ -267,7 +267,13 @@ export default function HostPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "players", filter: `game_id=eq.${game.id}` }, load)
       .subscribe();
 
-    const pollInterval = window.setInterval(load, 6000);
+    // Same egress fix as lib/gameStorage.js's identical pattern — this
+    // realtime subscription is the primary update mechanism; the poll
+    // below only guards against a missed/dropped realtime event, which
+    // doesn't need sub-10-second detection. This one fetches every
+    // column for every player in the season, so it was one of the
+    // larger individual payloads being repeated this often.
+    const pollInterval = window.setInterval(load, 45000);
     return () => { window.clearInterval(pollInterval); supabase.removeChannel(channel); };
   }, [game?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 

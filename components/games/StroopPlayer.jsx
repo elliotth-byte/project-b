@@ -44,6 +44,7 @@ export default function StroopPlayer({ gameId, challenge, round, player }) {
   // always applies to this tile, and clearing it naturally advances to
   // whichever tile is now first in the remaining order.
   const currentIdx = wall.findIndex((_, i) => !cleared.has(i));
+  const currentTile = currentIdx !== -1 ? wall[currentIdx] : null;
 
   useEffect(() => {
     if (!myStartTime || done) return;
@@ -54,7 +55,7 @@ export default function StroopPlayer({ gameId, challenge, round, player }) {
   const answerColor = (colorName) => {
     if (currentIdx === -1 || done) return;
     const tile = wall[currentIdx];
-    const correct = tile.ink === colorName;
+    const correct = tile.askFor === "word" ? tile.word === colorName : tile.ink === colorName;
     setFlash({ idx: currentIdx, correct });
     window.setTimeout(() => setFlash(null), 250);
 
@@ -112,7 +113,7 @@ export default function StroopPlayer({ gameId, challenge, round, player }) {
         <Badge>{elapsedDisplay}s · {cleared.size}/{WALL_SIZE}</Badge>
       </div>
       <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 10px", fontStyle: "italic" }}>
-        Working left to right, top to bottom — tap the color each word is actually PRINTED in, not what it says. Wrong answer costs {MISTAKE_PENALTY_MS / 1000}s.
+        Working left to right, top to bottom. Every tile asks for something different — sometimes the color it's PRINTED in, sometimes the word it SAYS — read the prompt each time. Wrong answer costs {MISTAKE_PENALTY_MS / 1000}s.
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 14 }}>
@@ -139,7 +140,15 @@ export default function StroopPlayer({ gameId, challenge, round, player }) {
         })}
       </div>
 
-      <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 8px" }}>What color is the highlighted word printed in?</p>
+      {currentTile?.askFor === "word" ? (
+        <div style={{ display: "inline-block", background: "rgba(0,217,255,0.15)", border: "1px solid #00d9ff", borderRadius: 20, padding: "4px 14px", marginBottom: 8 }}>
+          <span style={{ color: "#00d9ff", fontSize: 12, fontWeight: 800 }}>🔤 What does the word SAY?</span>
+        </div>
+      ) : (
+        <div style={{ display: "inline-block", background: "rgba(255,45,149,0.15)", border: "1px solid #ff2d95", borderRadius: 20, padding: "4px 14px", marginBottom: 8 }}>
+          <span style={{ color: "#ff2d95", fontSize: 12, fontWeight: 800 }}>🎨 What color is it PRINTED in?</span>
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
         {COLORS.map((c) => (
           <button
