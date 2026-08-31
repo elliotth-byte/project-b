@@ -1,26 +1,36 @@
 import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import Link from "next/link";
 import HomeLink from "../components/HomeLink";
 import { supabase } from "../lib/supabaseClient";
-import { fetchProfile, fetchSeasonHistory, upsertProfile } from "../lib/profiles";
+import { fetchProfile, fetchSeasonHistory, upsertProfile, searchSeasons } from "../lib/profiles";
+import { searchPeopleToDm } from "../lib/profileDms";
 import { uploadProfilePhoto, removeProfilePhoto } from "../lib/profilePhotoUpload";
 
 // ─── Profile ───
 // The first page in this app that isn't scoped to any one season — no
-// gameId anywhere here. See sql/add-profiles.sql for the full design
-// reasoning. Season history is read-only by design (it's a factual
-// record of what actually happened, not something to edit); display
-// name and photo are the only two editable things, and both can also
-// be overridden by a platform admin later (see lib/adminModeration.js,
-// not built yet — this page itself doesn't need to know that override
-// exists, since it's just editing the same profiles row either way).
+// gameId anywhere here. See sql/add-profiles.sql (and v2) for the full
+// design reasoning. Doubles as both "my own profile" (default) and
+// "someone else's profile" (?userId=X in the URL) — editing controls
+// (name, photo, quote) only ever show on your own; someone else's is
+// read-only. Season history is always read-only regardless of whose
+// profile this is — it's a factual record of what actually happened,
+// not something to edit.
 export default function ProfilePage() {
+  const router = useRouter();
   const [user, setUser] = useState(undefined); // undefined = not checked yet, null = checked and not logged in
   const [profile, setProfile] = useState(null);
   const [history, setHistory] = useState(null);
   const [nameDraft, setNameDraft] = useState("");
   const [savingName, setSavingName] = useState(false);
+  const [quoteDraft, setQuoteDraft] = useState("");
+  const [savingQuote, setSavingQuote] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoError, setPhotoError] = useState("");
+  const [searchMode, setSearchMode] = useState("people"); // "people" | "seasons"
+  const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user || null));
@@ -28,11 +38,22 @@ export default function ProfilePage() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // router.query isn't populated on the very first render (Next.js
+  // fills it in async) — falls back to your own id until it resolves,
+  // which for the common case (no ?userId at all) is simply correct
+  // immediately rather than a flash of the wrong state.
+  const viewingUserId = typeof router.query.userId === "string" ? router.query.userId : user?.id;
+  const isOwnProfile = !!user && viewingUserId === user.id;
+
   useEffect(() => {
-    if (!user) return;
-    fetchProfile(user.id).then((p) => { setProfile(p); setNameDraft(p?.display_name || ""); });
-    fetchSeasonHistory(user.id).then(setHistory);
-  }, [user]);
+    if (!viewingUserId) return;
+    fetchProfile(viewingUserId).then((p) => {
+      setProfile(p);
+      setNameDraft(p?.display_name || "");
+      setQuoteDraft(p?.quote || "");
+    });
+    fetchSeasonHistory(viewingUserId).then(setHistory);
+  }, [viewingUserId]);
 
   const saveName = async () => {
     const trimmed = nameDraft.trim();
@@ -40,6 +61,13 @@ export default function ProfilePage() {
     setSavingName(true);
     const res = await upsertProfile(user.id, { display_name: trimmed });
     setSavingName(false);
+    if (res.ok) setProfile(res.profile);
+  };
+
+  const saveQuote = async () => {
+    setSavingQuote(true);
+    const res = await upsertProfile(user.id, { quote: quoteDraft.trim() || null });
+    setSavingQuote(false);
     if (res.ok) setProfile(res.profile);
   };
 
@@ -62,13 +90,80 @@ export default function ProfilePage() {
     if (res.ok) setProfile((p) => ({ ...(p || {}), photo_url: null }));
   };
 
+  const runSearch = async (e) => {
+    e.preventDefault();
+    setSearching(true);
+    const res = searchMode === "people" ? await searchPeopleToDm(query) : await searchSeasons(query);
+    setSearching(false);
+    setSearchResults(res);
+  };
+
   if (user === undefined) return <div style={pageStyle}><p>Loading...</p></div>;
   if (!user) return <div style={pageStyle}><p>You need to be logged in to view a profile. <a href="/login" style={{ color: "#ff2d95" }}>Log in</a></p></div>;
 
   return (
     <div style={pageStyle}>
       <div style={{ maxWidth: 420, width: "100%", margin: "0 auto" }}>
-        <div style={{ marginBottom: 20 }}><HomeLink /></div>
+        <div style={{ marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <HomeLink />
+          {!isOwnProfile && <Link href="/profile" style={{ color: "#a68fd6", fontSize: 12, textDecoration: "none" }}>← My Profile</Link>}
+        </div>
+
+        {isOwnProfile && (
+          <div style={cardStyle}>
+            <div style={{ fontSize: 12, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+              🔍 Find People &amp; Seasons
+            </div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+              <button
+                onClick={() => { setSearchMode("people"); setSearchResults(null); }}
+                style={{ flex: 1, padding: "6px 10px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 700, background: searchMode === "people" ? "rgba(255,45,149,0.15)" : "#0d0618", border: `1px solid ${searchMode === "people" ? "#ff2d95" : "#3d1f5c"}`, color: searchMode === "people" ? "#ff2d95" : "#a68fd6" }}
+              >
+                People
+              </button>
+              <button
+                onClick={() => { setSearchMode("seasons"); setSearchResults(null); }}
+                style={{ flex: 1, padding: "6px 10px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 700, background: searchMode === "seasons" ? "rgba(255,45,149,0.15)" : "#0d0618", border: `1px solid ${searchMode === "seasons" ? "#ff2d95" : "#3d1f5c"}`, color: searchMode === "seasons" ? "#ff2d95" : "#a68fd6" }}
+              >
+                Seasons
+              </button>
+            </div>
+            <form onSubmit={runSearch} style={{ display: "flex", gap: 8 }}>
+              <input
+                type="text" value={query} onChange={(e) => setQuery(e.target.value)}
+                placeholder={searchMode === "people" ? "Search by name..." : "Search by season name..."}
+                style={{ flex: 1, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "10px 12px", color: "#f5f0ff", fontSize: 14 }}
+              />
+              <button type="submit" disabled={searching || !query.trim()} style={{
+                padding: "10px 16px", borderRadius: 8, border: "none", cursor: "pointer",
+                background: "linear-gradient(135deg, #ff2d95, #b829ff)", color: "#05010f", fontSize: 13, fontWeight: 700,
+              }}>
+                {searching ? "..." : "Search"}
+              </button>
+            </form>
+            {searchResults !== null && (
+              <div style={{ marginTop: 10 }}>
+                {searchResults.length === 0 ? (
+                  <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic", margin: 0 }}>No matches.</p>
+                ) : (
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {searchMode === "people" ? searchResults.map((p) => (
+                      <Link key={p.userId} href={`/profile?userId=${p.userId}`} style={{ display: "flex", alignItems: "center", gap: 10, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "8px 12px", textDecoration: "none" }}>
+                        <PersonAvatar photoUrl={p.photoUrl} />
+                        <span style={{ color: "#f5f0ff", fontSize: 13, fontWeight: 600 }}>{p.profileDisplayName || p.matchedName}</span>
+                      </Link>
+                    )) : searchResults.map((s) => (
+                      <Link key={s.gameId} href={`/season?gameId=${s.gameId}`} style={{ display: "block", background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "8px 12px", textDecoration: "none" }}>
+                        <span style={{ color: "#f5f0ff", fontSize: 13, fontWeight: 600 }}>{s.seasonName}</span>
+                        <span style={{ color: "#6b4f99", fontSize: 11, marginLeft: 8 }}>{s.playerCount} player{s.playerCount === 1 ? "" : "s"}</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <div style={cardStyle}>
           <div style={{ textAlign: "center", marginBottom: 16 }}>
@@ -78,53 +173,82 @@ export default function ProfilePage() {
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
               {profile?.photo_url
-                ? <img src={profile.photo_url} alt="Your profile photo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ? <img src={profile.photo_url} alt={`${profile?.display_name || "Profile"} photo`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 : <span style={{ fontSize: 32, color: "#3d1f5c" }}>👤</span>}
             </div>
-            {/* The actual saved value, separate from the editable input
-                below — makes a Save visibly take effect right here,
-                rather than the input just continuing to show whatever
-                was last typed whether or not it was ever saved. */}
-            <h2 style={{ fontSize: 18, color: "#f5f0ff", margin: "0 0 12px", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
+            <h2 style={{ fontSize: 18, color: "#f5f0ff", margin: "0 0 6px", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
               {profile?.display_name || "No display name set"}
             </h2>
-            <label style={{
-              display: "inline-block", padding: "6px 14px", borderRadius: 8, border: "1px solid #3d1f5c",
-              color: "#a68fd6", fontSize: 12, cursor: uploadingPhoto ? "default" : "pointer",
-            }}>
-              {uploadingPhoto ? "..." : (profile?.photo_url ? "Change photo" : "Upload a photo")}
-              <input type="file" accept="image/*" onChange={handlePhotoChange} disabled={uploadingPhoto} style={{ display: "none" }} />
-            </label>
-            {profile?.photo_url && !uploadingPhoto && (
-              <button onClick={clearPhoto} style={{ background: "none", border: "none", color: "#ff3860", fontSize: 12, marginLeft: 10, cursor: "pointer" }}>
-                Remove
-              </button>
+            {profile?.quote && (
+              <p style={{ fontSize: 13, color: "#a68fd6", fontStyle: "italic", margin: "0 0 12px" }}>
+                "{profile.quote}"
+              </p>
             )}
-            {photoError && <p style={{ color: "#ff3860", fontSize: 12, marginTop: 8 }}>{photoError}</p>}
+            {isOwnProfile && (
+              <>
+                <label style={{
+                  display: "inline-block", padding: "6px 14px", borderRadius: 8, border: "1px solid #3d1f5c",
+                  color: "#a68fd6", fontSize: 12, cursor: uploadingPhoto ? "default" : "pointer",
+                }}>
+                  {uploadingPhoto ? "..." : (profile?.photo_url ? "Change photo" : "Upload a photo")}
+                  <input type="file" accept="image/*" onChange={handlePhotoChange} disabled={uploadingPhoto} style={{ display: "none" }} />
+                </label>
+                {profile?.photo_url && !uploadingPhoto && (
+                  <button onClick={clearPhoto} style={{ background: "none", border: "none", color: "#ff3860", fontSize: 12, marginLeft: 10, cursor: "pointer" }}>
+                    Remove
+                  </button>
+                )}
+                {photoError && <p style={{ color: "#ff3860", fontSize: 12, marginTop: 8 }}>{photoError}</p>}
+              </>
+            )}
           </div>
 
-          <label style={{ display: "block", fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
-            Display Name
-          </label>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input
-              type="text" value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} maxLength={40}
-              placeholder="How you want to be known across seasons"
-              style={{ flex: 1, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "10px 12px", color: "#f5f0ff", fontSize: 14 }}
-            />
-            <button
-              onClick={saveName} disabled={savingName || !nameDraft.trim() || nameDraft.trim() === profile?.display_name}
-              style={{
-                padding: "10px 16px", borderRadius: 8, border: "none", cursor: "pointer",
-                background: "linear-gradient(135deg, #ff2d95, #b829ff)", color: "#05010f", fontSize: 13, fontWeight: 700,
-              }}
-            >
-              {savingName ? "..." : "Save"}
-            </button>
-          </div>
-          <p style={{ fontSize: 11, color: "#6b4f99", marginTop: 8, marginBottom: 0, fontStyle: "italic" }}>
-            This is separate from whatever alias a specific season gives you — it's how people find and recognize you across every season you've played.
-          </p>
+          {isOwnProfile && (
+            <>
+              <label style={{ display: "block", fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+                Display Name
+              </label>
+              <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                <input
+                  type="text" value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} maxLength={40}
+                  placeholder="How you want to be known across seasons"
+                  style={{ flex: 1, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "10px 12px", color: "#f5f0ff", fontSize: 14 }}
+                />
+                <button
+                  onClick={saveName} disabled={savingName || !nameDraft.trim() || nameDraft.trim() === profile?.display_name}
+                  style={{
+                    padding: "10px 16px", borderRadius: 8, border: "none", cursor: "pointer",
+                    background: "linear-gradient(135deg, #ff2d95, #b829ff)", color: "#05010f", fontSize: 13, fontWeight: 700,
+                  }}
+                >
+                  {savingName ? "..." : "Save"}
+                </button>
+              </div>
+
+              <label style={{ display: "block", fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+                Quote
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  type="text" value={quoteDraft} onChange={(e) => setQuoteDraft(e.target.value)} maxLength={140}
+                  placeholder="A line under your photo — a catchphrase, a motto, whatever you want"
+                  style={{ flex: 1, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "10px 12px", color: "#f5f0ff", fontSize: 14 }}
+                />
+                <button
+                  onClick={saveQuote} disabled={savingQuote || quoteDraft.trim() === (profile?.quote || "")}
+                  style={{
+                    padding: "10px 16px", borderRadius: 8, border: "none", cursor: "pointer",
+                    background: "linear-gradient(135deg, #ff2d95, #b829ff)", color: "#05010f", fontSize: 13, fontWeight: 700,
+                  }}
+                >
+                  {savingQuote ? "..." : "Save"}
+                </button>
+              </div>
+              <p style={{ fontSize: 11, color: "#6b4f99", marginTop: 8, marginBottom: 0, fontStyle: "italic" }}>
+                This is separate from whatever alias a specific season gives you — it's how people find and recognize you across every season you've played.
+              </p>
+            </>
+          )}
         </div>
 
         <div style={cardStyle}>
@@ -134,24 +258,36 @@ export default function ProfilePage() {
           {history === null ? (
             <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic" }}>Loading...</p>
           ) : history.length === 0 ? (
-            <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic" }}>No completed seasons yet.</p>
+            <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic" }}>No seasons yet.</p>
           ) : (
             <div style={{ display: "grid", gap: 10 }}>
               {history.map((s) => (
-                <div key={s.gameId} style={{ background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "10px 12px" }}>
+                <Link key={s.gameId} href={`/season?gameId=${s.gameId}`} style={{ display: "block", background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "10px 12px", textDecoration: "none" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
                     <span style={{ fontSize: 14, fontWeight: 700, color: "#f5f0ff" }}>{s.seasonName}</span>
                     {s.seasonDate && <span style={{ fontSize: 11, color: "#6b4f99" }}>{new Date(s.seasonDate).toLocaleDateString()}</span>}
                   </div>
                   <div style={{ fontSize: 13, color: "#a68fd6" }}>
-                    {s.character ? `Played as ${s.character}` : "Played"} — <span style={{ color: "#ff2d95", fontWeight: 600 }}>{s.placement}</span>
+                    {s.isHost ? (
+                      <span style={{ color: "#ff2d95", fontWeight: 600 }}>{s.placement}</span>
+                    ) : (
+                      <>{s.character ? `Played as ${s.character}` : "Played"} — <span style={{ color: "#ff2d95", fontWeight: 600 }}>{s.placement}</span></>
+                    )}
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function PersonAvatar({ photoUrl }) {
+  return (
+    <div style={{ width: 32, height: 32, borderRadius: "50%", overflow: "hidden", flexShrink: 0, background: "#0d0618", border: "1px solid #3d1f5c", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      {photoUrl ? <img src={photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 14, color: "#3d1f5c" }}>👤</span>}
     </div>
   );
 }

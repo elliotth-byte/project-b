@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card } from "./ui";
 import { storageGet, storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_FINALE } from "../lib/gameState";
-import { subscribeFinaleQa } from "../lib/finaleQaData";
+import { subscribeFinaleQa, isJuryEligible } from "../lib/finaleQaData";
 import MemoryWall from "./MemoryWall";
 import { aphroditeBlocksTargeting, powerFor } from "../lib/characterPowers";
 import FinaleQaPanel from "./FinaleQaPanel";
@@ -54,6 +54,7 @@ export default function FinalePlayer({ gameId, player, round, players, readOnly 
 
   const isFinalist = finale.finalists.some((f) => f.playerId === player?.id);
   const votingOpen = finale.votingOpen;
+  const myFullPlayerData = (players || []).find((p) => p.id === player?.id); // players carries alive/elimination_type; the simplified player prop passed into this component does not
 
   // finale.finalists[].name is baked in at the moment the Finale starts
   // (always the real name, never alias-aware — see
@@ -85,6 +86,26 @@ export default function FinalePlayer({ gameId, player, round, players, readOnly 
         <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>
           Voting is open right now — write your statement below and answer the jury's questions as they come in while it runs.
         </p>
+        {chaosBanner}
+      </Card>
+    );
+  } else if (myFullPlayerData && !isJuryEligible(myFullPlayerData)) {
+    // Quit or removed-for-inactivity players were never actually
+    // blocked from casting a real finale vote before this fix — this is
+    // the one place that stopped them, alongside a matching filter at
+    // tally time (see lib/roundEngine.js's advanceFromFinale) that
+    // protects any vote already recorded before this shipped. A
+    // finalist is always jury-ineligible too by this same check (they're
+    // still alive), which is exactly why this branch sits AFTER the
+    // isFinalist one above — that branch already handles them correctly
+    // and takes priority. Guarded on the lookup actually succeeding
+    // first — if players hasn't loaded yet and the lookup comes back
+    // empty, this fails safe by skipping the check entirely rather than
+    // blocking a legitimate voter over a transient data gap; the
+    // server-side filter at tally time is the real backstop either way.
+    voteSection = (
+      <Card style={{ marginBottom: 20, textAlign: "center" }}>
+        <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: 0 }}>You're not part of the jury for this finale.</p>
         {chaosBanner}
       </Card>
     );

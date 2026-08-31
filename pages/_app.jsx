@@ -31,8 +31,23 @@ export default function App({ Component, pageProps }) {
              the voting history table in VotingHistorySpreadsheet.jsx)
              keeps scrolling exactly as it does today; CSS overflow is
              scoped per-element, not inherited in a way that would
-             override a child's own setting. */
+             override a child's own setting.
+             overflow-x: hidden alone isn't the full story on iOS
+             Safari specifically, though: if anything on the page is
+             ever actually wider than the viewport at any moment (even
+             briefly, or inside a flex row that didn't shrink the way
+             it should have), iOS can still let the viewport itself get
+             dragged/rubber-banded sideways past its edge — and once
+             that happens, overflow-x: hidden then blocks the normal
+             gesture that would scroll it back, leaving the page stuck
+             showing a horizontally-shifted view with content clipped
+             on both sides. overscroll-behavior-x below is the other
+             half of this fix: it stops that sideways rubber-band from
+             happening in the first place, rather than only cleaning up
+             after it.
+          */
           overflow-x: hidden;
+          overscroll-behavior-x: none;
           max-width: 100vw;
         }
         ::selection { background: #ff2d95; color: #05010f; }

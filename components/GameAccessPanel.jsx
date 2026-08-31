@@ -197,7 +197,7 @@ export default function GameAccessPanel({
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
               <code style={{
-                flex: 1, color: "#f5f0ff", fontSize: 13, wordBreak: "break-all",
+                flex: 1, minWidth: 0, color: "#f5f0ff", fontSize: 13, wordBreak: "break-all",
                 background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8,
                 padding: "10px 12px", display: "flex", alignItems: "center",
               }}>

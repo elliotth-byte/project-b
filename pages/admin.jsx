@@ -277,13 +277,17 @@ export default function AdminPage() {
                   {history === null ? (
                     <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>Loading...</p>
                   ) : history.length === 0 ? (
-                    <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No completed seasons.</p>
+                    <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No seasons yet.</p>
                   ) : (
                     <div style={{ display: "grid", gap: 6 }}>
                       {history.map((s) => (
                         <div key={s.gameId} style={{ background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "8px 10px", fontSize: 12 }}>
                           <span style={{ color: "#f5f0ff", fontWeight: 700 }}>{s.seasonName}</span>
-                          <span style={{ color: "#a68fd6" }}> — {s.character ? `played as ${s.character}` : "played"} — </span>
+                          {s.isHost ? (
+                            <span style={{ color: "#a68fd6" }}> — </span>
+                          ) : (
+                            <span style={{ color: "#a68fd6" }}> — {s.character ? `played as ${s.character}` : "played"} — </span>
+                          )}
                           <span style={{ color: "#ff2d95", fontWeight: 600 }}>{s.placement}</span>
                         </div>
                       ))}
