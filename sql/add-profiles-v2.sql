@@ -19,6 +19,12 @@
 
 alter table profiles add column if not exists quote text;
 
+-- create or replace can't change a function's return columns (only
+-- create or replace is normally needed for a body-only change) — this
+-- one adds is_host on top of the original 9 columns, so Postgres
+-- requires the old version dropped first rather than replaced in place.
+drop function if exists public.public_season_history(uuid);
+
 create or replace function public.public_season_history(p_user_id uuid)
 returns table (
   game_id uuid,

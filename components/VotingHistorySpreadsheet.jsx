@@ -76,7 +76,7 @@ export default function VotingHistorySpreadsheet({ exileHistory, finaleState, pl
       </div>
       <div style={{ fontSize: 10, color: "#6b4f99", marginBottom: 10 }}><s style={{ textDecorationColor: "#ff3860" }}>Struck-through</s> votes were nullified by the Power of Khaos.</div>
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+        <table style={{ width: "max-content", minWidth: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <thead>
             <tr style={headerRowStyle}>
               <th style={{ textAlign: "left", padding: "6px 10px", color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, whiteSpace: "nowrap", position: "sticky", left: 0, background: "#1a0a2e" }}>
