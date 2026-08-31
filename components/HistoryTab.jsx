@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { Card } from "./ui";
 import { subscribeGameState } from "../lib/gameStorage";
-import { KEY_CHALLENGE_HISTORY, KEY_EXILE_HISTORY, KEY_REENTRY, KEY_FINALE, KEY_FATES, KEY_EXILE } from "../lib/gameState";
+import { KEY_CHALLENGE_HISTORY, KEY_EXILE_HISTORY, KEY_REENTRY, KEY_FINALE, KEY_FATES, KEY_EXILE, PHASES } from "../lib/gameState";
 import VotingHistorySpreadsheet from "./VotingHistorySpreadsheet";
 import AnnouncementsFeed from "./AnnouncementsFeed";
-import { LiveNominationsRecap, ChallengeResultsCard, RoundCeremonyCard, FinaleCard } from "./CeremonyCards";
+import { LiveNominationsRecap, ChallengeResultsCard, RoundCeremonyCard, FinaleCard, IdentityRevealCard } from "./CeremonyCards";
+import { subscribeFinaleQa } from "../lib/finaleQaData";
 import { buildVotingRows } from "../lib/votingSpreadsheet";
 
 // ─── Host: History tab ───
@@ -16,11 +17,12 @@ import { buildVotingRows } from "../lib/votingSpreadsheet";
 // tab already did — nothing here shows a live vote tally before it's
 // actually revealed; the host already has that live view on the Current
 // Round tab, so this stays a clean recap rather than a duplicate.
-export default function HistoryTab({ gameId, players, gameName, round }) {
+export default function HistoryTab({ gameId, players, gameName, round, settings }) {
   const [challengeHistory, setChallengeHistory] = useState([]);
   const [exileHistory, setExileHistory] = useState([]);
   const [reentry, setReentry] = useState([]);
   const [finale, setFinale] = useState(null);
+  const [finaleQa, setFinaleQa] = useState({ statements: {}, questions: [] });
   const [liveFates, setLiveFates] = useState(null);
   const [liveExile, setLiveExile] = useState(null);
   const [showComments, setShowComments] = useState(false);
@@ -41,6 +43,10 @@ export default function HistoryTab({ gameId, players, gameName, round }) {
   }, [gameId]);
   useEffect(() => {
     const unsubscribe = subscribeGameState(gameId, KEY_FINALE, setFinale);
+    return unsubscribe;
+  }, [gameId]);
+  useEffect(() => {
+    const unsubscribe = subscribeFinaleQa(gameId, setFinaleQa);
     return unsubscribe;
   }, [gameId]);
   // Live (not-yet-history) nomination state — nominations aren't secret,
@@ -159,7 +165,10 @@ export default function HistoryTab({ gameId, players, gameName, round }) {
       )}
 
       {currentPage?.type === "finale" && (
-        <FinaleCard finale={finale} rows={finaleRows} byId={byId} showComments={showComments} />
+        <>
+          {round?.phase === PHASES.ENDED && settings?.aliasEnabled && <IdentityRevealCard players={players} />}
+          <FinaleCard finale={finale} rows={finaleRows} byId={byId} showComments={showComments} qa={finaleQa} />
+        </>
       )}
 
       {currentPage?.type === "inProgress" && (

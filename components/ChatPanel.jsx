@@ -614,12 +614,23 @@ export default function ChatPanel({ gameId, player, players, realName, isExiled,
   const markGroupReadNow = () => markGroupChatRead(gameId, player.id);
   const markThreadReadNow = (threadId) => markThreadRead(threadId, player.id);
 
+  // Once the season is actually over, EVERYONE gets access to the main
+  // Panopticon chat back — voted off, quit, or removed, it doesn't
+  // matter. There's no more game to protect the deliberation of at that
+  // point, so the original reason Group disappeared for an exiled
+  // player (see the tabs comment above) no longer applies. Purely
+  // additive: this never takes anything away from anyone who already
+  // had Exile-room or DM access — it only ever adds the Panopticon tab
+  // back for whoever lost it.
+  const gameEnded = round?.phase === PHASES.ENDED;
+
   // Once exiled, the main Group chat disappears entirely — not just a
   // new Exile tab added alongside it. "They should only see the exiled
   // chat / be able to DM players out of the game" means Group is gone,
-  // not just de-emphasized.
+  // not just de-emphasized. That only holds DURING the season, though —
+  // see gameEnded above for why it's reinstated once the season ends.
   const tabs = [
-    ...(isExiled ? [] : [{ key: "group", label: "💬 Panopticon", unread: groupUnread }]),
+    ...(isExiled && !gameEnded ? [] : [{ key: "group", label: "💬 Panopticon", unread: groupUnread }]),
     ...(isExiled ? [{ key: "exile", label: "🔥 Exile" }] : []),
     { key: "messages", label: "✉️ Messages", unread: anyThreadUnread },
   ];
@@ -641,7 +652,7 @@ export default function ChatPanel({ gameId, player, players, realName, isExiled,
       </div>
 
       <Card>
-        {mode === "group" && !isExiled && <GroupChatView gameId={gameId} player={player} players={players} realName={realName} onRead={markGroupReadNow} readOnly={readOnly} round={round} settings={settings} />}
+        {mode === "group" && (!isExiled || gameEnded) && <GroupChatView gameId={gameId} player={player} players={players} realName={realName} onRead={markGroupReadNow} readOnly={readOnly} round={round} settings={settings} />}
         {mode === "exile" && isExiled && <ExileRoomView gameId={gameId} player={player} players={players} byId={byId} onRead={markThreadReadNow} readOnly={readOnly} />}
         {mode === "messages" && (
           <MessagesView

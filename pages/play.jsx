@@ -635,7 +635,7 @@ export default function PlayPage() {
 
             {tab === "ceremony" && (
               <ChallengeErrorBoundary label="Ceremony">
-                <CeremonyPlayer gameId={gameId} players={identityAllPlayers} round={round} />
+                <CeremonyPlayer gameId={gameId} players={identityAllPlayers} round={round} settings={settings} />
               </ChallengeErrorBoundary>
             )}
 

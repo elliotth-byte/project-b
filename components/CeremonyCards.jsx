@@ -171,8 +171,46 @@ export function RoundCeremonyCard({ entry: e, challenge, rows, byId, showComment
   );
 }
 
-export function FinaleCard({ finale, rows, byId, showComments }) {
+// ─── Identity Reveal ───
+// The "who was actually who" moment every alias season builds toward —
+// shown once the season is truly over (see gameEnded gating at the
+// call sites in CeremonyPlayer.jsx/HistoryTab.jsx), covering the WHOLE
+// cast rather than just the three finalists FinaleCard itself is scoped
+// to. Uses real_display_name specifically, not display_name — the two
+// resolution functions that build the players list passed in here
+// (resolveIdentities for players, resolveIdentitiesForHost for the
+// host) format display_name completely differently from each other
+// (a bare alias mid-season vs. a host-only "Real (Alias)" combined
+// string), but both set real_display_name the exact same way
+// regardless of which one ran upstream — that consistency is what
+// makes this safe to reuse from both call sites without needing to
+// know which one produced the list. Filters to players who actually
+// have an alias on record — someone who joined after alias mode was
+// turned on, or never finished onboarding, has nothing to reveal.
+export function IdentityRevealCard({ players }) {
+  const revealed = (players || []).filter((p) => p.approved && p.alias);
+  if (revealed.length === 0) return null;
+  return (
+    <Card>
+      <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+        🎭 Who Was Who
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 8 }}>
+        {revealed.map((p) => (
+          <div key={p.id} style={{ background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "8px 10px" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#ff2d95" }}>{p.alias}</div>
+            <div style={{ fontSize: 11, color: "#a68fd6" }}>{p.real_display_name}</div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+export function FinaleCard({ finale, rows, byId, showComments, qa }) {
   const winnerName = finale.winnerId ? byId[finale.winnerId] : null;
+  const statementEntries = Object.entries(qa?.statements || {});
+  const questions = qa?.questions || [];
   return (
     <Card style={{ borderColor: "rgba(255,45,149,0.5)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
@@ -193,6 +231,67 @@ export function FinaleCard({ finale, rows, byId, showComments }) {
           )}
         </div>
       )}
+
+      {/* Final Statements and Jury Q&A bubble — not secret (visible to
+          everyone live during the Finale itself), so this shows
+          regardless of finale.revealed, matching how a regular round's
+          Battle/Fates results already show before that round's Exile
+          Vote tally is revealed. This is what "a ceremony like all
+          rounds" was actually missing here — the vote tally alone told
+          you WHO won, but none of the pitch or questioning that led up
+          to it, unlike every regular round's ceremony which preserves
+          the full nomination reasoning. Names resolved via byId rather
+          than any name stored on the statement/question itself
+          (finale.finalists[].name, q.jurorName) — those are frozen at
+          whenever they were first written, which would never correctly
+          reveal real names once the game actually ends; byId reacts to
+          that the same way the rest of this card already does. */}
+      {(statementEntries.length > 0 || questions.length > 0) && (
+        <Card style={{ marginBottom: 10 }}>
+          {statementEntries.length > 0 && (
+            <div style={{ marginBottom: questions.length > 0 ? 14 : 0 }}>
+              <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+                🎤 Final Statements
+              </div>
+              <div style={{ display: "grid", gap: 8 }}>
+                {statementEntries.map(([finalistId, s]) => (
+                  <div key={finalistId}>
+                    <p style={{ fontSize: 12, color: "#f5f0ff", fontWeight: 700, margin: "0 0 2px" }}>{byId[finalistId] || "?"}</p>
+                    <p style={{ fontSize: 12, color: "#a68fd6", margin: 0, whiteSpace: "pre-wrap" }}>{s.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {questions.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+                ❓ Jury Questions
+              </div>
+              <div style={{ display: "grid", gap: 12 }}>
+                {questions.map((q) => (
+                  <div key={q.id}>
+                    <p style={{ fontSize: 12, color: "#ff3860", fontWeight: 700, margin: "0 0 2px" }}>{byId[q.jurorId] || q.jurorName} asks:</p>
+                    <p style={{ fontSize: 12, color: "#f5f0ff", margin: "0 0 6px", whiteSpace: "pre-wrap" }}>{q.text}</p>
+                    <div style={{ display: "grid", gap: 4, paddingLeft: 10, borderLeft: "2px solid #3d1f5c" }}>
+                      {(finale.finalists || []).map((f) => {
+                        const r = q.responses?.[f.playerId];
+                        if (!r) return null;
+                        return (
+                          <p key={f.playerId} style={{ fontSize: 11, color: "#a68fd6", margin: 0 }}>
+                            <strong style={{ color: "#f5f0ff" }}>{byId[f.playerId] || f.name}:</strong> {r.text}
+                          </p>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
+
       {finale.revealed ? (
         <>
           <VoteRowsList rows={rows} showComments={showComments} />

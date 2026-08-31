@@ -287,7 +287,7 @@ export default function PlayerViewer({ gameId, targetPlayer, allPlayers, round, 
 
           {tab === "ceremony" && (
             <ChallengeErrorBoundary label="Ceremony">
-              <CeremonyPlayer gameId={gameId} players={allPlayers} round={round} />
+              <CeremonyPlayer gameId={gameId} players={allPlayers} round={round} settings={settings} />
             </ChallengeErrorBoundary>
           )}
 
@@ -299,7 +299,7 @@ export default function PlayerViewer({ gameId, targetPlayer, allPlayers, round, 
 
           {tab === "chat" && settings?.chatEnabled && !chatBlockedByChallenge && (
             <ChallengeErrorBoundary label="Chat">
-              <ChatPanel gameId={gameId} player={player} players={allPlayers} realName={targetPlayer.display_name} isExiled={exiled} readOnly />
+              <ChatPanel gameId={gameId} player={player} players={allPlayers} realName={targetPlayer.display_name} isExiled={exiled} round={round} settings={settings} readOnly />
             </ChallengeErrorBoundary>
           )}
 

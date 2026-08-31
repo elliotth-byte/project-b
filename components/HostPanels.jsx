@@ -206,7 +206,7 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
 
       {tab === "history" && (
         <ChallengeErrorBoundary label="History">
-          <HistoryTab gameId={gameId} players={hostApprovedRoster} gameName={gameName} round={round} />
+          <HistoryTab gameId={gameId} players={hostApprovedRoster} gameName={gameName} round={round} settings={settings} />
         </ChallengeErrorBoundary>
       )}
 

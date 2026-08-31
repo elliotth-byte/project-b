@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { Card } from "./ui";
 import { subscribeGameState } from "../lib/gameStorage";
-import { KEY_EXILE_HISTORY, KEY_FINALE, KEY_CHALLENGE_HISTORY, KEY_EXILE, KEY_FATES } from "../lib/gameState";
+import { KEY_EXILE_HISTORY, KEY_FINALE, KEY_CHALLENGE_HISTORY, KEY_EXILE, KEY_FATES, PHASES } from "../lib/gameState";
 import { buildVotingRows } from "../lib/votingSpreadsheet";
 import AnnouncementsFeed from "./AnnouncementsFeed";
 import VotingHistorySpreadsheet from "./VotingHistorySpreadsheet";
-import { LiveNominationsRecap, ChallengeResultsCard, RoundCeremonyCard, FinaleCard } from "./CeremonyCards";
+import { LiveNominationsRecap, ChallengeResultsCard, RoundCeremonyCard, FinaleCard, IdentityRevealCard } from "./CeremonyCards";
+import { subscribeFinaleQa } from "../lib/finaleQaData";
 
 // ─── Player-facing Ceremony tab ───
 // Unlike FatesPlayer/ExileVotePlayer/FinalePlayer (which only render while
@@ -25,10 +26,11 @@ import { LiveNominationsRecap, ChallengeResultsCard, RoundCeremonyCard, FinaleCa
 // shared with the host's HistoryTab.jsx so the two views can't drift
 // apart — this file is just the subscriptions + the page-by-page
 // navigation around them.
-export default function CeremonyPlayer({ gameId, players, round }) {
+export default function CeremonyPlayer({ gameId, players, round, settings }) {
   const [exileHistory, setExileHistory] = useState([]);
   const [challengeHistory, setChallengeHistory] = useState([]);
   const [finale, setFinale] = useState(null);
+  const [finaleQa, setFinaleQa] = useState({ statements: {}, questions: [] });
   const [liveExile, setLiveExile] = useState(null);
   const [liveFates, setLiveFates] = useState(null);
   const [showComments, setShowComments] = useState(false);
@@ -47,6 +49,16 @@ export default function CeremonyPlayer({ gameId, players, round }) {
 
   useEffect(() => {
     const unsubscribe = subscribeGameState(gameId, KEY_FINALE, setFinale);
+    return unsubscribe;
+  }, [gameId]);
+
+  // Not secret at any point during the Finale — same reasoning as
+  // KEY_EXILE/KEY_FATES below, subscribed unconditionally rather than
+  // scoped to round.phase === "finale" the way those two are, since
+  // this needs to keep showing on the Ceremony tab after the game has
+  // fully ended too, not just while the Finale is the active phase.
+  useEffect(() => {
+    const unsubscribe = subscribeFinaleQa(gameId, setFinaleQa);
     return unsubscribe;
   }, [gameId]);
 
@@ -181,7 +193,10 @@ export default function CeremonyPlayer({ gameId, players, round }) {
       )}
 
       {currentPage?.type === "finale" && (
-        <FinaleCard finale={finale} rows={finaleRows} byId={byId} showComments={showComments} />
+        <>
+          {round?.phase === PHASES.ENDED && settings?.aliasEnabled && <IdentityRevealCard players={players} />}
+          <FinaleCard finale={finale} rows={finaleRows} byId={byId} showComments={showComments} qa={finaleQa} />
+        </>
       )}
 
       {currentPage?.type === "inProgress" && (
