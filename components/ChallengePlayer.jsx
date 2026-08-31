@@ -32,6 +32,7 @@ import SnakePlayer from "./games/SnakePlayer";
 import MinesweeperPlayer from "./games/MinesweeperPlayer";
 import StroopPlayer from "./games/StroopPlayer";
 import RedLightGreenLightPlayer from "./games/RedLightGreenLightPlayer";
+import SandsOfTimePlayer from "./games/SandsOfTimePlayer";
 import SlidingPuzzlePlayer from "./games/SlidingPuzzlePlayer";
 import TorchedPlayer from "./games/TorchedPlayer";
 import ChainsPlayer from "./games/ChainsPlayer";
@@ -70,6 +71,7 @@ export const GAME_COMPONENTS = {
   minesweeper: MinesweeperPlayer,
   stroop: StroopPlayer,
   redlightgreenlight: RedLightGreenLightPlayer,
+  sandsoftime: SandsOfTimePlayer,
   slidingpuzzle: SlidingPuzzlePlayer,
   torched: TorchedPlayer,
   chains: ChainsPlayer,

@@ -5,6 +5,7 @@ import { useCountdown } from "./useCountdown";
 import { useSwipeControls } from "../../lib/games/useSwipeControls";
 import { reportScore } from "../../lib/challengeScores";
 import DPad from "./DPad";
+import SwipeControlsCallout from "./SwipeControlsCallout";
 
 const COLS = 16, ROWS = 16, CELL = 18;
 const W = COLS * CELL, H = ROWS * CELL;
@@ -25,6 +26,7 @@ export default function SnakePlayer({ gameId, round, challenge, player }) {
   const stateRef = useRef(null);
   const [phase, setPhase] = useState("ready"); // "ready" | "playing" | "over"
   const [score, setScore] = useState(0);
+  const [swipeOverride, setSwipeOverride] = useState(false); // true once turned on via the in-game callout this session, before player.gamePrefs itself has caught up
   const reportedRef = useRef(false);
   const dirRef = useRef({ x: 1, y: 0 });
   const pendingDirRef = useRef({ x: 1, y: 0 }); // buffered next direction, applied once per tick so a fast double-tap can't reverse into itself mid-frame
@@ -60,7 +62,7 @@ export default function SnakePlayer({ gameId, round, challenge, player }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [setDirection]);
 
-  const swipeEnabled = !!player?.gamePrefs?.swipeControls;
+  const swipeEnabled = !!player?.gamePrefs?.swipeControls || swipeOverride;
   const swipeHandlers = useSwipeControls((dir) => {
     if (dir === "up") setDirection(0, -1);
     else if (dir === "down") setDirection(0, 1);
@@ -131,6 +133,7 @@ export default function SnakePlayer({ gameId, round, challenge, player }) {
       <Card style={{ marginBottom: 20, textAlign: "center" }}>
         <h3 style={{ color: "#ff2d95", margin: "0 0 8px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🐍 Snake</h3>
         <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 14px" }}>Eat the food, don't hit the walls or yourself. Speeds up as you grow.</p>
+        {!swipeEnabled && <SwipeControlsCallout player={player} onEnabled={() => setSwipeOverride(true)} />}
         <button onClick={startGame} style={{
           padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 700,
           background: "linear-gradient(135deg, #ff2d95, #b829ff)", border: "none", color: "#05010f",

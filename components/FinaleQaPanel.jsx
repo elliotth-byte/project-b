@@ -101,9 +101,20 @@ export default function FinaleQaPanel({ gameId, finale, qa, players, player, rea
         <div style={{ display: "grid", gap: 10 }}>
           {finale.finalists.map((f) => {
             const s = qa.statements[f.playerId];
+            // Not f.name directly — that's whatever name got baked into
+            // finale.finalists the instant the Finale started (always the
+            // real name, never alias-aware — see lib/roundEngine.js),
+            // which is exactly what was showing real identities during
+            // an active alias season before this fix. (players || []) is
+            // already resolved through resolveIdentities (see
+            // pages/play.jsx's identityAllPlayers) — display_name there
+            // is already the correct alias-or-real name for right now,
+            // reacting correctly once the game actually ends too,
+            // instead of a name frozen from the moment the Finale began.
+            const displayName = (players || []).find((p) => p.id === f.playerId)?.display_name || f.name;
             return (
               <div key={f.playerId} style={{ background: "#0d0618", borderRadius: 8, padding: "10px 12px" }}>
-                <div style={{ color: "#ff2d95", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{f.name}</div>
+                <div style={{ color: "#ff2d95", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{displayName}</div>
                 {s ? (
                   <p style={{ color: "#f5f0ff", fontSize: 13, margin: 0, whiteSpace: "pre-wrap" }}>{s.text}</p>
                 ) : (
@@ -131,9 +142,10 @@ export default function FinaleQaPanel({ gameId, finale, qa, players, player, rea
                   {finale.finalists.map((f) => {
                     const r = q.responses[f.playerId];
                     const isMe = isFinalist && player.id === f.playerId;
+                    const displayName = (players || []).find((p) => p.id === f.playerId)?.display_name || f.name;
                     return (
                       <div key={f.playerId}>
-                        <div style={{ color: "#a68fd6", fontSize: 11, fontWeight: 700, marginBottom: 2 }}>{f.name}</div>
+                        <div style={{ color: "#a68fd6", fontSize: 11, fontWeight: 700, marginBottom: 2 }}>{displayName}</div>
                         {r ? (
                           <p style={{ color: "#f5f0ff", fontSize: 12, margin: 0, whiteSpace: "pre-wrap" }}>{r.text}</p>
                         ) : isMe && submissionsOpen ? (

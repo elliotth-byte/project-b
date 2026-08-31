@@ -4,6 +4,8 @@ import { supabase } from "../lib/supabaseClient";
 import { checkIsPlatformAdmin, searchPeople, fetchOpenReports, markReportReviewed } from "../lib/adminModeration";
 import { upsertProfile, fetchSeasonHistory } from "../lib/profiles";
 import { removeProfilePhoto, uploadProfilePhoto } from "../lib/profilePhotoUpload";
+import { fetchGloballyDisabledChallenges, setGloballyDisabledChallenges } from "../lib/platformSettings";
+import { GAME_REGISTRY } from "../lib/challengeGames";
 
 // ─── Platform Admin ───
 // A genuinely new privilege tier, separate from any individual
@@ -29,6 +31,8 @@ export default function AdminPage() {
   const [history, setHistory] = useState(null); // season history for whichever person is currently open, null = not loaded yet
   const [reports, setReports] = useState(null);
   const [reviewingBusy, setReviewingBusy] = useState(null); // reportId currently being marked reviewed, or null
+  const [globallyDisabled, setGloballyDisabledState] = useState(null); // null = not loaded yet
+  const [savingChallengePool, setSavingChallengePool] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user || null));
@@ -47,7 +51,18 @@ export default function AdminPage() {
   useEffect(() => {
     if (isAdmin !== true) return;
     fetchOpenReports().then(setReports);
+    fetchGloballyDisabledChallenges().then(setGloballyDisabledState);
   }, [isAdmin]);
+
+  const toggleGlobalChallenge = async (key, enabled) => {
+    const current = globallyDisabled || [];
+    const next = enabled ? current.filter((k) => k !== key) : [...current, key];
+    setGloballyDisabledState(next); // optimistic -- reverted below if the write actually fails
+    setSavingChallengePool(true);
+    const res = await setGloballyDisabledChallenges(next);
+    setSavingChallengePool(false);
+    if (!res.ok) setGloballyDisabledState(current); // the write failed (most likely: not actually a platform admin per the DB's own check) -- don't leave the UI showing a change that didn't really save
+  };
 
   const reviewReport = async (reportId) => {
     setReviewingBusy(reportId);
@@ -152,6 +167,35 @@ export default function AdminPage() {
                   </button>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ ...cardStyle, marginBottom: 20 }}>
+          <div style={{ fontSize: 12, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+            🎲 Global Challenge Pool
+          </div>
+          <p style={{ fontSize: 11, color: "#6b4f99", margin: "0 0 12px", fontStyle: "italic" }}>
+            Turning a game off here removes it everywhere, for every season — random selection, Hephaestus's draw, and every host's
+            own manual picker. Meant for pulling a game that's turned out broken, before every individual host thinks to disable it
+            themselves. Each season can also turn off games just for itself, separately, from its own Setup tab.
+          </p>
+          {globallyDisabled === null ? (
+            <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>Loading...</p>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8 }}>
+              {Object.entries(GAME_REGISTRY).filter(([key]) => key !== "manual").map(([key, g]) => {
+                const isDisabled = globallyDisabled.includes(key);
+                return (
+                  <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: isDisabled ? "#6b4f99" : "#f5f0ff", cursor: savingChallengePool ? "default" : "pointer" }}>
+                    <input
+                      type="checkbox" checked={!isDisabled} disabled={savingChallengePool}
+                      onChange={(e) => toggleGlobalChallenge(key, e.target.checked)}
+                    />
+                    {g.icon} {g.label}
+                  </label>
+                );
+              })}
             </div>
           )}
         </div>

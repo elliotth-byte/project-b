@@ -6,6 +6,7 @@ import { usePersistedStart } from "./usePersistedStart";
 import { useSwipeControls } from "../../lib/games/useSwipeControls";
 import { generateLevel, push, isSolved, isDeadlocked, SIZE } from "../../lib/games/tavoData";
 import { reportScore } from "../../lib/challengeScores";
+import SwipeControlsCallout from "./SwipeControlsCallout";
 
 const DIR_MAP = { up: { dx: 0, dy: -1 }, down: { dx: 0, dy: 1 }, left: { dx: -1, dy: 0 }, right: { dx: 1, dy: 0 } };
 
@@ -81,7 +82,8 @@ export default function TavoPlayer({ gameId, round, challenge, player }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [move]);
 
-  const swipeEnabled = !!player?.gamePrefs?.swipeControls;
+  const [swipeOverride, setSwipeOverride] = useState(false); // true once turned on via the in-game callout this session, before player.gamePrefs itself has caught up
+  const swipeEnabled = !!player?.gamePrefs?.swipeControls || swipeOverride;
   const swipeHandlers = useSwipeControls((dir) => move(DIR_MAP[dir]), swipeEnabled);
 
   const undo = () => {
@@ -122,6 +124,7 @@ export default function TavoPlayer({ gameId, round, challenge, player }) {
       <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 10px" }}>
         Walk into a crate to push it. Every crate onto a marker. You can only push, never pull.
       </p>
+      {!swipeEnabled && <SwipeControlsCallout player={player} onEnabled={() => setSwipeOverride(true)} />}
 
       {stuck && (
         <div style={{ background: "rgba(255,56,96,0.12)", border: "1px solid #ff3860", borderRadius: 8, padding: "8px 10px", marginBottom: 10 }}>

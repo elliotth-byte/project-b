@@ -6,6 +6,7 @@ import { usePersistedStart } from "./usePersistedStart";
 import { generateMazeWithGems } from "../../lib/games/mazeGemsData";
 import { useSwipeControls } from "../../lib/games/useSwipeControls";
 import DPad from "./DPad";
+import SwipeControlsCallout from "./SwipeControlsCallout";
 
 const DEFAULT_SIZE = 15;
 const WALL_BUMP_PENALTY_MS = 1500;
@@ -86,7 +87,8 @@ export default function MazeInvisiblePlayer({ gameId, round, challenge, player }
   // player has swipeControls on (see lib/gamePrefs.js). Called
   // unconditionally (Rules of Hooks) — `enabled` gates its behavior
   // internally instead of this being called conditionally.
-  const swipeEnabled = !!player?.gamePrefs?.swipeControls;
+  const [swipeOverride, setSwipeOverride] = useState(false); // true once turned on via the in-game callout this session, before player.gamePrefs itself has caught up
+  const swipeEnabled = !!player?.gamePrefs?.swipeControls || swipeOverride;
   const swipeHandlers = useSwipeControls((dir) => {
     if (dir === "up") move(-1, 0);
     else if (dir === "down") move(1, 0);
@@ -121,6 +123,7 @@ export default function MazeInvisiblePlayer({ gameId, round, challenge, player }
         Get all {gems.length} gems in order. Toggle View to memorize, or Move blind — bumping a wall costs {WALL_BUMP_PENALTY_MS / 1000}s.
       </p>
       {penaltyMs > 0 && <p style={{ color: "#ff3860", fontSize: 11, margin: "0 0 6px", fontWeight: 700 }}>-{(penaltyMs / 1000).toFixed(1)}s in wall-bump penalties</p>}
+      {!swipeEnabled && <SwipeControlsCallout player={player} onEnabled={() => setSwipeOverride(true)} />}
 
       <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 10 }}>
         <button

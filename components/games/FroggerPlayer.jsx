@@ -5,6 +5,7 @@ import { useCountdown } from "./useCountdown";
 import { reportScore } from "../../lib/challengeScores";
 import { useSwipeControls } from "../../lib/games/useSwipeControls";
 import DPad from "./DPad";
+import SwipeControlsCallout from "./SwipeControlsCallout";
 
 // 9-wide grid so 5 home slots can sit with real gaps between them, the
 // way the original arcade game's 5 lily pads work — landing in a gap (or
@@ -136,7 +137,8 @@ export default function FroggerPlayer({ gameId, round, challenge, player }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [move]);
 
-  const swipeEnabled = !!player?.gamePrefs?.swipeControls;
+  const [swipeOverride, setSwipeOverride] = useState(false); // true once turned on via the in-game callout this session, before player.gamePrefs itself has caught up
+  const swipeEnabled = !!player?.gamePrefs?.swipeControls || swipeOverride;
   const swipeHandlers = useSwipeControls((dir) => {
     if (dir === "up") move(0, -1);
     else if (dir === "down") move(0, 1);
@@ -242,6 +244,7 @@ export default function FroggerPlayer({ gameId, round, challenge, player }) {
       <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 8px" }}>
         🏠 {homesFilled}/5 home{boardsCleared > 0 && ` · ${boardsCleared} board${boardsCleared === 1 ? "" : "s"} cleared`}{carrying && " · 🤍 carrying the lady frog"}
       </p>
+      {!swipeEnabled && <SwipeControlsCallout player={player} onEnabled={() => setSwipeOverride(true)} />}
       <canvas
         ref={canvasRef} width={W} height={H}
         onTouchStart={swipeHandlers.onTouchStart} onTouchEnd={swipeHandlers.onTouchEnd}

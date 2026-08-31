@@ -5,6 +5,7 @@ import { reportScore } from "../../lib/challengeScores";
 import { usePersistedStart } from "./usePersistedStart";
 import { useSwipeControls } from "../../lib/games/useSwipeControls";
 import DPad from "./DPad";
+import SwipeControlsCallout from "./SwipeControlsCallout";
 
 // ─── The Labyrinth ───
 // An original take on "collect items in a maze while something hunts
@@ -184,7 +185,8 @@ export default function LabyrinthPlayer({ gameId, round, challenge, player }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [move]);
 
-  const swipeEnabled = !!player?.gamePrefs?.swipeControls;
+  const [swipeOverride, setSwipeOverride] = useState(false); // true once turned on via the in-game callout this session, before player.gamePrefs itself has caught up
+  const swipeEnabled = !!player?.gamePrefs?.swipeControls || swipeOverride;
   const swipeHandlers = useSwipeControls((dir) => {
     if (dir === "up") move(-1, 0);
     else if (dir === "down") move(1, 0);
@@ -252,6 +254,7 @@ export default function LabyrinthPlayer({ gameId, round, challenge, player }) {
         <Badge>🫒 {collected.size}/{totalOlives}</Badge>
       </div>
       <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 8px", fontStyle: "italic" }}>The Minotaur is always coming for you — keep moving.</p>
+      {!swipeEnabled && <SwipeControlsCallout player={player} onEnabled={() => setSwipeOverride(true)} />}
       <div
         onTouchStart={swipeHandlers.onTouchStart} onTouchEnd={swipeHandlers.onTouchEnd}
         style={{

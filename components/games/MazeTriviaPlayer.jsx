@@ -7,6 +7,7 @@ import { generateMazeWithGems, straightLinePath } from "../../lib/games/mazeGems
 import { pickMazeTriviaQuestions } from "../../lib/games/mazeTriviaQuestions";
 import { useSwipeControls } from "../../lib/games/useSwipeControls";
 import DPad from "./DPad";
+import SwipeControlsCallout from "./SwipeControlsCallout";
 
 const DEFAULT_SIZE = 15;
 
@@ -114,7 +115,8 @@ export default function MazeTriviaPlayer({ gameId, round, challenge, player }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [move]);
 
-  const swipeEnabled = !!player?.gamePrefs?.swipeControls;
+  const [swipeOverride, setSwipeOverride] = useState(false); // true once turned on via the in-game callout this session, before player.gamePrefs itself has caught up
+  const swipeEnabled = !!player?.gamePrefs?.swipeControls || swipeOverride;
   const swipeHandlers = useSwipeControls((dir) => {
     if (dir === "up") move(-1, 0);
     else if (dir === "down") move(1, 0);
@@ -167,6 +169,7 @@ export default function MazeTriviaPlayer({ gameId, round, challenge, player }) {
       <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 8px", fontStyle: "italic" }}>
         Get all 5 gems in order. Walk into the gate for a shot at the shortcut, or navigate the maze the long way.
       </p>
+      {!swipeEnabled && <SwipeControlsCallout player={player} onEnabled={() => setSwipeOverride(true)} />}
       {gateState === "failed" && <p style={{ color: "#ff3860", fontSize: 11, margin: "0 0 8px", fontWeight: 700 }}>Shortcut's shut — find the long way to this gem.</p>}
 
       <div

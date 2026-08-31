@@ -180,7 +180,7 @@ export function FinaleCard({ finale, rows, byId, showComments }) {
         {winnerName && <Badge color="#00ff9d">Winner: {winnerName}</Badge>}
       </div>
       <p style={{ fontSize: 12, color: "#a68fd6", margin: "0 0 4px" }}>
-        Finalists: {(finale.finalists || []).map((f) => f.name).join(", ")}
+        Finalists: {(finale.finalists || []).map((f) => byId[f.playerId] || f.name).join(", ")}
       </p>
       {finale.chaosHolderId && (
         <div style={{ margin: "0 0 4px" }}>

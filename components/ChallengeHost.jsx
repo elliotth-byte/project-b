@@ -17,6 +17,7 @@ import { initTorched } from "../lib/games/torchedData";
 import { initChains, subscribeChains } from "../lib/games/chainsData";
 import { initScavengerHunt, subscribeScavengerHunt, OFFERING_TYPES as SCAVENGER_OFFERING_TYPES } from "../lib/games/scavengerHuntData";
 import { pickRandomChallenge, hephaestusDrawKey, randomPickKey } from "../lib/challengeSelection";
+import { fetchGloballyDisabledChallenges } from "../lib/platformSettings";
 import { powerFor } from "../lib/characterPowers";
 import ParticipantPicker from "./ParticipantPicker";
 import CopyMessage from "./CopyMessage";
@@ -54,6 +55,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   const [resettingId, setResettingId] = useState(null);
   const [challengeHistory, setChallengeHistory] = useState([]);
   const [randomPickState, setRandomPickState] = useState(null);
+  const [globallyDisabled, setGloballyDisabled] = useState(null); // null = not loaded yet; the random-pick effect below waits for this rather than risk picking before it's known
   const [hephaestusDraw, setHephaestusDraw] = useState(null);
   const [editingScoreId, setEditingScoreId] = useState(null); // playerId currently showing the edit-score input, or null
   const [scoreDraft, setScoreDraft] = useState("");
@@ -145,9 +147,26 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   // the round begins.
   const hephaestusPlayer = (players || []).find((p) => p.alive && p.approved && powerFor(p, settings) === "Hephaestus");
   useEffect(() => {
-    if (settings?.challengeSelectionMode !== "random" || hephaestusPlayer || !round?.round || challenge?.active || randomPickState) return;
-    storageUpdate(gameId, randomPickKey(round.round), (fresh) => (fresh ? fresh : { gameType: pickRandomChallenge(challengeHistory) }));
-  }, [settings?.challengeSelectionMode, hephaestusPlayer, round?.round, challenge?.active, randomPickState, gameId, challengeHistory]);
+    fetchGloballyDisabledChallenges().then(setGloballyDisabled);
+  }, []);
+  // If the currently-selected manual game type turns out to be
+  // disabled (either the initial default happened to land on one, or
+  // a platform admin disables the one a host already had selected),
+  // switch to the first still-enabled option instead of leaving a
+  // disabled game selected under the hood even though it's no longer
+  // shown as a choice.
+  useEffect(() => {
+    if (globallyDisabled === null) return;
+    const disabledTypes = [...(settings?.disabledChallenges || []), ...globallyDisabled];
+    if (!disabledTypes.includes(gameType)) return;
+    const firstEnabled = Object.keys(GAME_REGISTRY).find((k) => k !== "manual" && !disabledTypes.includes(k));
+    if (firstEnabled) setGameType(firstEnabled);
+  }, [globallyDisabled, settings?.disabledChallenges, gameType]);
+  useEffect(() => {
+    if (settings?.challengeSelectionMode !== "random" || hephaestusPlayer || !round?.round || challenge?.active || randomPickState || globallyDisabled === null) return;
+    const disabledTypes = [...(settings?.disabledChallenges || []), ...globallyDisabled];
+    storageUpdate(gameId, randomPickKey(round.round), (fresh) => (fresh ? fresh : { gameType: pickRandomChallenge(challengeHistory, disabledTypes) }));
+  }, [settings?.challengeSelectionMode, settings?.disabledChallenges, hephaestusPlayer, round?.round, challenge?.active, randomPickState, globallyDisabled, gameId, challengeHistory]);
 
   // Keeps gameType (the state everything else in this component — maze
   // size, duration, the start button — already reads from) in sync with
@@ -349,7 +368,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 6, marginBottom: 10 }}>
-            {Object.entries(GAME_REGISTRY).filter(([key]) => key !== "manual").map(([key, g]) => (
+            {Object.entries(GAME_REGISTRY).filter(([key]) => key !== "manual" && !(settings?.disabledChallenges || []).includes(key) && !(globallyDisabled || []).includes(key)).map(([key, g]) => (
               <button key={key} onClick={() => pickGameType(key)} style={{
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
                 padding: "10px 8px", borderRadius: 8, cursor: "pointer",

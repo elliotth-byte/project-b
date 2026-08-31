@@ -55,6 +55,22 @@ export default function FinalePlayer({ gameId, player, round, players, readOnly 
   const isFinalist = finale.finalists.some((f) => f.playerId === player?.id);
   const votingOpen = finale.votingOpen;
 
+  // finale.finalists[].name is baked in at the moment the Finale starts
+  // (always the real name, never alias-aware — see
+  // lib/roundEngine.js), which is exactly what was prematurely
+  // revealing identities during an active alias season, both in the
+  // vote confirmation text and in the actual voting UI (MemoryWall
+  // reads candidates[].name directly — see its own comment). players
+  // is already alias-resolved via resolveIdentities (see
+  // pages/play.jsx's identityAllPlayers), so looking display_name up
+  // from there instead reacts correctly to alias mode, and correctly
+  // reveals the real name once the game actually ends too, rather than
+  // a name permanently frozen from the moment the Finale began.
+  const resolvedFinalists = finale.finalists.map((f) => ({
+    ...f,
+    name: (players || []).find((p) => p.id === f.playerId)?.display_name || f.name,
+  }));
+
   // Everything below computes the vote-status-specific card that used to
   // be a set of early returns — now a single `voteSection` value instead,
   // so the Q&A panel (see the bottom of this component) can always be
@@ -124,7 +140,7 @@ export default function FinalePlayer({ gameId, player, round, players, readOnly 
     const submit = async () => {
       if (!choice || !reason.trim()) return;
       if (aphroditeBlockedId === choice) return; // same defense-in-depth pattern as ExileVotePlayer.jsx
-      const targetName = finale.finalists.find((f) => f.playerId === choice)?.name || "";
+      const targetName = resolvedFinalists.find((f) => f.playerId === choice)?.name || "";
       const res = await storageUpdate(gameId, VOTES_KEY, (fresh) => {
         const existingMap = fresh || {};
         existingMap[player.id] = { targetId: choice, targetName, voterName: player.name, reason: reason.trim(), time: new Date().toLocaleTimeString() };
@@ -142,7 +158,7 @@ export default function FinalePlayer({ gameId, player, round, players, readOnly 
         </div>
         <Card style={{ marginBottom: 14 }}>
           <MemoryWall
-            candidates={finale.finalists}
+            candidates={resolvedFinalists}
             players={players}
             selectedId={choice}
             onSelect={setChoice}

@@ -3,6 +3,7 @@ import { Card, Badge } from "../ui";
 import GameResultCard from "./GameResultCard";
 import { useCountdown } from "./useCountdown";
 import { reportScore, peekSession, getOrStartSession } from "../../lib/challengeScores";
+import SwipeControlsCallout from "./SwipeControlsCallout";
 import { COLOR_BLIND_SAFE_PALETTE } from "../../lib/games/colorBlindPalette";
 
 const SIZE = 6;
@@ -103,7 +104,8 @@ const MATCH3_DURATION_MS = 3 * 60 * 1000;
 
 export default function Match3Player({ gameId, round, challenge, player }) {
   const colorBlindMode = !!player?.gamePrefs?.colorBlindMode;
-  const swipeEnabled = !!player?.gamePrefs?.swipeControls;
+  const [swipeOverride, setSwipeOverride] = useState(false); // true once turned on via the in-game callout this session, before player.gamePrefs itself has caught up
+  const swipeEnabled = !!player?.gamePrefs?.swipeControls || swipeOverride;
   const GEMS = colorBlindMode ? GEMS_COLOR_BLIND : GEMS_VIBRANT;
 
   // Match 3 always gets a flat 3 minutes from the moment the player hits
@@ -244,6 +246,7 @@ export default function Match3Player({ gameId, round, challenge, player }) {
           You get 3 minutes on the clock from the moment you hit Start, no matter how long this round is.
           Match 4 or 5+ in a row for bonus points.
         </p>
+        {!swipeEnabled && <SwipeControlsCallout player={player} onEnabled={() => setSwipeOverride(true)} />}
         <button onClick={handleStart} style={{
           padding: "10px 24px", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 700,
           background: "linear-gradient(135deg, #ff2d95, #b829ff)", border: "none", color: "#05010f",

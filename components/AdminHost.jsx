@@ -13,45 +13,38 @@ import { exileDrawContext, chaosPicksKey, FINALE_DRAW_CONTEXT } from "../lib/cha
 import { AVATAR_COLLECTIONS } from "../lib/avatarCollections";
 import { uploadAvatar, removeAvatar } from "../lib/avatarUpload";
 import { CHARACTER_POWERS, powerFor, assignRandomPowers } from "../lib/characterPowers";
+import { formatDurationHours } from "../lib/fatesLogic";
+import { fetchGloballyDisabledChallenges } from "../lib/platformSettings";
 
-// ─── Season Length Presets ───
-// A quick way to fill in all three phase durations at once, rather than
-// tuning Battle/Fates/Exile Vote separately from scratch. "12-Hour
-// Round" is exact and unambiguous — it directly sets each round's own
-// pace, no estimation involved. Blitz and Marathon are different in
-// kind: they target a WHOLE SEASON'S length, which this app has no
-// fixed number of rounds for (a season runs until enough players are
-// eliminated, which depends entirely on how many people are playing) —
-// so hitting an exact total isn't actually possible. Both assume a
-// season of roughly 10 rounds (a middle-of-the-road estimate, not a
-// guarantee) to turn "the whole season in 2 hours" into a concrete
-// per-round number; an actual season with very different player count
-// will run faster or slower than the label suggests. Framed to the host
-// as a starting pace, not a promise, for exactly that reason.
+// ─── Season Length ───
+// "12-Hour Round" is the one fixed preset: each phase (Battle, Fates,
+// Exile Vote) gets its own 12 hours, evenly — not 12 hours split
+// across all three. No player-count math needed since it doesn't
+// target a season total at all, just a flat, predictable per-phase
+// pace regardless of how many people are playing.
+//
+// A season's TOTAL length can't be preset the same way, because this
+// app has no fixed round count — a season runs until only 3 players
+// remain (see lib/roundEngine.js: the Finale triggers at
+// remainingAlive.length <= 3), which depends entirely on how many
+// people started. ROUNDS_UNTIL_FINALE below is that same relationship,
+// used to turn "I want this season to take about X" into a real
+// per-phase number: for N starting players, assuming one elimination
+// per round, it takes N-3 rounds to reach 3 remaining and trigger the
+// Finale (verified directly: 10 players -> 9,8,7,6,5,4,3 remaining
+// across rounds 1-7, so exactly 7 = 10-3 rounds). The Finale itself
+// doesn't need its own separate time slot — it reuses voteDurationSec
+// (see lib/roundEngine.js), landing inside that same last round's
+// Exile-Vote-shaped slot rather than adding an extra one.
+const ROUNDS_UNTIL_FINALE = (playerCount) => Math.max(1, playerCount - 3);
+
 const SEASON_LENGTH_PRESETS = [
   {
     key: "12hour",
     icon: "🕛",
     label: "12-Hour Round",
-    summary: "Each round takes about half a day",
-    detail: "Battle 8h, Fates 2h, Exile Vote 2h — exact, per round, no estimation involved.",
-    patch: { challengeDurationSec: 8 * 3600, fatesDurationSec: 2 * 3600, voteDurationSec: 2 * 3600, infiniteTime: false },
-  },
-  {
-    key: "blitz",
-    icon: "⚡",
-    label: "2-Hour Blitz",
-    summary: "Whole season in one sitting",
-    detail: "Battle 8min, Fates 2min, Exile Vote 2min per round — hits 2 hours total assuming ~10 rounds.",
-    patch: { challengeDurationSec: 8 * 60, fatesDurationSec: 2 * 60, voteDurationSec: 2 * 60, infiniteTime: false },
-  },
-  {
-    key: "marathon",
-    icon: "🐌",
-    label: "7-Day Marathon",
-    summary: "A relaxed, week-long season",
-    detail: "Battle 10h, Fates 3h, Exile Vote 3h per round — roughly a week total assuming ~10 rounds.",
-    patch: { challengeDurationSec: 10 * 3600, fatesDurationSec: 3 * 3600, voteDurationSec: 3 * 3600, infiniteTime: false },
+    summary: "Battle, Fates, and Exile Vote each get 12 hours",
+    patch: { challengeDurationSec: 12 * 3600, fatesDurationSec: 12 * 3600, voteDurationSec: 12 * 3600, infiniteTime: false },
   },
 ];
 
@@ -69,6 +62,17 @@ export default function AdminHost({ gameId, players, round }) {
   const [resetResult, setResetResult] = useState(null); // { playerId, username, newPassword } | null
   const [resetError, setResetError] = useState("");
   const [notifiedPlayerIds, setNotifiedPlayerIds] = useState(new Set());
+  // Season Length Calculator's two inputs — see SEASON_LENGTH_PRESETS's
+  // own comment above for the full reasoning. Player count starts
+  // pre-filled from the actual current roster (a reasonable starting
+  // point whether planning before the season starts or recalculating
+  // mid-season), but is freely editable from there — a lazy initializer
+  // so it's set once on mount and doesn't get silently overwritten if
+  // the roster changes later while a host is mid-experiment with a
+  // different hypothetical count.
+  const [calcPlayerCount, setCalcPlayerCount] = useState(() => Math.max(4, players.filter((p) => p.approved).length || 4));
+  const [calcSeasonSec, setCalcSeasonSec] = useState(2 * 3600); // 2 hours, just a reasonable starting point to edit from
+  const [globallyDisabled, setGloballyDisabled] = useState(null); // null = not loaded yet -- see the Challenge Pool card below
 
   // A player can have multiple subscription rows (one per device — see
   // sql/add-push-subscriptions.sql), so this only needs to know WHICH
@@ -187,6 +191,16 @@ export default function AdminHost({ gameId, players, round }) {
     await setSettings(gameId, patch);
     setSavingSettings(false);
   };
+
+  // Derived, not stored — recomputed live as either calculator input
+  // changes, matching a normal spreadsheet-style "plug in numbers, see
+  // the result" feel rather than needing an explicit "calculate" step.
+  const calcRounds = ROUNDS_UNTIL_FINALE(calcPlayerCount);
+  const calcPhaseSec = Math.max(60, Math.round(calcSeasonSec / calcRounds / 3)); // 1:1:1 split across Battle/Fates/Exile; floored at DurationInput's own 60s minimum
+
+  useEffect(() => {
+    fetchGloballyDisabledChallenges().then(setGloballyDisabled);
+  }, []);
 
   // Random-mode power assignment — one-time (well, re-triggerable, but
   // doing so mid-season would reshuffle everyone's power out from under
@@ -568,7 +582,6 @@ export default function AdminHost({ gameId, players, round }) {
                   <button
                     key={preset.key}
                     onClick={() => saveSettings(preset.patch)}
-                    title={preset.detail}
                     style={{
                       padding: "8px 14px", borderRadius: 8, cursor: "pointer", textAlign: "left",
                       background: "#0d0618", border: "1px solid #3d1f5c", color: "#f5f0ff",
@@ -580,11 +593,40 @@ export default function AdminHost({ gameId, players, round }) {
                 ))}
               </div>
               <p style={{ fontSize: 10.5, color: "#6b4f99", margin: 0, fontStyle: "italic" }}>
-                Fills in Battle/Fates/Exile Vote below and turns off Infinite Time — you can still fine-tune any of the three
-                afterward. The Blitz and Marathon presets target a WHOLE season of that length, assuming a season runs about 10
-                rounds — your actual season could run shorter or longer depending on how many people are playing and how often
-                someone's exiled, so treat these as a starting pace to aim for, not an exact guarantee.
+                Fills in Battle/Fates/Exile Vote below and turns off Infinite Time — you can still fine-tune any of the three afterward.
               </p>
+            </div>
+
+            <div style={{ marginBottom: 16, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 10, padding: 14 }}>
+              <div style={{ fontSize: 11, color: "#6b4f99", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+                🧮 Season Length Calculator
+              </div>
+              <p style={{ fontSize: 10.5, color: "#6b4f99", margin: "0 0 12px", fontStyle: "italic" }}>
+                For a specific total season length, based on how many players are actually in THIS season — a season runs until 3
+                players remain, so more players means more rounds to fit into the same total, and each phase gets a smaller slice.
+                Battle, Fates, and Exile Vote always come out equal.
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 12 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 10.5, color: "#a68fd6", marginBottom: 4 }}>Players in this season</label>
+                  <input
+                    type="number" min={4} value={calcPlayerCount}
+                    onChange={(e) => setCalcPlayerCount(Math.max(4, Number(e.target.value) || 4))}
+                    style={{ width: 70, background: "#150a28", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 8px", color: "#f5f0ff", fontSize: 13, textAlign: "center" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 10.5, color: "#a68fd6", marginBottom: 4 }}>Desired total season length</label>
+                  <DurationInput valueSec={calcSeasonSec} onChange={setCalcSeasonSec} min={180} />
+                </div>
+              </div>
+              <p style={{ fontSize: 12.5, color: "#f5f0ff", margin: "0 0 10px" }}>
+                With {calcPlayerCount} players, this season runs <strong>{calcRounds}</strong> round{calcRounds === 1 ? "" : "s"} before
+                the Finale — that's <strong>{formatDurationHours(calcPhaseSec)}</strong> for Battle, Fates, and Exile Vote each.
+              </p>
+              <Btn small onClick={() => saveSettings({ challengeDurationSec: calcPhaseSec, fatesDurationSec: calcPhaseSec, voteDurationSec: calcPhaseSec, infiniteTime: false })}>
+                Apply This Pace
+              </Btn>
             </div>
 
             <div style={{ display: "grid", gap: 10 }}>
@@ -631,6 +673,35 @@ export default function AdminHost({ gameId, players, round }) {
                 <strong>{seasonStarted ? "Locked — can only be changed before Round 1 starts." : "Only changeable now, before Round 1 starts."}</strong>
               </label>
               {savingSettings && <span style={{ fontSize: 11, color: "#00ff9d" }}>Saved.</span>}
+            </div>
+          </Card>
+
+          <Card>
+            <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🎲 Challenge Pool</h3>
+            <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+              Turn off any game for THIS season specifically — it won't come up in random selection, Hephaestus's two-option draw, or
+              your own manual picker below. Doesn't affect any other season.
+              {globallyDisabled === null ? "" : globallyDisabled.length > 0 && (
+                <> A platform admin has also turned off {globallyDisabled.length} game{globallyDisabled.length === 1 ? "" : "s"} across every season — those are excluded here too and aren't shown as a choice.</>
+              )}
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8 }}>
+              {Object.entries(GAME_REGISTRY).filter(([key]) => key !== "manual" && !(globallyDisabled || []).includes(key)).map(([key, g]) => {
+                const isDisabled = (settings.disabledChallenges || []).includes(key);
+                return (
+                  <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: isDisabled ? "#6b4f99" : "#f5f0ff", cursor: "pointer" }}>
+                    <input
+                      type="checkbox" checked={!isDisabled}
+                      onChange={(e) => {
+                        const current = settings.disabledChallenges || [];
+                        const next = e.target.checked ? current.filter((k) => k !== key) : [...current, key];
+                        saveSettings({ disabledChallenges: next });
+                      }}
+                    />
+                    {g.icon} {g.label}
+                  </label>
+                );
+              })}
             </div>
           </Card>
 
