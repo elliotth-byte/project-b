@@ -3,6 +3,12 @@ import { subscribeHostState } from "../lib/hostStorage";
 import { STORAGE_KEY_TRAITOR_ROLES } from "../lib/traitorData";
 import { fetchAllConfessionals, subscribeConfessionalsTable } from "../lib/confessionalsData";
 import { subscribeChallengeArchive } from "../lib/challengeArchive";
+import { fetchGloballyDisabledChallenges } from "../lib/platformSettings";
+import {
+  STORAGE_KEY_WORDS, STORAGE_KEY_CASINO, STORAGE_KEY_HOT_POTATO, STORAGE_KEY_ZOMBIE,
+  STORAGE_KEY_PIGGY, STORAGE_KEY_MASQUERADE, STORAGE_KEY_ATTACK_DEFEND, STORAGE_KEY_VOODOO,
+  STORAGE_KEY_MAZE3D, STORAGE_KEY_COFFIN, STORAGE_KEY_ICEBREAKER,
+} from "../lib/traitorsMiniGames";
 import ChallengeArchiveList from "./ChallengeArchiveList";
 import MissionsHost from "./MissionsHost";
 import ScheduledPostsList from "./ScheduledPostsList";
@@ -46,6 +52,11 @@ export default function HostPanels({ gameId, players, adminExtra }) {
   const [tr, setTr] = useState(null);
   const [unreadConfessionals, setUnreadConfessionals] = useState(0);
   const [challengeArchive, setChallengeArchive] = useState([]);
+  const [globallyDisabled, setGloballyDisabled] = useState(null); // null = not loaded yet; see the "challenges" tab below
+
+  useEffect(() => {
+    fetchGloballyDisabledChallenges().then(setGloballyDisabled);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = subscribeChallengeArchive(gameId, setChallengeArchive);
@@ -146,17 +157,46 @@ export default function HostPanels({ gameId, players, adminExtra }) {
               <ChallengeArchiveList gameId={gameId} archive={challengeArchive} />
             </ChallengeErrorBoundary>
           )}
-          <ChallengeErrorBoundary label="Word Scramble"><WordHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="Casino"><CasinoHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="Hot Potato"><HotPotatoHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="Zombie Game"><ZombieHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="Piggy Bank"><PiggyHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="Masquerade Houses"><MasqueradeHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="Attack/Defend"><AttackDefendHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="Voodoo Doll"><VoodooHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="3D Maze"><Maze3DHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="Coffin Slide"><CoffinHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="Icebreaker"><IcebreakerHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          {/* Each mini-game is skipped entirely (not shown as merely
+              greyed-out) once platform admin disables it — same
+              treatment ChallengeHost.jsx gives GAME_REGISTRY's own
+              disabled entries, just applied to a mount instead of a
+              picker option. globallyDisabled === null (not loaded yet)
+              intentionally renders everything, same as ChallengeHost's
+              own "don't risk gating on a still-loading list" reasoning. */}
+          {!globallyDisabled?.includes(STORAGE_KEY_WORDS) && (
+            <ChallengeErrorBoundary label="Word Scramble"><WordHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_CASINO) && (
+            <ChallengeErrorBoundary label="Casino"><CasinoHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_HOT_POTATO) && (
+            <ChallengeErrorBoundary label="Hot Potato"><HotPotatoHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_ZOMBIE) && (
+            <ChallengeErrorBoundary label="Zombie Game"><ZombieHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_PIGGY) && (
+            <ChallengeErrorBoundary label="Piggy Bank"><PiggyHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_MASQUERADE) && (
+            <ChallengeErrorBoundary label="Masquerade Houses"><MasqueradeHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_ATTACK_DEFEND) && (
+            <ChallengeErrorBoundary label="Attack/Defend"><AttackDefendHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_VOODOO) && (
+            <ChallengeErrorBoundary label="Voodoo Doll"><VoodooHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_MAZE3D) && (
+            <ChallengeErrorBoundary label="3D Maze"><Maze3DHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_COFFIN) && (
+            <ChallengeErrorBoundary label="Coffin Slide"><CoffinHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_ICEBREAKER) && (
+            <ChallengeErrorBoundary label="Icebreaker"><IcebreakerHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
         </div>
       )}
 

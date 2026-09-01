@@ -2,6 +2,12 @@ import { useState, useEffect } from "react";
 import { subscribeGameState } from "../lib/gameStorage";
 import { STORAGE_KEY_ROUND_INFO } from "../lib/roundtableData";
 import { subscribeMyRole } from "../lib/playerRoles";
+import { fetchGloballyDisabledChallenges } from "../lib/platformSettings";
+import {
+  STORAGE_KEY_WORDS, STORAGE_KEY_CASINO, STORAGE_KEY_HOT_POTATO, STORAGE_KEY_ZOMBIE,
+  STORAGE_KEY_PIGGY, STORAGE_KEY_MASQUERADE, STORAGE_KEY_ATTACK_DEFEND, STORAGE_KEY_VOODOO,
+  STORAGE_KEY_MAZE3D, STORAGE_KEY_COFFIN, STORAGE_KEY_ICEBREAKER,
+} from "../lib/traitorsMiniGames";
 import ChallengeErrorBoundary from "./ChallengeErrorBoundary";
 import WordPlayer from "./WordPlayer";
 import RoundtableVoter from "./RoundtableVoter";
@@ -33,11 +39,18 @@ const TABS = [
 // tabs already drive from the host side; each mini-game self-gates on
 // whether it's actually active (see e.g. WordPlayer's own early
 // `if (!wordState?.active) return null`), so there's no need to
-// duplicate that "is this even running right now" check up here.
+// duplicate that "is this even running right now" check up here — this
+// only additionally skips a mini-game a platform admin has disabled
+// outright (see TraitorsHostPanels.jsx's own identical gate).
 export default function PlayerPanels({ gameId, player }) {
   const [tab, setTab] = useState("challenge");
   const [myRole, setMyRole] = useState("faithful");
   const [roundInfo, setRoundInfo] = useState(null);
+  const [globallyDisabled, setGloballyDisabled] = useState(null); // null = not loaded yet
+
+  useEffect(() => {
+    fetchGloballyDisabledChallenges().then(setGloballyDisabled);
+  }, []);
 
   // Live subscription to my own role — see sql/add-murder-vote.sql for
   // why this can't be read from anywhere else.
@@ -78,17 +91,39 @@ export default function PlayerPanels({ gameId, player }) {
 
       {tab === "challenge" && (
         <>
-          <ChallengeErrorBoundary label="Word Scramble"><WordPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="Casino"><CasinoPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="Hot Potato"><HotPotatoPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="Zombie Game"><ZombiePlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="Piggy Bank"><PiggyPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="Masquerade Houses"><MasqueradePlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="Attack/Defend"><AttackDefendPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="Voodoo Doll"><VoodooPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="3D Maze"><Maze3DPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="Coffin Slide"><CoffinPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="Icebreaker"><IcebreakerPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
+          {!globallyDisabled?.includes(STORAGE_KEY_WORDS) && (
+            <ChallengeErrorBoundary label="Word Scramble"><WordPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_CASINO) && (
+            <ChallengeErrorBoundary label="Casino"><CasinoPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_HOT_POTATO) && (
+            <ChallengeErrorBoundary label="Hot Potato"><HotPotatoPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_ZOMBIE) && (
+            <ChallengeErrorBoundary label="Zombie Game"><ZombiePlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_PIGGY) && (
+            <ChallengeErrorBoundary label="Piggy Bank"><PiggyPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_MASQUERADE) && (
+            <ChallengeErrorBoundary label="Masquerade Houses"><MasqueradePlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_ATTACK_DEFEND) && (
+            <ChallengeErrorBoundary label="Attack/Defend"><AttackDefendPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_VOODOO) && (
+            <ChallengeErrorBoundary label="Voodoo Doll"><VoodooPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_MAZE3D) && (
+            <ChallengeErrorBoundary label="3D Maze"><Maze3DPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_COFFIN) && (
+            <ChallengeErrorBoundary label="Coffin Slide"><CoffinPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_ICEBREAKER) && (
+            <ChallengeErrorBoundary label="Icebreaker"><IcebreakerPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
+          )}
         </>
       )}
 

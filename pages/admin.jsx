@@ -6,6 +6,7 @@ import { upsertProfile, fetchSeasonHistory } from "../lib/profiles";
 import { removeProfilePhoto, uploadProfilePhoto } from "../lib/profilePhotoUpload";
 import { fetchGloballyDisabledChallenges, setGloballyDisabledChallenges } from "../lib/platformSettings";
 import { GAME_REGISTRY } from "../lib/challengeGames";
+import { TRAITORS_GAME_REGISTRY } from "../lib/traitorsMiniGames";
 
 // ─── Platform Admin ───
 // A genuinely new privilege tier, separate from any individual
@@ -185,6 +186,35 @@ export default function AdminPage() {
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8 }}>
               {Object.entries(GAME_REGISTRY).filter(([key]) => key !== "manual").map(([key, g]) => {
+                const isDisabled = globallyDisabled.includes(key);
+                return (
+                  <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: isDisabled ? "#6b4f99" : "#f5f0ff", cursor: savingChallengePool ? "default" : "pointer" }}>
+                    <input
+                      type="checkbox" checked={!isDisabled} disabled={savingChallengePool}
+                      onChange={(e) => toggleGlobalChallenge(key, e.target.checked)}
+                    />
+                    {g.icon} {g.label}
+                  </label>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Traitors' own mini-games (see lib/traitorsMiniGames.js) —
+              a separate list from GAME_REGISTRY above since they're not
+              part of Project B's random/manual challenge picker at all,
+              but the exact same disabled_challenges list underneath:
+              each key here is that game's own game_state storage key,
+              namespaced with a "traitors:" prefix so it can't collide
+              with GAME_REGISTRY's own un-namespaced keys. */}
+          <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, margin: "16px 0 8px" }}>
+            🏰 Traitors Mini-Games
+          </div>
+          {globallyDisabled === null ? (
+            <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>Loading...</p>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8 }}>
+              {Object.entries(TRAITORS_GAME_REGISTRY).map(([key, g]) => {
                 const isDisabled = globallyDisabled.includes(key);
                 return (
                   <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: isDisabled ? "#6b4f99" : "#f5f0ff", cursor: savingChallengePool ? "default" : "pointer" }}>
