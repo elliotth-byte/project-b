@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import HomeLink from "../components/HomeLink";
 import { supabase } from "../lib/supabaseClient";
-import { fetchProfile, fetchSeasonHistory, upsertProfile, searchSeasons } from "../lib/profiles";
+import { fetchProfile, fetchSeasonHistory, fetchMostRecentAvatars, upsertProfile, searchSeasons } from "../lib/profiles";
 import { searchPeopleToDm } from "../lib/profileDms";
 import { uploadProfilePhoto, removeProfilePhoto } from "../lib/profilePhotoUpload";
 import { fetchFriendedUserIds, addFriend, removeFriend } from "../lib/friendships";
@@ -35,6 +35,7 @@ export default function ProfilePage() {
   const [searchResults, setSearchResults] = useState(null);
   const [friended, setFriended] = useState(null); // null = not checked yet; Set of user_ids once loaded
   const [friendBusy, setFriendBusy] = useState(false);
+  const [fallbackAvatarUrl, setFallbackAvatarUrl] = useState(null); // this person's most recent season's own avatar, only fetched if they have no profile photo
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user || null));
@@ -51,13 +52,23 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!viewingUserId) return;
+    setFallbackAvatarUrl(null); // clear any previous person's fallback immediately, don't let it flash while switching profiles
     fetchProfile(viewingUserId).then((p) => {
       setProfile(p);
       setNameDraft(p?.display_name || "");
       setQuoteDraft(p?.quote || "");
+      if (!p?.photo_url) {
+        fetchMostRecentAvatars([viewingUserId]).then((map) => setFallbackAvatarUrl(map[viewingUserId] || null));
+      }
     });
     fetchSeasonHistory(viewingUserId).then(setHistory);
   }, [viewingUserId]);
+
+  // profile.photo_url wins if set; otherwise this person's own most
+  // recent season's avatar (see lib/profiles.js's fetchMostRecentAvatars
+  // for exactly what "most recent" means — just that one season, no
+  // deeper cascade); the 👤 placeholder only shows if both are absent.
+  const displayPhotoUrl = profile?.photo_url || fallbackAvatarUrl || null;
 
   // Only meaningful when viewing someone else — this is what drives the
   // Friend/Unfriend button below, so it always checks the CURRENT
@@ -215,8 +226,8 @@ export default function ProfilePage() {
               border: "2px solid #ff2d95", background: "#0d0618",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
-              {profile?.photo_url
-                ? <img src={profile.photo_url} alt={`${profile?.display_name || "Profile"} photo`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              {displayPhotoUrl
+                ? <img src={displayPhotoUrl} alt={`${profile?.display_name || "Profile"} photo`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 : <span style={{ fontSize: 32, color: "#3d1f5c" }}>👤</span>}
             </div>
             <h2 style={{ fontSize: 18, color: "#f5f0ff", margin: "0 0 6px", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
