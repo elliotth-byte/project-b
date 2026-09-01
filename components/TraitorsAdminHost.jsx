@@ -1,9 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Btn, Card } from "./traitorsUi";
 import { supabase } from "../lib/supabaseClient";
 import { storageDelete, storageGet } from "../lib/gameStorage";
 import { hostStorageDelete } from "../lib/hostStorage";
 import { declareWinner, subscribeTraitorsFinale, KEY_TRAITORS_FINALE } from "../lib/traitorsFinale";
+import { DEFAULT_SETTINGS, setSettings, subscribeSettings } from "../lib/gameState";
+import { uploadAvatar, removeAvatar } from "../lib/avatarUpload";
 import { STORAGE_KEY_WORDS } from "../lib/wordGameData";
 import { STORAGE_KEY_CASINO } from "../lib/casinoData";
 import { STORAGE_KEY_HOT_POTATO } from "../lib/hotPotatoData";
@@ -43,6 +45,47 @@ export default function AdminHost({ gameId, players }) {
     const unsubscribe = subscribeTraitorsFinale(gameId, setFinale);
     return unsubscribe;
   }, [gameId]);
+
+  // Settings — the same shared game_state-backed record Project B's own
+  // AdminHost.jsx reads/writes (see lib/gameState.js's own header: it's
+  // keyed by gameId alone, nothing scoped to game_type, so this is
+  // already safe to reuse here). Traitors only ever touches the
+  // avatarMode/avatarCollectionId fields on it — everything else on
+  // DEFAULT_SETTINGS (round timers, alias mode, character powers, ...)
+  // is Project B-only and simply never read here.
+  const [settings, setLocalSettings] = useState(DEFAULT_SETTINGS);
+  useEffect(() => {
+    const unsubscribe = subscribeSettings(gameId, setLocalSettings);
+    return unsubscribe;
+  }, [gameId]);
+
+  const saveSettings = async (patch) => {
+    await setSettings(gameId, patch);
+  };
+
+  // Avatar moderation — see AdminHost.jsx's identical block for why this
+  // stays visible regardless of mode (a photo set under one mode doesn't
+  // disappear just because the host later switches modes).
+  const hostUploadFileInputs = useRef({});
+  const [avatarBusyId, setAvatarBusyId] = useState(null);
+  const [avatarError, setAvatarError] = useState("");
+
+  const hostUploadAvatar = async (playerId, file) => {
+    setAvatarBusyId(playerId);
+    setAvatarError("");
+    const res = await uploadAvatar(playerId, file);
+    setAvatarBusyId(null);
+    if (!res.ok) setAvatarError(res.error || "Couldn't upload — try again.");
+  };
+
+  const hostRemoveAvatar = async (playerId, playerName) => {
+    if (!confirm(`Remove ${playerName}'s avatar photo?`)) return;
+    setAvatarBusyId(playerId);
+    setAvatarError("");
+    const res = await removeAvatar(playerId);
+    setAvatarBusyId(null);
+    if (!res.ok) setAvatarError(res.error || "Couldn't remove — try again.");
+  };
 
   // Optimistic-approval overlay — see AdminHost.jsx's identical comment
   // on why (players is a prop fed by host.jsx's own realtime
@@ -194,6 +237,74 @@ export default function AdminHost({ gameId, players }) {
           ))}
           {players.length === 0 && <p style={{ color: "#706050", fontSize: 12, fontStyle: "italic" }}>No players have joined yet.</p>}
         </div>
+      </Card>
+
+      <Card>
+        <h3 style={{ color: "#f0e6d3", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🖼 Avatars</h3>
+        <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+          Changeable any time — switching this mid-season is safe. Shows up on the host console and each player's
+          own screen wherever their name appears.
+        </p>
+        <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
+          {[
+            { value: "none", label: "None", blurb: "Just a name, like today." },
+            { value: "player_upload", label: "Player uploads their own", blurb: "Each player sets their own photo from their own screen, any time." },
+            { value: "host_upload", label: "You upload for each player", blurb: "Set a photo for each player yourself, below." },
+          ].map((opt) => (
+            <label key={opt.value} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12.5, color: "#a09080", cursor: "pointer" }}>
+              <input
+                type="radio" name="avatarMode" checked={settings.avatarMode === opt.value}
+                onChange={() => saveSettings({ avatarMode: opt.value })}
+                style={{ marginTop: 2 }}
+              />
+              <span>
+                <strong style={{ color: "#f0e6d3" }}>{opt.label}</strong> — {opt.blurb}
+              </span>
+            </label>
+          ))}
+        </div>
+
+        {avatarError && <p style={{ fontSize: 11.5, color: "#c45c3c", margin: "0 0 10px" }}>{avatarError}</p>}
+
+        {(settings.avatarMode === "player_upload" || settings.avatarMode === "host_upload") && (
+          <div>
+            <div style={{ fontSize: 11, color: "#a09080", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+              Uploaded photos {settings.avatarMode === "host_upload" ? "— set one for anyone below" : "— moderation"}
+            </div>
+            <div style={{ display: "grid", gap: 6 }}>
+              {players.filter((p) => p.approved).map((p) => (
+                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#0a1020", borderRadius: 6, padding: "6px 10px" }}>
+                  {p.avatar_url ? (
+                    <img src={p.avatar_url} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                  ) : (
+                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#132038", border: "1px dashed #253550", flexShrink: 0 }} />
+                  )}
+                  <span style={{ flex: 1, fontSize: 13, color: "#f0e6d3" }}>{p.display_name}</span>
+                  {settings.avatarMode === "host_upload" && (
+                    <>
+                      <input
+                        type="file" accept="image/*" style={{ display: "none" }}
+                        ref={(el) => { if (el) hostUploadFileInputs.current[p.id] = el; }}
+                        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) hostUploadAvatar(p.id, f); }}
+                      />
+                      <Btn small onClick={() => hostUploadFileInputs.current[p.id]?.click()} disabled={avatarBusyId === p.id}>
+                        {avatarBusyId === p.id ? "..." : p.avatar_url ? "Change" : "Upload"}
+                      </Btn>
+                    </>
+                  )}
+                  {p.avatar_url && (
+                    <Btn small variant="ghost" onClick={() => hostRemoveAvatar(p.id, p.display_name)} disabled={avatarBusyId === p.id}>
+                      Remove
+                    </Btn>
+                  )}
+                </div>
+              ))}
+              {players.filter((p) => p.approved).length === 0 && (
+                <p style={{ color: "#706050", fontSize: 12, fontStyle: "italic" }}>No approved players yet.</p>
+              )}
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Traitors never had a jury vote or finale mechanic at all (see
