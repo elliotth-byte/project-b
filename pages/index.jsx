@@ -55,7 +55,7 @@ export default function Home() {
         ) : user === null ? (
           <>
             <p style={{ color: SITE_THEME.textMuted, fontSize: 14, marginBottom: 28, fontStyle: "italic" }}>
-              One house, every season. Log in to find out who's playing this time.
+              Be someone. More.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <Link href={withGame("/signup")} style={linkBtn}>👤 New player — Create account</Link>
