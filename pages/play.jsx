@@ -128,8 +128,18 @@ export default function PlayPage() {
   useEffect(() => {
     if (!gameId) return;
     (async () => {
-      const { data } = await supabase.from("games").select("name, subtitle, game_type").eq("id", gameId).maybeSingle();
-      setGameInfo(data || null);
+      // .limit(1) + data?.[0] instead of .maybeSingle() — .maybeSingle()
+      // depends on a special "return one object, not an array" Accept
+      // header PostgREST has to honor; a real, observed case had
+      // something in the network path (proxy/CDN/pooler) not preserving
+      // that, silently falling back to array-shaped JSON that
+      // .maybeSingle() doesn't unwrap, leaving gameInfo permanently null
+      // (and isTraitors permanently false) with the failure completely
+      // invisible, since only `data` was ever destructured, never
+      // `error`. A plain array response works everywhere regardless.
+      const { data, error } = await supabase.from("games").select("name, subtitle, game_type").eq("id", gameId).limit(1);
+      if (error) console.error("Failed to load game info:", error);
+      setGameInfo(data?.[0] || null);
     })();
   }, [gameId]);
 
