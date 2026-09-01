@@ -15,6 +15,8 @@ import AthenaTrigger from "../components/AthenaTrigger";
 import HermesReveal from "../components/HermesReveal";
 import ConfessionalPlayer from "../components/ConfessionalPlayer";
 import MusicPlayer from "../components/MusicPlayer";
+import TraitorsMusicPlayer from "../components/TraitorsMusicPlayer";
+import TraitorsPlayerPanels from "../components/TraitorsPlayerPanels";
 import HelpPanel from "../components/HelpPanel";
 import FinalWordsPrompt from "../components/FinalWordsPrompt";
 import { hasResolvedFinalWords } from "../lib/finalWords";
@@ -53,6 +55,16 @@ import { DEFAULT_GAME_PREFS } from "../lib/gamePrefs";
 import { useHasUnreadChat } from "../lib/useChatUnread";
 import { useNeedsAction } from "../lib/useNeedsAction";
 import { useRoundWatcher } from "../lib/useRoundWatcher";
+
+// Flavor text for a traitors-type season's elimination banner — mirrors
+// the standalone Traitors app's own copy (see its pages/play.jsx); a
+// Project B season never produces these elimination_type values, so
+// this only ever gets consulted when isTraitors below is true.
+const TRAITORS_ELIMINATION_MESSAGES = {
+  murdered: "By the order of the Traitors, you have been murdered.",
+  banished: "You have been banished from the castle.",
+  walked: "You have chosen to walk away from the game.",
+};
 
 const BASE_TABS = [
   { key: "game", label: "🎲 Game" },
@@ -106,7 +118,7 @@ export default function PlayPage() {
   useEffect(() => {
     if (!gameId) return;
     (async () => {
-      const { data } = await supabase.from("games").select("name, subtitle").eq("id", gameId).maybeSingle();
+      const { data } = await supabase.from("games").select("name, subtitle, game_type").eq("id", gameId).maybeSingle();
       setGameInfo(data || null);
     })();
   }, [gameId]);
@@ -380,6 +392,13 @@ export default function PlayPage() {
       (iAmCloseToTwentyParticipant && !closeToTwentyState?.submittedIds?.includes(player.id))
     )
   );
+  // Traitors seasons have no color/alias/onboarding-prefs step (they
+  // never existed in the standalone Traitors app this was ported from —
+  // see components/TraitorsPlayerPanels.jsx) and no round-phase engine
+  // (round stays null forever for these games, since that's Project B's
+  // own lib/gameState.js machinery), so the gates below are forced off
+  // for them rather than evaluated for real.
+  const isTraitors = gameInfo?.game_type === "traitors";
   const exiled = joined && myPlayer && myPlayer.alive === false;
   const quitByChoice = exiled && myPlayer.eliminationType === "quit";
   const removedForInactivity = exiled && myPlayer.eliminationType === "removed_inactivity";
@@ -389,13 +408,13 @@ export default function PlayPage() {
   const needsFinalWords = exiled && !quitByChoice && !removedForInactivity && myPlayer.eliminationRound != null && !finalWordsResolved;
   const approved = joined && !!myPlayer?.approved;
   const gameEnded = round?.phase === PHASES.ENDED;
-  const needsIdentity = joined && myPlayer && !identityComplete(myPlayer, settings);
+  const needsIdentity = !isTraitors && joined && myPlayer && !identityComplete(myPlayer, settings);
   // Shown once, right after identity is picked and before the "waiting
   // for host approval" screen — see components/OnboardingPreferences.jsx
   // for the full reasoning. Gated off once approved (an approved player
   // never needs to see this again, even if they somehow never completed
   // it — better to let them into the game than trap them here).
-  const needsOnboardingPrefs = joined && myPlayer && !needsIdentity && !approved && !myPlayer.gamePrefs?.onboardingComplete;
+  const needsOnboardingPrefs = !isTraitors && joined && myPlayer && !needsIdentity && !approved && !myPlayer.gamePrefs?.onboardingComplete;
   // Once the game's over, the whole point of keeping exiled players
   // separated from the main chat (protecting the still-competing
   // players from anything an exiled player might reveal or pressure
@@ -504,9 +523,15 @@ export default function PlayPage() {
             background: "linear-gradient(160deg, #200a1a 0%, #120612 100%)",
             border: "2px solid #ff3860", borderRadius: 12, boxShadow: "0 0 24px rgba(255,56,96,0.25)",
           }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>{quitByChoice ? "🚪" : removedForInactivity ? "⏳" : "💀"}</div>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>
+              {isTraitors
+                ? (myPlayer.eliminationType === "murdered" ? "💀" : myPlayer.eliminationType === "walked" ? "🚪" : "⚖️")
+                : (quitByChoice ? "🚪" : removedForInactivity ? "⏳" : "💀")}
+            </div>
             <p style={{ color: "#f5f0ff", fontSize: 17, fontWeight: 600, margin: 0, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
-              {quitByChoice ? "You've left this game." : removedForInactivity ? "You were removed for inactivity." : "You have been exiled."}
+              {isTraitors
+                ? (TRAITORS_ELIMINATION_MESSAGES[myPlayer.eliminationType] || "You are no longer in the game.")
+                : (quitByChoice ? "You've left this game." : removedForInactivity ? "You were removed for inactivity." : "You have been exiled.")}
             </p>
           </div>
         )}
@@ -525,7 +550,7 @@ export default function PlayPage() {
           </ChallengeErrorBoundary>
         )}
 
-        {approved && !needsIdentity && playerName && !pendingReveal && (
+        {!isTraitors && approved && !needsIdentity && playerName && !pendingReveal && (
           <>
             <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #3d1f5c" }}>
               {visibleTabs.map((t) => (
@@ -683,8 +708,15 @@ export default function PlayPage() {
             )}
           </>
         )}
+
+        {isTraitors && approved && playerName && (
+          <ChallengeErrorBoundary label="Traitors">
+            <TraitorsPlayerPanels gameId={gameId} player={{ id: myPlayer.id, name: playerName }} />
+          </ChallengeErrorBoundary>
+        )}
       </div>
-      {approved && <MusicPlayer gameId={gameId} isHost={false} portalTarget={radioPortalNode} />}
+      {approved && isTraitors && <TraitorsMusicPlayer gameId={gameId} isHost={false} />}
+      {approved && !isTraitors && <MusicPlayer gameId={gameId} isHost={false} portalTarget={radioPortalNode} />}
       {showNavTour && (
         <NavTourOverlay
           visibleTabKeys={visibleTabs.map((t) => t.key)}
