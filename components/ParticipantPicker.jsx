@@ -2,6 +2,7 @@ import { DEFAULT_PARTICIPATION, computeParticipants } from "../lib/challengePart
 
 const boxStyle = { background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 };
 const rowStyle = { display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 8 };
+const toggleLabel = { display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: "#a68fd6", cursor: "pointer" };
 const chip = (active) => ({
   fontSize: 11, padding: "3px 9px", borderRadius: 12, cursor: "pointer",
   background: active ? "rgba(255,45,149,0.15)" : "transparent",
@@ -13,11 +14,17 @@ const chip = (active) => ({
 // and pass it to computeParticipants() inside start(). Exiled players
 // aren't handled here at all — see lib/reentryData.js's per-challenge
 // opt-in, which every eligible exiled player decides for themselves.
-export default function ParticipantPicker({ alive, value, onChange }) {
+//
+// allPlayers/shieldedNames/returnedNames are optional — only Traitors-mode
+// hosts pass them (their excludeShielded/includeReturned/
+// includeEliminatedSpectators toggles below need them; see
+// lib/challenges/participants.js). A Project B challenge that never sets
+// those config flags gets exactly its old behavior back either way.
+export default function ParticipantPicker({ alive, allPlayers, shieldedNames = [], returnedNames = [], value, onChange }) {
   const cfg = { ...DEFAULT_PARTICIPATION, ...value };
   const set = (patch) => onChange({ ...cfg, ...patch });
 
-  const { participants, spectators } = computeParticipants(cfg, { alive });
+  const { participants, spectators } = computeParticipants(cfg, { alive, allPlayers, shieldedNames, returnedNames });
 
   const toggleManual = (name) => {
     const selected = cfg.manualSelected.includes(name)
@@ -47,6 +54,26 @@ export default function ParticipantPicker({ alive, value, onChange }) {
           {alive.length === 0 && <span style={{ fontSize: 11, color: "#6b4f99", fontStyle: "italic" }}>No alive players.</span>}
         </div>
       )}
+
+      {/* These three only do anything when the caller passes allPlayers/
+          shieldedNames/returnedNames (Traitors-mode hosts) — see
+          lib/challenges/participants.js's computeParticipants. Still shown
+          unconditionally rather than hidden per game type, since toggling
+          one with no matching data is a harmless no-op. */}
+      <div style={rowStyle}>
+        <label style={toggleLabel}>
+          <input type="checkbox" checked={cfg.excludeShielded} onChange={(e) => set({ excludeShielded: e.target.checked })} />
+          Exclude shielded players
+        </label>
+        <label style={toggleLabel}>
+          <input type="checkbox" checked={cfg.includeEliminatedSpectators} onChange={(e) => set({ includeEliminatedSpectators: e.target.checked })} />
+          Include eliminated players as spectators
+        </label>
+        <label style={toggleLabel}>
+          <input type="checkbox" checked={cfg.includeReturned} onChange={(e) => set({ includeReturned: e.target.checked })} />
+          Include returned players
+        </label>
+      </div>
 
       <div style={{ fontSize: 11.5, color: "#6b4f99" }}>
         {participants.length} participant{participants.length === 1 ? "" : "s"}

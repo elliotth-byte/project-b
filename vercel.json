@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/advance-rounds",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/post-scheduled",
+      "schedule": "0 13 * * *"
     }
   ]
 }
