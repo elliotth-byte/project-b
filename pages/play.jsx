@@ -55,6 +55,7 @@ import { DEFAULT_GAME_PREFS } from "../lib/gamePrefs";
 import { useHasUnreadChat } from "../lib/useChatUnread";
 import { useNeedsAction } from "../lib/useNeedsAction";
 import { useRoundWatcher } from "../lib/useRoundWatcher";
+import { themeFor } from "../lib/uiTheme";
 
 // Flavor text for a traitors-type season's elimination banner — mirrors
 // the standalone Traitors app's own copy (see its pages/play.jsx); a
@@ -95,11 +96,16 @@ export default function PlayPage() {
   const [showNavTour, setShowNavTour] = useState(false);
   const [radioPortalNode, setRadioPortalNode] = useState(null);
 
-  // See lib/useRoundWatcher.js's own comment on why a traitors season
-  // passes enabled: false — gameInfo.game_type isn't known yet on the
-  // very first render (gameInfo starts null), which just means this
-  // stays enabled for that one render until the fetch below resolves.
-  useRoundWatcher(gameId, { enabled: gameInfo?.game_type !== "traitors" });
+  // Declared this early (rather than down with the other derived consts
+  // below, where it conceptually belongs) so useRoundWatcher, right
+  // below, and pageStyle, right after, can both use it. gameInfo.game_type
+  // isn't known yet on the very first render (gameInfo starts null) —
+  // isTraitors just reads false for that one render until the fetch
+  // below resolves, same effect as host.jsx's identical situation.
+  const isTraitors = gameInfo?.game_type === "traitors";
+  const theme = themeFor(gameInfo?.game_type);
+  const pageStyle = { minHeight: "100vh", background: theme.pageBg, color: theme.text, fontFamily: theme.font, padding: 24 };
+  useRoundWatcher(gameId, { enabled: !isTraitors });
 
   // Hooks must run unconditionally, before any early returns below — this
   // is intentionally called this early (using the raw state directly,
@@ -401,8 +407,8 @@ export default function PlayPage() {
   // see components/TraitorsPlayerPanels.jsx) and no round-phase engine
   // (round stays null forever for these games, since that's Project B's
   // own lib/gameState.js machinery), so the gates below are forced off
-  // for them rather than evaluated for real.
-  const isTraitors = gameInfo?.game_type === "traitors";
+  // for them rather than evaluated for real. isTraitors itself is
+  // declared up with pageStyle, near the top of the component.
   const exiled = joined && myPlayer && myPlayer.alive === false;
   const quitByChoice = exiled && myPlayer.eliminationType === "quit";
   const removedForInactivity = exiled && myPlayer.eliminationType === "removed_inactivity";
@@ -456,28 +462,28 @@ export default function PlayPage() {
       <div style={{ width: "100%", maxWidth: 400, margin: "0 auto" }}><UpdateBanner /></div>
       <div style={{ display: "flex", justifyContent: "space-between", width: "100%", maxWidth: 400, margin: "0 auto 12px" }}>
         <HomeLink />
-        <span style={{ color: "#a68fd6", fontSize: 13 }}>Playing as {effectivePlayerName || "..."}</span>
+        <span style={{ color: theme.textMuted, fontSize: 13 }}>Playing as {effectivePlayerName || "..."}</span>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           {joined && myPlayer && !approved && (
             <button onClick={handleQuit} disabled={quitBusy} style={{
-              background: "none", border: "none", color: "#ff3860", fontSize: 12,
+              background: "none", border: "none", color: theme.danger, fontSize: 12,
               cursor: quitBusy ? "not-allowed" : "pointer", opacity: quitBusy ? 0.5 : 1,
             }}>
               {quitBusy ? "Leaving..." : "✕ Cancel"}
             </button>
           )}
-          <button onClick={signOut} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 12, cursor: "pointer" }}>Log out</button>
+          <button onClick={signOut} style={{ background: "none", border: "none", color: theme.textDim, fontSize: 12, cursor: "pointer" }}>Log out</button>
         </div>
       </div>
 
       <div style={{ maxWidth: 400, width: "100%", margin: "0 auto" }}>
         {gameInfo && (
           <div style={{ textAlign: "center", marginBottom: 14 }}>
-            <div style={{ fontFamily: "'Orbitron', 'Segoe UI', sans-serif", fontSize: 16, fontWeight: 700 }}>{gameInfo.name}</div>
-            {gameInfo.subtitle && <div style={{ color: "#a68fd6", fontSize: 12, fontStyle: "italic", marginTop: 1 }}>{gameInfo.subtitle}</div>}
+            <div style={{ fontFamily: theme.font, fontSize: 16, fontWeight: 700 }}>{gameInfo.name}</div>
+            {gameInfo.subtitle && <div style={{ color: theme.textMuted, fontSize: 12, fontStyle: "italic", marginTop: 1 }}>{gameInfo.subtitle}</div>}
           </div>
         )}
-        {joinError && <p style={{ color: "#ff3860" }}>{joinError}</p>}
+        {joinError && <p style={{ color: theme.danger }}>{joinError}</p>}
 
         {joined && myPlayer && needsIdentity && (
           <ColorPicker
@@ -499,19 +505,23 @@ export default function PlayPage() {
         {joined && myPlayer && !needsIdentity && !needsOnboardingPrefs && !myPlayer.approved && (
           <div style={{
             marginBottom: 20, textAlign: "center", padding: "28px 20px",
-            background: "linear-gradient(160deg, #1a0a2e 0%, #1a0a2e 100%)",
-            border: "2px solid #ff2d95", borderRadius: 12,
+            background: theme.cardBg,
+            border: `2px solid ${theme.accent}`, borderRadius: 12,
           }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>⏳</div>
-            <p style={{ color: "#f5f0ff", fontSize: 16, fontWeight: 600, margin: "0 0 6px", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
+            <p style={{ color: theme.text, fontSize: 16, fontWeight: 600, margin: "0 0 6px", fontFamily: theme.font }}>
               Waiting for the host to let you in
             </p>
-            <p style={{ color: "#a68fd6", fontSize: 13, margin: 0, fontStyle: "italic" }}>
+            <p style={{ color: theme.textMuted, fontSize: 13, margin: 0, fontStyle: "italic" }}>
               You've joined, but the host needs to approve you first. This page updates automatically once you're approved.
             </p>
           </div>
         )}
 
+        {/* Dormant for Traitors — gameEnded stays false forever there
+            (see this file's own comment on isTraitors above); left
+            untouched/still Project-B-flavored on purpose rather than
+            themed for a state that can't actually occur. */}
         {gameEnded && approved && !pendingReveal && (
           <div style={{ marginBottom: 20, textAlign: "center", padding: "28px 20px", background: "linear-gradient(160deg, #1a0a2e 0%, #1a0a2e 100%)", border: "2px solid #ff2d95", borderRadius: 12 }}>
             <div style={{ fontSize: 36, marginBottom: 8 }}>🏆</div>
@@ -524,15 +534,15 @@ export default function PlayPage() {
         {exiled && approved && !gameEnded && !pendingReveal && (
           <div style={{
             marginBottom: 20, textAlign: "center", padding: "24px 20px",
-            background: "linear-gradient(160deg, #200a1a 0%, #120612 100%)",
-            border: "2px solid #ff3860", borderRadius: 12, boxShadow: "0 0 24px rgba(255,56,96,0.25)",
+            background: theme.cardBg,
+            border: `2px solid ${theme.danger}`, borderRadius: 12, boxShadow: `0 0 24px ${theme.danger}40`,
           }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>
               {isTraitors
                 ? (myPlayer.eliminationType === "murdered" ? "💀" : myPlayer.eliminationType === "walked" ? "🚪" : "⚖️")
                 : (quitByChoice ? "🚪" : removedForInactivity ? "⏳" : "💀")}
             </div>
-            <p style={{ color: "#f5f0ff", fontSize: 17, fontWeight: 600, margin: 0, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
+            <p style={{ color: theme.text, fontSize: 17, fontWeight: 600, margin: 0, fontFamily: theme.font }}>
               {isTraitors
                 ? (TRAITORS_ELIMINATION_MESSAGES[myPlayer.eliminationType] || "You are no longer in the game.")
                 : (quitByChoice ? "You've left this game." : removedForInactivity ? "You were removed for inactivity." : "You have been exiled.")}
@@ -731,7 +741,3 @@ export default function PlayPage() {
   );
 }
 
-const pageStyle = {
-  minHeight: "100vh", background: "linear-gradient(180deg, #05010f, #1a0a2e)", color: "#f5f0ff",
-  fontFamily: "'Orbitron', 'Segoe UI', sans-serif", padding: 24,
-};

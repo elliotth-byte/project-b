@@ -125,12 +125,26 @@ export default function AdminHost({ gameId, players, round }) {
     return unsubscribe;
   }, [gameId]);
 
-  const pending = players.filter((p) => !p.approved);
+  // Optimistic-approval overlay — players is a prop fed by host.jsx's
+  // own realtime subscription + 45s poll fallback (lib/gameStorage.js's
+  // egress-driven interval), so without this, clicking Approve/Remove
+  // waits on that round trip before the pending list visibly updates,
+  // which can read as the button "not working" if realtime is ever
+  // slow to deliver. Cleared automatically once the real update lands
+  // and players itself reflects it (this player naturally drops out of
+  // `pending` on its own at that point); only restored if the write
+  // itself actually failed.
+  const [optimisticallyApproved, setOptimisticallyApproved] = useState(new Set());
+  const pending = players.filter((p) => !p.approved && !optimisticallyApproved.has(p.id));
   const seasonStarted = !!round && round.phase !== PHASES.LOBBY;
 
   const approvePlayer = async (p) => {
+    setOptimisticallyApproved((prev) => new Set(prev).add(p.id));
     const { error } = await supabase.from("players").update({ approved: true }).eq("id", p.id);
-    if (error) alert("Couldn't approve: " + error.message);
+    if (error) {
+      alert("Couldn't approve: " + error.message);
+      setOptimisticallyApproved((prev) => { const next = new Set(prev); next.delete(p.id); return next; });
+    }
   };
 
   const rejectPlayer = async (p) => {

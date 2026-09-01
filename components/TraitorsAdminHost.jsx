@@ -44,7 +44,12 @@ export default function AdminHost({ gameId, players }) {
     return unsubscribe;
   }, [gameId]);
 
-  const pending = players.filter((p) => !p.approved);
+  // Optimistic-approval overlay — see AdminHost.jsx's identical comment
+  // on why (players is a prop fed by host.jsx's own realtime
+  // subscription + 45s poll fallback; without this, the pending list
+  // only updates once that round trip lands).
+  const [optimisticallyApproved, setOptimisticallyApproved] = useState(new Set());
+  const pending = players.filter((p) => !p.approved && !optimisticallyApproved.has(p.id));
   // Whoever's still standing when the host declares a winner — see
   // this card below and lib/traitorsFinale.js. Everyone else is
   // already alive: false with their own elimination_order recorded
@@ -68,8 +73,12 @@ export default function AdminHost({ gameId, players }) {
   };
 
   const approvePlayer = async (p) => {
+    setOptimisticallyApproved((prev) => new Set(prev).add(p.id));
     const { error } = await supabase.from("players").update({ approved: true }).eq("id", p.id);
-    if (error) alert("Couldn't approve: " + error.message);
+    if (error) {
+      alert("Couldn't approve: " + error.message);
+      setOptimisticallyApproved((prev) => { const next = new Set(prev); next.delete(p.id); return next; });
+    }
   };
 
   const rejectPlayer = async (p) => {

@@ -11,6 +11,7 @@ import TraitorsMusicPlayer from "../components/TraitorsMusicPlayer";
 import HomeLink from "../components/HomeLink";
 import { useRoundWatcher } from "../lib/useRoundWatcher";
 import { initRound } from "../lib/gameState";
+import { themeFor } from "../lib/uiTheme";
 
 export default function HostPage() {
   const router = useRouter();
@@ -46,6 +47,13 @@ export default function HostPage() {
   // a traitors season needs enabled: false.
   const game = useMemo(() => games?.find((g) => g.id === activeGameId) || null, [games, activeGameId]);
   useRoundWatcher(activeGameId, { enabled: game?.game_type !== "traitors" });
+  // Drives every color/font reference below — see lib/uiTheme.js. No
+  // active season yet (login, "no active season") just gets Project
+  // B's own palette, same as always.
+  const theme = themeFor(game?.game_type);
+  const pageStyle = { minHeight: "100vh", background: theme.pageBg, color: theme.text, fontFamily: theme.font, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 };
+  const inputStyle = { display: "block", width: "100%", background: theme.inputBg, border: `1px solid ${theme.border}`, borderRadius: 8, padding: "10px 14px", color: theme.text, fontSize: 14, outline: "none", marginBottom: 10, boxSizing: "border-box" };
+  const btnStyle = { width: "100%", background: theme.accentGradient, color: theme.accentText, border: "none", borderRadius: 8, padding: "10px 18px", fontSize: 14, fontWeight: 700, cursor: "pointer" };
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -352,13 +360,13 @@ export default function HostPage() {
       <div style={pageStyle}>
         <form onSubmit={submitLogin} style={{ maxWidth: 320, width: "100%", textAlign: "center" }}>
           <div style={{ marginBottom: 16 }}><HomeLink /></div>
-          <h2 style={{ fontFamily: "'Orbitron', 'Segoe UI', sans-serif", fontSize: 22, marginBottom: 4 }}>Host Access</h2>
-          <p style={{ color: "#a68fd6", fontSize: 13, marginBottom: 16, fontStyle: "italic" }}>
+          <h2 style={{ fontFamily: theme.font, fontSize: 22, marginBottom: 4 }}>Host Access</h2>
+          <p style={{ color: theme.textMuted, fontSize: 13, marginBottom: 16, fontStyle: "italic" }}>
             Log in with the host account created in Supabase.
           </p>
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Host email" style={inputStyle} autoFocus />
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" style={inputStyle} />
-          {error && <p style={{ color: "#ff3860", fontSize: 13 }}>{error}</p>}
+          {error && <p style={{ color: theme.danger, fontSize: 13 }}>{error}</p>}
           <button type="submit" style={btnStyle}>Enter</button>
         </form>
       </div>
@@ -371,7 +379,7 @@ export default function HostPage() {
         <div style={{ textAlign: "center" }}>
           <div style={{ marginBottom: 16 }}><HomeLink /></div>
           <p>This account isn't marked as a host. Set <code>role: "host"</code> in this user's metadata in Supabase, or use a dedicated host account.</p>
-          <button onClick={signOut} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 12, cursor: "pointer", marginTop: 12 }}>Log out and try a different account</button>
+          <button onClick={signOut} style={{ background: "none", border: "none", color: theme.textDim, fontSize: 12, cursor: "pointer", marginTop: 12 }}>Log out and try a different account</button>
         </div>
       </div>
     );
@@ -384,27 +392,33 @@ export default function HostPage() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <HomeLink />
-            <h1 style={{ fontFamily: "'Orbitron', 'Segoe UI', sans-serif", fontSize: 22, margin: 0 }}>Host Console</h1>
+            <h1 style={{ fontFamily: theme.font, fontSize: 22, margin: 0 }}>Host Console</h1>
           </div>
-          <button onClick={signOut} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 12, cursor: "pointer" }}>Log out</button>
+          <button onClick={signOut} style={{ background: "none", border: "none", color: theme.textDim, fontSize: 12, cursor: "pointer" }}>Log out</button>
         </div>
 
         {/* ---------------- Season switcher ---------------- */}
         {/* Always shown once `games` has loaded (even as an empty array —
             e.g. right after deleting your only season) so "+ New Season"
-            is never stranded behind a season that no longer exists. */}
+            is never stranded behind a season that no longer exists.
+            Each button keeps its OWN season's colors regardless of
+            which one is currently active/selected — a Traitors season
+            in the list still looks gold even while a Project B one is
+            the active tab — since this is the one place a host might
+            be looking at both types side by side. */}
         {games && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
             {visibleGames.map((g) => {
               const active = g.id === activeGameId;
+              const gTheme = themeFor(g.game_type);
               return (
                 <button
                   key={g.id}
                   onClick={() => switchTo(g.id)}
                   style={{
-                    background: active ? "linear-gradient(135deg, #ff2d95, #b829ff)" : "#150a28",
-                    color: active ? "#05010f" : "#f5f0ff",
-                    border: active ? "none" : "1px solid #3d1f5c",
+                    background: active ? gTheme.accentGradient : theme.cardBg,
+                    color: active ? gTheme.accentText : theme.text,
+                    border: active ? "none" : `1px solid ${theme.border}`,
                     borderRadius: 20, padding: "7px 14px", fontSize: 12.5, fontWeight: 700,
                     cursor: "pointer", textAlign: "left",
                   }}
@@ -420,7 +434,7 @@ export default function HostPage() {
             <button
               onClick={() => setCreating((v) => !v)}
               style={{
-                background: "transparent", color: "#ff2d95", border: "1px dashed #ff2d95",
+                background: "transparent", color: theme.accent, border: `1px dashed ${theme.accent}`,
                 borderRadius: 20, padding: "7px 14px", fontSize: 12.5, fontWeight: 700, cursor: "pointer",
               }}
             >
@@ -431,7 +445,7 @@ export default function HostPage() {
 
         {games && archivedGames.length > 0 && (
           <div style={{ marginBottom: 14 }}>
-            <button onClick={() => setShowArchived((v) => !v)} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 12, cursor: "pointer", padding: 0 }}>
+            <button onClick={() => setShowArchived((v) => !v)} style={{ background: "none", border: "none", color: theme.textDim, fontSize: 12, cursor: "pointer", padding: 0 }}>
               {showArchived ? "▾" : "▸"} Archived seasons ({archivedGames.length})
             </button>
             {showArchived && (
@@ -439,17 +453,17 @@ export default function HostPage() {
                 {archivedGames.map((g) => {
                   const primaryForThis = user && g.host_id === user.id;
                   return (
-                    <div key={g.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#150a28", border: "1px solid #3d1f5c", borderRadius: 8, padding: "8px 12px" }}>
-                      <span style={{ fontSize: 12.5, color: "#a68fd6" }}>
+                    <div key={g.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: theme.cardBg, border: `1px solid ${theme.border}`, borderRadius: 8, padding: "8px 12px" }}>
+                      <span style={{ fontSize: 12.5, color: theme.textMuted }}>
                         {g.name}{g.subtitle && <span style={{ opacity: 0.7 }}> — {g.subtitle}</span>}
                       </span>
                       {primaryForThis ? (
                         <div style={{ display: "flex", gap: 6 }}>
-                          <button onClick={() => restoreSeason(g.id)} style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, color: "#a68fd6", fontSize: 11, cursor: "pointer", padding: "4px 8px" }}>Restore</button>
-                          <button onClick={() => deleteSeason(g)} style={{ background: "none", border: "1px solid #ff386055", borderRadius: 6, color: "#ff3860", fontSize: 11, cursor: "pointer", padding: "4px 8px" }}>Delete forever</button>
+                          <button onClick={() => restoreSeason(g.id)} style={{ background: "none", border: `1px solid ${theme.border}`, borderRadius: 6, color: theme.textMuted, fontSize: 11, cursor: "pointer", padding: "4px 8px" }}>Restore</button>
+                          <button onClick={() => deleteSeason(g)} style={{ background: "none", border: `1px solid ${theme.danger}55`, borderRadius: 6, color: theme.danger, fontSize: 11, cursor: "pointer", padding: "4px 8px" }}>Delete forever</button>
                         </div>
                       ) : (
-                        <span style={{ fontSize: 11, color: "#6b4f99", fontStyle: "italic" }}>only the primary host can restore this</span>
+                        <span style={{ fontSize: 11, color: theme.textDim, fontStyle: "italic" }}>only the primary host can restore this</span>
                       )}
                     </div>
                   );
@@ -460,51 +474,57 @@ export default function HostPage() {
         )}
 
         {games && !game && !creating && (
-          <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: "8px 0 16px" }}>
+          <p style={{ color: theme.textDim, fontSize: 13, fontStyle: "italic", margin: "8px 0 16px" }}>
             No active season — click "+ New Season" above to start one.
           </p>
         )}
 
         {creating && (
-          <form onSubmit={submitNewSeason} style={{ background: "#150a28", border: "1px solid #3d1f5c", borderRadius: 10, padding: 14, marginBottom: 16 }}>
-            <div style={{ color: "#a68fd6", fontSize: 12, marginBottom: 8 }}>Start a new season</div>
+          <form onSubmit={submitNewSeason} style={{ background: theme.cardBg, border: `1px solid ${theme.border}`, borderRadius: 10, padding: 14, marginBottom: 16 }}>
+            <div style={{ color: theme.textMuted, fontSize: 12, marginBottom: 8 }}>Start a new season</div>
 
             {/* Locked in at creation — see createSeason's own comment on
                 why this can't change after the fact (Project B's and
                 Traitors' round engines are completely separate, so a
-                season needs to pick one bootstrap path up front). */}
+                season needs to pick one bootstrap path up front). Each
+                option previews in its OWN color when selected, not
+                whichever type this form itself is currently styled as. */}
             <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
               {[
                 { value: "project_b", label: "🃏 Project B", desc: "Challenge → Fates → Exile" },
                 { value: "traitors", label: "🏰 Traitors", desc: "Roundtable & Murder Vote" },
-              ].map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setNewGameType(opt.value)}
-                  style={{
-                    flex: 1, textAlign: "left", cursor: "pointer", borderRadius: 8, padding: "8px 10px",
-                    background: newGameType === opt.value ? "rgba(255,45,149,0.13)" : "transparent",
-                    border: `1px solid ${newGameType === opt.value ? "#ff2d95" : "#3d1f5c"}`,
-                  }}
-                >
-                  <div style={{ color: newGameType === opt.value ? "#ff2d95" : "#f5f0ff", fontSize: 13, fontWeight: 700 }}>{opt.label}</div>
-                  <div style={{ color: "#6b4f99", fontSize: 10.5, marginTop: 2 }}>{opt.desc}</div>
-                </button>
-              ))}
+              ].map((opt) => {
+                const optTheme = themeFor(opt.value);
+                const selected = newGameType === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setNewGameType(opt.value)}
+                    style={{
+                      flex: 1, textAlign: "left", cursor: "pointer", borderRadius: 8, padding: "8px 10px",
+                      background: selected ? `${optTheme.accent}22` : "transparent",
+                      border: `1px solid ${selected ? optTheme.accent : theme.border}`,
+                    }}
+                  >
+                    <div style={{ color: selected ? optTheme.accent : theme.text, fontSize: 13, fontWeight: 700 }}>{opt.label}</div>
+                    <div style={{ color: theme.textDim, fontSize: 10.5, marginTop: 2 }}>{opt.desc}</div>
+                  </button>
+                );
+              })}
             </div>
 
             <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Season name (e.g. Office Offsite 2026)" style={inputStyle} autoFocus />
             <input value={newSubtitle} onChange={(e) => setNewSubtitle(e.target.value)} placeholder="Subtitle — optional" style={{ ...inputStyle, marginBottom: 10 }} />
             <div style={{ display: "flex", gap: 8 }}>
               <button type="submit" style={{ ...btnStyle, flex: 1 }}>Create</button>
-              <button type="button" onClick={() => setCreating(false)} style={{ ...btnStyle, flex: 1, background: "transparent", color: "#a68fd6", border: "1px solid #3d1f5c" }}>Cancel</button>
+              <button type="button" onClick={() => setCreating(false)} style={{ ...btnStyle, flex: 1, background: "transparent", color: theme.textMuted, border: `1px solid ${theme.border}` }}>Cancel</button>
             </div>
           </form>
         )}
 
         {game && (
-          <div style={{ background: "#150a28", border: "1px solid #3d1f5c", borderRadius: 10, padding: 14, marginBottom: 16 }}>
+          <div style={{ background: theme.cardBg, border: `1px solid ${theme.border}`, borderRadius: 10, padding: 14, marginBottom: 16 }}>
             {/* ---------------- Season name / subtitle ---------------- */}
             {editing ? (
               <form onSubmit={saveEditing} style={{ marginBottom: 12 }}>
@@ -512,21 +532,21 @@ export default function HostPage() {
                 <input value={editSubtitle} onChange={(e) => setEditSubtitle(e.target.value)} placeholder="Subtitle — optional" style={{ ...inputStyle, marginBottom: 10 }} />
                 <div style={{ display: "flex", gap: 8 }}>
                   <button type="submit" style={{ ...btnStyle, flex: 1 }}>Save</button>
-                  <button type="button" onClick={() => setEditing(false)} style={{ ...btnStyle, flex: 1, background: "transparent", color: "#a68fd6", border: "1px solid #3d1f5c" }}>Cancel</button>
+                  <button type="button" onClick={() => setEditing(false)} style={{ ...btnStyle, flex: 1, background: "transparent", color: theme.textMuted, border: `1px solid ${theme.border}` }}>Cancel</button>
                 </div>
               </form>
             ) : (
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                 <div>
-                  <div style={{ fontFamily: "'Orbitron', 'Segoe UI', sans-serif", fontSize: 17, fontWeight: 700 }}>{game.name}</div>
-                  {game.subtitle && <div style={{ color: "#a68fd6", fontSize: 12.5, fontStyle: "italic", marginTop: 2 }}>{game.subtitle}</div>}
+                  <div style={{ fontFamily: theme.font, fontSize: 17, fontWeight: 700 }}>{game.name}</div>
+                  {game.subtitle && <div style={{ color: theme.textMuted, fontSize: 12.5, fontStyle: "italic", marginTop: 2 }}>{game.subtitle}</div>}
                 </div>
                 <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
-                  <button onClick={startEditing} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 12, cursor: "pointer" }}>✎ Edit</button>
+                  <button onClick={startEditing} style={{ background: "none", border: "none", color: theme.textDim, fontSize: 12, cursor: "pointer" }}>✎ Edit</button>
                   {isPrimaryHost && (
                     <>
-                      <button onClick={() => archiveSeason(game.id)} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 12, cursor: "pointer" }}>📦 Archive</button>
-                      <button onClick={() => deleteSeason(game)} style={{ background: "none", border: "none", color: "#ff3860", fontSize: 12, cursor: "pointer" }}>🗑 Delete</button>
+                      <button onClick={() => archiveSeason(game.id)} style={{ background: "none", border: "none", color: theme.textDim, fontSize: 12, cursor: "pointer" }}>📦 Archive</button>
+                      <button onClick={() => deleteSeason(game)} style={{ background: "none", border: "none", color: theme.danger, fontSize: 12, cursor: "pointer" }}>🗑 Delete</button>
                     </>
                   )}
                 </div>
@@ -540,7 +560,7 @@ export default function HostPage() {
           </div>
         )}
 
-        {error && <p style={{ color: "#ff3860", fontSize: 13 }}>{error}</p>}
+        {error && <p style={{ color: theme.danger, fontSize: 13 }}>{error}</p>}
 
         {/* key={game.id} forces a clean remount of all host panels/polling
             when switching seasons, instead of every tab's internal state
@@ -605,24 +625,10 @@ export default function HostPage() {
       </div>
       {game && game.game_type === "traitors" && <TraitorsMusicPlayer key={`music-${game.id}`} gameId={game.id} isHost={true} />}
       {game && game.game_type !== "traitors" && <MusicPlayer key={`music-${game.id}`} gameId={game.id} isHost={true} portalTarget={radioPortalNode} />}
-      <p style={{ fontSize: 10, color: "#3d1f5c", textAlign: "center", margin: "16px 0 0" }}>
+      <p style={{ fontSize: 10, color: theme.border, textAlign: "center", margin: "16px 0 0" }}>
         Version {process.env.NEXT_PUBLIC_APP_VERSION || "dev"}
       </p>
     </div>
   );
 }
 
-const pageStyle = {
-  minHeight: "100vh", background: "linear-gradient(180deg, #05010f, #1a0a2e)", color: "#f5f0ff",
-  fontFamily: "'Orbitron', 'Segoe UI', sans-serif", display: "flex",
-  alignItems: "center", justifyContent: "center", padding: 24,
-};
-const inputStyle = {
-  display: "block", width: "100%", background: "#0d0618", border: "1px solid #3d1f5c",
-  borderRadius: 8, padding: "10px 14px", color: "#f5f0ff", fontSize: 14, outline: "none", marginBottom: 10,
-  boxSizing: "border-box",
-};
-const btnStyle = {
-  width: "100%", background: "linear-gradient(135deg, #ff2d95, #b829ff)", color: "#05010f",
-  border: "none", borderRadius: 8, padding: "10px 18px", fontSize: 14, fontWeight: 700, cursor: "pointer",
-};
