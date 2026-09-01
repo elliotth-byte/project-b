@@ -54,7 +54,7 @@ export default function VotingHistorySpreadsheet({ exileHistory, finaleState, pl
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${(gameName || "project-b").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-voting-history.csv`;
+    a.download = `${(gameName || "panopticon").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-voting-history.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

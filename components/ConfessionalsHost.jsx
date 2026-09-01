@@ -162,7 +162,7 @@ export default function ConfessionalsHost({ gameId, round, players }) {
       const tagPart = recapOpts.tags && c.tags?.length ? ` [${c.tags.join(", ")}]` : "";
       return `*${who}${roundPart}:*${tagPart}\n"${c.text}"`;
     });
-    return `🎥 Project B Confessionals\n\n${lines.join("\n\n")}`;
+    return `🎥 Panopticon Confessionals\n\n${lines.join("\n\n")}`;
   };
 
   if (loading) return <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>Loading...</p></Card>;

@@ -297,7 +297,7 @@ export function FinaleCard({ finale, rows, byId, showComments, qa }) {
           <VoteRowsList rows={rows} showComments={showComments} />
           {winnerName && (
             <p style={{ fontSize: 15, color: "#f5f0ff", margin: "10px 0 0", fontWeight: 700, textAlign: "center" }}>
-              🏆 <span style={{ color: "#00ff9d" }}>{winnerName}</span> wins Project B!
+              🏆 <span style={{ color: "#00ff9d" }}>{winnerName}</span> wins Panopticon!
             </p>
           )}
         </>

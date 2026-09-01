@@ -30,7 +30,7 @@ self.addEventListener("push", (event) => {
   try {
     payload = event.data.json();
   } catch (e) {
-    payload = { title: "Project B", body: event.data.text() };
+    payload = { title: "Cruel Summer House", body: event.data.text() };
   }
 
   const { title, body, url, tag } = payload;
@@ -39,8 +39,13 @@ self.addEventListener("push", (event) => {
   // the whole app would be an arbitrary, confusing choice — omitting
   // icon/badge entirely is valid per the Notifications API and just
   // falls back to the browser's own default appearance.
+  //
+  // Fallback title is the platform's own brand, not a game type's —
+  // this is a generic malformed-payload fallback, not scoped to
+  // whichever season the notification is actually about (see
+  // pages/api/push/notify-*.js for the real, per-notification titles).
   event.waitUntil(
-    self.registration.showNotification(title || "Project B", {
+    self.registration.showNotification(title || "Cruel Summer House", {
       body: body || "",
       tag: tag || "project-b",
       data: { url: url || "/" },

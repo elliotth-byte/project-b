@@ -184,7 +184,7 @@ export default function PlayerViewer({ gameId, targetPlayer, allPlayers, round, 
         <div style={{ marginBottom: 20, textAlign: "center", padding: "28px 20px", background: "linear-gradient(160deg, #1a0a2e 0%, #1a0a2e 100%)", border: "2px solid #ff2d95", borderRadius: 12 }}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>🏆</div>
           <p style={{ color: "#f5f0ff", fontSize: 18, fontWeight: 700, margin: 0, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
-            {round.winnerName} wins Project B!
+            {round.winnerName} wins Panopticon!
           </p>
         </div>
       )}

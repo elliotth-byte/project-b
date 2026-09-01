@@ -157,7 +157,7 @@ export default function HostPage() {
       // No seasons at all yet — create the first one automatically.
       // Always Project B — a host who wants a Traitors season instead
       // just uses "+ New Season" and picks it there.
-      const created = await createSeason("Project B", "", "project_b");
+      const created = await createSeason("Panopticon", "", "project_b");
       if (created) {
         setActiveGameId(created.id);
         router.replace(`/host?game=${created.id}`, undefined, { shallow: true });
@@ -313,7 +313,7 @@ export default function HostPage() {
     const { data: code } = await supabase.rpc("generate_join_code");
     const { data: created, error } = await supabase
       .from("games")
-      .insert({ name: name || (type === "traitors" ? "The Traitors" : "Project B"), subtitle: subtitle || null, host_id: user.id, join_code: code, game_type: type })
+      .insert({ name: name || (type === "traitors" ? "The Traitors" : "Panopticon"), subtitle: subtitle || null, host_id: user.id, join_code: code, game_type: type })
       .select()
       .single();
     if (error) { setError(error.message); return null; }
@@ -351,7 +351,7 @@ export default function HostPage() {
     e.preventDefault();
     const { data: updated, error } = await supabase
       .from("games")
-      .update({ name: editName.trim() || "Project B", subtitle: editSubtitle.trim() || null })
+      .update({ name: editName.trim() || "Panopticon", subtitle: editSubtitle.trim() || null })
       .eq("id", game.id)
       .select()
       .single();
@@ -498,7 +498,7 @@ export default function HostPage() {
                 whichever type this form itself is currently styled as. */}
             <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
               {[
-                { value: "project_b", label: "🃏 Project B", desc: "Challenge → Fates → Exile" },
+                { value: "project_b", label: "🃏 Panopticon", desc: "Challenge → Fates → Exile" },
                 { value: "traitors", label: "🏰 Traitors", desc: "Roundtable & Murder Vote" },
               ].map((opt) => {
                 const optTheme = themeFor(opt.value);

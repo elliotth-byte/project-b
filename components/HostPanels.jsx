@@ -150,7 +150,7 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
             <Card style={{ textAlign: "center", borderColor: "rgba(255,45,149,0.5)" }}>
               <div style={{ fontSize: 40, marginBottom: 8 }}>🏆</div>
               <h3 style={{ color: "#ff2d95", margin: "0 0 4px", fontSize: 20, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
-                {round.winnerName || "Someone"} wins Project B!
+                {round.winnerName || "Someone"} wins Panopticon!
               </h3>
             </Card>
           ) : (
