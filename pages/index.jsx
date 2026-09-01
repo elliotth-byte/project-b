@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 import { signOut, isHost, displayNameFromUser } from "../lib/auth";
+import { checkIsPlatformAdmin } from "../lib/adminModeration";
 import { SITE_THEME, LOGO_SRC } from "../lib/siteTheme";
 
 // ─── Cruel Summer House — the front door ───
@@ -22,12 +23,25 @@ export default function Home() {
   const game = router.query.game;
   const withGame = (path) => (game ? `${path}?game=${game}` : path);
   const [user, setUser] = useState(undefined); // undefined = still checking, null = logged out
+  // undefined = not checked yet, true/false once known. This is the
+  // platform-admin role (see pages/admin.jsx) — a separate, narrower
+  // tier from isHost(user) below, which is about running your OWN
+  // season, not moderating the whole platform. Checked here (not just
+  // left as a bare URL) specifically because nothing else in normal
+  // navigation ever links to /admin — a real host who's also a
+  // platform admin had no way to find it short of typing the URL.
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user || null));
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => setUser(session?.user || null));
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user) { setIsAdmin(false); return; }
+    checkIsPlatformAdmin().then(({ isAdmin: ok }) => setIsAdmin(!!ok));
+  }, [user]);
 
   return (
     <div style={pageStyle}>
@@ -59,6 +73,7 @@ export default function Home() {
               <Link href="/profile" style={linkBtn}>🪪 My Profile</Link>
               <Link href="/messages" style={linkBtn}>💬 Messages</Link>
               {isHost(user) && <Link href="/host" style={{ ...linkBtn, borderColor: SITE_THEME.accent, color: SITE_THEME.accent }}>👑 Host Console</Link>}
+              {isAdmin && <Link href="/admin" style={linkBtn}>🛠 Platform Admin</Link>}
               <button onClick={signOut} style={{ ...linkBtn, background: "none", cursor: "pointer", color: SITE_THEME.textDim }}>Log out</button>
             </div>
           </>
