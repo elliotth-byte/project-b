@@ -204,6 +204,9 @@ actually drives the game from phase to phase.
 
    **Already have a project running?** A few migrations only matter if
    you set this project up before they existed:
+   - Run `add-game-type.sql` then `add-traitors-tables.sql` to pick up the
+     Traitors game mode (see the "Game types" section below) — additive,
+     safe to run on any existing project regardless of how old it is.
    - If you ran `add-chaos-secrets.sql` before this note was added, also
      run `sql/fix-chaos-holder-check.sql` once — it patches a bug where
      the player actually holding the Power of Chaos could never read
@@ -357,7 +360,44 @@ they like, rather than posting it anywhere automatically.
   vote were removed — Project B's Challenge/Fates/Exile loop replaces
   Roundtable entirely, and there's no host-only secret state anymore
   (no `host_state` table), since nothing in Project B needs to be hidden
-  from other players the way traitor identities did.
+  from other players the way traitor identities did. **Update:** as of
+  the "Game types" section below, this app is being re-merged with the
+  Traitors app it forked from — `host_state`, `traitor_state`, and
+  `player_roles` are coming back, but scoped to Traitors-type seasons
+  only; Project B seasons still never touch them.
+
+## Game types
+
+This app now hosts two different sets of season rules from one
+codebase/database, distinguished by `games.game_type` (`'project_b'` or
+`'traitors'`, see `sql/add-game-type.sql`) — the intent being that a
+third (Survivor) can be added later the same way, sharing the same
+Supabase project, the same `auth.users`/`profiles` identity layer, and a
+shared library of mini-games (see `lib/challenges/`) rather than being a
+separate app.
+
+- **Shared across every game type:** Supabase auth, `profiles`,
+  `platform_admins`, `game_hosts` (co-hosts), the `games`/`players`/
+  `game_state` core tables, and the mini-game challenge engine
+  (`lib/challenges/registry.js`, `scores.js`, `selection.js`,
+  `participants.js` — a game-type-agnostic "run a mini-game, collect
+  scores, hand back a leaderboard" layer; what a game type's own round
+  engine does with that leaderboard is entirely up to it).
+- **`project_b` seasons** get this app's own Challenge → Fates → Exile
+  engine (`lib/roundEngine.js`) — unchanged, this is the original
+  behavior of this app.
+- **`traitors` seasons** get the Roundtable/Murder Vote/Missions engine
+  ported from the standalone Traitors app (`player_roles`, `host_state`,
+  `traitor_state` — see `sql/add-traitors-tables.sql`), reusing this
+  app's existing `confessionals` table rather than a separate one, since
+  the schema was already identical.
+- `game_type` is set once, at season creation, and not meant to change
+  after — see `pages/host.jsx`'s `createSeason`.
+
+As of this note, the schema side of this is in place; the host-facing
+mode picker and the ported Traitors host/player UI are still landing —
+check `sql/add-traitors-tables.sql`'s own header comment and this
+section's git history for the current state.
 - **Admin-configurable round lengths** (`components/AdminHost.jsx`,
   `lib/gameState.js`'s `getSettings`/`setSettings`), plus the whole
   auto-advance engine described above (`lib/roundEngine.js`).
