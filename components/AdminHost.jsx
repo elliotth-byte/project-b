@@ -153,7 +153,7 @@ export default function AdminHost({ gameId, players, round }) {
 
   const removeApprovedPlayer = async (p) => {
     if (!confirm(`Remove ${p.display_name} from this game? They'll be marked out (like an exile, but with no re-entry attempt) rather than deleted, so past rounds still show their name correctly.`)) return;
-    const { error } = await quitOrRemoveApprovedPlayer(p.id, round?.round ?? null);
+    const { error } = await quitOrRemoveApprovedPlayer(gameId, p.id, round?.round ?? null);
     if (error) alert("Couldn't remove: " + error.message);
   };
 

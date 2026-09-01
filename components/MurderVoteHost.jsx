@@ -3,6 +3,7 @@ import { Btn, Card, Badge } from "./traitorsUi";
 import { supabase } from "../lib/supabaseClient";
 import { traitorStorageSet, traitorStorageUpdate, traitorStorageDelete, subscribeTraitorState } from "../lib/traitorStorage";
 import { hostStorageUpdate } from "../lib/hostStorage";
+import { recordElimination } from "../lib/seasonPlacement";
 import { STORAGE_KEY_TRAITOR_ROLES, factionLabel } from "../lib/traitorData";
 import { murderVoteKey, calculateMurderVoteResult, defaultEligibleTargets } from "../lib/murderVoteData";
 import { murderScript } from "../lib/slackScripts";
@@ -124,6 +125,10 @@ function FactionPanel({ gameId, players, tr, faction, factionTraitors }) {
     });
     if (res.ok && target) {
       await supabase.from("players").update({ alive: false, elimination_type: "murdered" }).eq("id", target.id);
+      // See lib/seasonPlacement.js — same shared placement pool Project
+      // B's own eliminations feed, so "Xth place of Y" means the same
+      // thing regardless of game type or which season ended someone's run.
+      await recordElimination(supabase, gameId, target.id);
       const shieldedNames = Object.keys(res.value.shielded).filter((n) => res.value.shielded[n]);
       setAnnouncement(murderScript(targetName, shieldedNames));
     }

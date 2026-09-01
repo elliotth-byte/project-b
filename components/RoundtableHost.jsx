@@ -8,6 +8,7 @@ import {
 } from "../lib/roundtableData";
 import { roundtableAnnouncementScript, voteRevealScript, banishScript } from "../lib/slackScripts";
 import PostToSlack from "./PostToSlack";
+import { recordElimination } from "../lib/seasonPlacement";
 
 // ─── Roundtable: Host Control ───
 //
@@ -107,6 +108,9 @@ export default function RoundtableHost({ gameId, players }) {
     const target = players.find((p) => p.display_name === leadingTarget);
     if (target) {
       await supabase.from("players").update({ alive: false, elimination_type: "banished" }).eq("id", target.id);
+      // See lib/seasonPlacement.js — same shared placement pool a murder
+      // (MurderVoteHost.jsx) or a Project B exile feeds.
+      await recordElimination(supabase, gameId, target.id);
     }
     setBanishing(false);
   };

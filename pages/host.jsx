@@ -40,7 +40,12 @@ export default function HostPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteStatus, setInviteStatus] = useState(null); // null | "sending" | message string
 
-  useRoundWatcher(activeGameId);
+  // Declared here (rather than down with visibleGames/archivedGames
+  // below, where it conceptually belongs) so useRoundWatcher, right
+  // below, can gate on game_type — see that hook's own comment on why
+  // a traitors season needs enabled: false.
+  const game = useMemo(() => games?.find((g) => g.id === activeGameId) || null, [games, activeGameId]);
+  useRoundWatcher(activeGameId, { enabled: game?.game_type !== "traitors" });
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -145,7 +150,6 @@ export default function HostPage() {
     })();
   }, [games, router.query.game]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const game = useMemo(() => games?.find((g) => g.id === activeGameId) || null, [games, activeGameId]);
   const visibleGames = useMemo(() => (games || []).filter((g) => !g.archived), [games]);
   const archivedGames = useMemo(() => (games || []).filter((g) => g.archived), [games]);
   const isPrimaryHost = !!(game && user && game.host_id === user.id);

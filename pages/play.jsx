@@ -95,7 +95,11 @@ export default function PlayPage() {
   const [showNavTour, setShowNavTour] = useState(false);
   const [radioPortalNode, setRadioPortalNode] = useState(null);
 
-  useRoundWatcher(gameId);
+  // See lib/useRoundWatcher.js's own comment on why a traitors season
+  // passes enabled: false — gameInfo.game_type isn't known yet on the
+  // very first render (gameInfo starts null), which just means this
+  // stays enabled for that one render until the fetch below resolves.
+  useRoundWatcher(gameId, { enabled: gameInfo?.game_type !== "traitors" });
 
   // Hooks must run unconditionally, before any early returns below — this
   // is intentionally called this early (using the raw state directly,
@@ -440,7 +444,7 @@ export default function PlayPage() {
     if (!confirm(`Are you sure you want to ${verb}? This can't be undone.`)) return;
     setQuitBusy(true);
     const { error } = approved
-      ? await quitOrRemoveApprovedPlayer(myPlayer.id, round?.round ?? null)
+      ? await quitOrRemoveApprovedPlayer(gameId, myPlayer.id, round?.round ?? null)
       : await removePendingPlayer(myPlayer.id);
     setQuitBusy(false);
     if (error) { alert("Couldn't leave: " + error.message); return; }
