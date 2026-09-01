@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabaseClient";
 import { signOut, displayNameFromUser } from "../lib/auth";
 import { removePendingPlayer, quitOrRemoveApprovedPlayer } from "../lib/playerRemoval";
 import ColorPicker from "../components/ColorPicker";
+import TraitorsAliasPicker from "../components/TraitorsAliasPicker";
 import { AVATAR_COLLECTIONS } from "../lib/avatarCollections";
 import ChallengePlayer from "../components/ChallengePlayer";
 import FatesPlayer from "../components/FatesPlayer";
@@ -49,7 +50,8 @@ import { subscribeScores } from "../lib/challengeScores";
 import { subscribeCloseToTwenty } from "../lib/games/closeToTwentyData";
 import { subscribeRevealAck } from "../lib/revealAck";
 import { computeWinnerAndNomineeIds } from "../lib/memoryWallGlow";
-import { resolveIdentities, identityComplete } from "../lib/playerIdentity";
+import { resolveIdentities, identityComplete, traitorsIdentityComplete } from "../lib/playerIdentity";
+import { subscribeTraitorsFinale } from "../lib/traitorsFinale";
 import { resolveAvatars } from "../lib/avatarIdentity";
 import { DEFAULT_GAME_PREFS } from "../lib/gamePrefs";
 import { useHasUnreadChat } from "../lib/useChatUnread";
@@ -192,6 +194,19 @@ export default function PlayPage() {
   useEffect(() => {
     if (!gameId) return;
     const unsubscribe = subscribeSettings(gameId, setSettings);
+    return unsubscribe;
+  }, [gameId]);
+
+  // Traitors' own "the season is over" marker — the alias-reveal
+  // condition further down needs SOME equivalent of Project B's
+  // round.phase === PHASES.ENDED, and Traitors has no round-phase
+  // engine at all (round stays null forever for it). Harmless to
+  // subscribe unconditionally; this key simply never gets written for a
+  // Project B game, so traitorsFinale just stays null there.
+  const [traitorsFinale, setTraitorsFinale] = useState(null);
+  useEffect(() => {
+    if (!gameId) return;
+    const unsubscribe = subscribeTraitorsFinale(gameId, setTraitorsFinale);
     return unsubscribe;
   }, [gameId]);
 
@@ -419,12 +434,18 @@ export default function PlayPage() {
   }
 
   const playerName = myPlayer?.name;
-  const identityAllPlayers = resolveAvatars(resolveIdentities(allPlayers, { settings, round, isHost: false }), settings);
+  // "Revealed" (aliases drop, real names show again) is Project B's own
+  // round.phase === ENDED for a Project B game, or a declared Traitors
+  // finale for a Traitors one — Traitors has no round-phase engine, so
+  // round?.phase can never actually reach ENDED for it. See
+  // resolveIdentities' own comment on the `revealed` override.
+  const aliasRevealed = isTraitors ? !!traitorsFinale : round?.phase === PHASES.ENDED;
+  const identityAllPlayers = resolveAvatars(resolveIdentities(allPlayers, { settings, revealed: aliasRevealed }), settings);
   // The player's own displayed name follows the same override — once
   // their alias is confirmed, that's who they are for the season,
   // including to themselves, right down to what shows up in "Playing
   // as..." up top and what name their own chat/confessional posts carry.
-  const effectivePlayerName = settings?.aliasEnabled && myPlayer?.alias && round?.phase !== PHASES.ENDED ? myPlayer.alias : playerName;
+  const effectivePlayerName = settings?.aliasEnabled && myPlayer?.alias && !aliasRevealed ? myPlayer.alias : playerName;
   const player = myPlayer ? { id: myPlayer.id, name: effectivePlayerName, gamePrefs: myPlayer.gamePrefs || DEFAULT_GAME_PREFS, battleBanRound: myPlayer.battleBanRound, torchedPreset: myPlayer.torchedPreset, powerState: myPlayer.powerState, alias: myPlayer.alias, inactivityStrikes: myPlayer.inactivityStrikes } : null;
 
   // Who Said It pulls its quiz straight from Panopticon chat history, and
@@ -473,6 +494,13 @@ export default function PlayPage() {
   // never needs to see this again, even if they somehow never completed
   // it — better to let them into the game than trap them here).
   const needsOnboardingPrefs = !isTraitors && joined && myPlayer && !needsIdentity && !approved && !myPlayer.gamePrefs?.onboardingComplete;
+  // Traitors' own, much lighter identity step — a free-text alias only,
+  // no color, no fixed god-name list, no onboarding-prefs step (see
+  // traitorsIdentityComplete's own comment for why this is separate from
+  // needsIdentity above rather than a shared variable). Same placement
+  // in the season as Project B's needsIdentity: resolved before the
+  // "waiting for host approval" screen, once, right after joining.
+  const needsTraitorsAlias = isTraitors && joined && myPlayer && !traitorsIdentityComplete(myPlayer, settings);
   // Once the game's over, the whole point of keeping exiled players
   // separated from the main chat (protecting the still-competing
   // players from anything an exiled player might reveal or pressure
@@ -550,7 +578,14 @@ export default function PlayPage() {
           />
         )}
 
-        {joined && myPlayer && !needsIdentity && !needsOnboardingPrefs && !myPlayer.approved && (
+        {joined && myPlayer && needsTraitorsAlias && (
+          <TraitorsAliasPicker
+            player={myPlayer}
+            onPicked={(alias) => setMyPlayer((p) => p && ({ ...p, alias }))}
+          />
+        )}
+
+        {joined && myPlayer && !needsIdentity && !needsOnboardingPrefs && !needsTraitorsAlias && !myPlayer.approved && (
           <div style={{
             marginBottom: 20, textAlign: "center", padding: "28px 20px",
             background: theme.cardBg,
@@ -771,10 +806,49 @@ export default function PlayPage() {
           </>
         )}
 
-        {isTraitors && approved && playerName && (
-          <ChallengeErrorBoundary label="Traitors">
-            <TraitorsPlayerPanels gameId={gameId} player={{ id: myPlayer.id, name: playerName }} />
-          </ChallengeErrorBoundary>
+        {isTraitors && approved && playerName && !needsTraitorsAlias && (
+          <>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 14, marginBottom: 10 }}>
+              <button onClick={() => setShowMemoryWall(!showMemoryWall)} style={{
+                background: showMemoryWall ? `${theme.accent}22` : "transparent",
+                border: `1px solid ${showMemoryWall ? theme.accent : theme.border}`,
+                color: showMemoryWall ? theme.accent : theme.textMuted, fontSize: 12, cursor: "pointer",
+                borderRadius: 6, padding: "4px 10px",
+              }}>
+                🖼 {showMemoryWall ? "Hide" : "Show"} memory wall
+              </button>
+              {myPlayer.alive !== false && (
+                <button onClick={handleQuit} disabled={quitBusy} style={{
+                  background: "none", border: "none", color: theme.danger, fontSize: 12,
+                  cursor: quitBusy ? "not-allowed" : "pointer", opacity: quitBusy ? 0.5 : 1,
+                }}>
+                  {quitBusy ? "Leaving..." : "✕ Leave Game"}
+                </button>
+              )}
+            </div>
+
+            {/* winnerIds/nomineeIds passed empty — Traitors has no direct
+                equivalent of Project B's computeWinnerAndNomineeIds
+                (challenge-history-derived MemoryWall glow) readily
+                available; the wall still shows everyone's photo/status
+                without it, just without that particular highlight. Must
+                be Sets, not arrays — PlayerMemoryWall calls .has() on
+                both. */}
+            {showMemoryWall && (
+              <div style={{ marginBottom: 20 }}>
+                <PlayerMemoryWall players={identityAllPlayers.filter((p) => p.approved)} winnerIds={new Set()} nomineeIds={new Set()} />
+              </div>
+            )}
+
+            <ChallengeErrorBoundary label="Traitors">
+              <TraitorsPlayerPanels
+                gameId={gameId}
+                player={{ id: myPlayer.id, name: effectivePlayerName, realName: playerName, alive: myPlayer.alive }}
+                players={identityAllPlayers}
+                settings={settings}
+              />
+            </ChallengeErrorBoundary>
+          </>
         )}
       </div>
       {approved && isTraitors && <TraitorsMusicPlayer gameId={gameId} isHost={false} />}

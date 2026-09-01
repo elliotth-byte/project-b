@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Btn, Card } from "./traitorsUi";
 import { supabase } from "../lib/supabaseClient";
-import { storageSet, storageUpdate, storageDelete, subscribeGameState } from "../lib/gameStorage";
+import { storageGet, storageSet, storageUpdate, storageDelete, subscribeGameState } from "../lib/gameStorage";
 import {
   buildDramaticVoteOrder, buildVoteRevealMessage, cumulativeTallyThrough,
   computeVoteTally, STORAGE_KEY_ROUND_INFO, VOTES_KEY_PREFIX, STORAGE_KEY_VOTE_HISTORY,
@@ -9,6 +9,8 @@ import {
 import { roundtableAnnouncementScript, voteRevealScript, banishScript } from "../lib/slackScripts";
 import PostToSlack from "./PostToSlack";
 import { recordElimination } from "../lib/seasonPlacement";
+import { GROUP_CHAT_KEY } from "../lib/chatData";
+import { applyTraitorsRoundInactivity, decayTraitorsStrikesIfDue } from "../lib/traitorsInactivity";
 
 // ─── Roundtable: Host Control ───
 //
@@ -21,7 +23,7 @@ import { recordElimination } from "../lib/seasonPlacement";
 // Slack integration itself gets converted). The suspenseful reveal ordering
 // logic itself is unchanged from the original — it just plays out in the
 // browser instead of being scripted for Slack.
-export default function RoundtableHost({ gameId, players }) {
+export default function RoundtableHost({ gameId, players, settings }) {
   const [roundInfo, setRoundInfo] = useState(null);
   const [votes, setVotes] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -72,6 +74,10 @@ export default function RoundtableHost({ gameId, players }) {
       round,
       votingOpen: true,
       players: alive.map((p) => ({ id: p.id, name: p.display_name })),
+      // Only meaningful for the inactivity system below — see its own
+      // comment on why it needs a "since when" to check chat activity
+      // against. Harmless/unread by anything else that reads roundInfo.
+      startedAt: Date.now(),
     });
     setRevealOrder(null);
     setRevealIndex(-1);
@@ -111,6 +117,21 @@ export default function RoundtableHost({ gameId, players }) {
       // See lib/seasonPlacement.js — same shared placement pool a murder
       // (MurderVoteHost.jsx) or a Project B exile feeds.
       await recordElimination(supabase, gameId, target.id);
+      // Chat's Exile Room (see sql/add-group-chat.sql) — same treatment
+      // Project B's own exile-by-vote path gives it (lib/roundEngine.js),
+      // scoped the same narrow way: a banish is the vote-based equivalent
+      // of an exile, so it gets this; a murder (MurderVoteHost.jsx) is
+      // not treated as one, matching how Project B itself never adds a
+      // quit/inactivity-removal to this room either. Best-effort — chat
+      // being off, or this RPC failing, must never block a real banish.
+      if (settings?.chatEnabled) {
+        try {
+          const { error: chatErr } = await supabase.rpc("add_to_exile_room", { p_game_id: gameId, p_player_id: target.id });
+          if (chatErr) console.error("add_to_exile_room failed (non-fatal)", chatErr);
+        } catch (chatErr) {
+          console.error("add_to_exile_room threw (non-fatal)", chatErr);
+        }
+      }
     }
     setBanishing(false);
   };
@@ -127,11 +148,33 @@ export default function RoundtableHost({ gameId, players }) {
         return [...list, { round, votes: votesMap, banished: leadingTarget || null }];
       });
     }
+
+    const survivors = alive.filter((p) => p.display_name !== leadingTarget);
+
+    // Traitors' own (toggleable) inactivity system — see
+    // lib/traitorsInactivity.js's own header comment for exactly what
+    // counts as "activity" here and how it's narrowed from Project B's
+    // fuller version. Computed BEFORE the votes for this round get
+    // deleted below, and against `survivors` (post-banish) since the
+    // banished player already has their own elimination on record and
+    // has nothing left to be struck for.
+    if (settings?.inactivityEnabled) {
+      const voterNames = new Set(Object.keys(votes || {}));
+      let chatSenderIds = null;
+      if (settings.chatEnabled && roundInfo?.startedAt) {
+        const groupChat = (await storageGet(gameId, GROUP_CHAT_KEY)) || [];
+        chatSenderIds = new Set(groupChat.filter((m) => m.createdAt >= roundInfo.startedAt).map((m) => m.senderId));
+      }
+      await applyTraitorsRoundInactivity(supabase, gameId, { round, alivePlayers: survivors, voterNames, chatSenderIds });
+      await decayTraitorsStrikesIfDue(supabase, gameId, round + 1);
+    }
+
     await storageDelete(gameId, VOTES_KEY_PREFIX + round);
     await storageSet(gameId, STORAGE_KEY_ROUND_INFO, {
       round: round + 1,
       votingOpen: false,
-      players: alive.filter((p) => p.display_name !== leadingTarget).map((p) => ({ id: p.id, name: p.display_name })),
+      players: survivors.map((p) => ({ id: p.id, name: p.display_name })),
+      startedAt: Date.now(),
     });
     setVotes(null);
     setRevealOrder(null);

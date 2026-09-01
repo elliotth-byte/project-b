@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Btn, Card } from "./traitorsUi";
 import { supabase } from "../lib/supabaseClient";
 import { storageDelete, storageGet } from "../lib/gameStorage";
-import { hostStorageDelete } from "../lib/hostStorage";
+import { hostStorageDelete, subscribeHostState } from "../lib/hostStorage";
 import { declareWinner, subscribeTraitorsFinale, KEY_TRAITORS_FINALE } from "../lib/traitorsFinale";
 import { DEFAULT_SETTINGS, setSettings, subscribeSettings } from "../lib/gameState";
 import { uploadAvatar, removeAvatar } from "../lib/avatarUpload";
@@ -62,6 +62,20 @@ export default function AdminHost({ gameId, players }) {
   const saveSettings = async (patch) => {
     await setSettings(gameId, patch);
   };
+
+  // Same host-only "have traitor roles actually been assigned" state
+  // TraitorsHostPanels.jsx's own summary header reads — used here purely
+  // to define "has this season substantively started" for locking Alias
+  // mode below, the same way Project B's AdminHost.jsx locks it once
+  // round.phase leaves LOBBY (Traitors has no round-phase engine to key
+  // that off of, so this is the closest equivalent: the one clearly
+  // irreversible-in-spirit step every Traitors season starts with).
+  const [tr, setTr] = useState(null);
+  useEffect(() => {
+    const unsubscribe = subscribeHostState(gameId, STORAGE_KEY_TRAITOR_ROLES, setTr);
+    return unsubscribe;
+  }, [gameId]);
+  const seasonStarted = !!tr;
 
   // Avatar moderation — see AdminHost.jsx's identical block for why this
   // stays visible regardless of mode (a photo set under one mode doesn't
@@ -305,6 +319,59 @@ export default function AdminHost({ gameId, players }) {
             </div>
           </div>
         )}
+      </Card>
+
+      <Card>
+        <h3 style={{ color: "#f0e6d3", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>💬 Chat</h3>
+        <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+          Off by default — an existing season doesn't suddenly grow a Chat tab underneath it. Adds a group chat, an
+          Exile-equivalent room for anyone murdered/banished, and DMs, the same as Panopticon's own Chat. Safe to
+          switch on or off mid-season.
+        </p>
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12.5, color: "#a09080", cursor: "pointer" }}>
+          <input
+            type="checkbox" checked={!!settings.chatEnabled}
+            onChange={(e) => saveSettings({ chatEnabled: e.target.checked })}
+            style={{ marginTop: 2 }}
+          />
+          <span><strong style={{ color: "#f0e6d3" }}>Turn on Chat</strong> — group chat, DMs, and (once someone's out) an Exile room, for this season.</span>
+        </label>
+      </Card>
+
+      <Card>
+        <h3 style={{ color: "#f0e6d3", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🎭 Alias Mode</h3>
+        <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+          Each player picks their own alias (typed freely, not a fixed list) — it replaces their real name
+          everywhere other players see them until you declare a winner. You'll always see both, everywhere.{" "}
+          <strong>{seasonStarted ? "Locked — traitor roles have already been assigned for this season." : "Only changeable now, before you assign traitor roles."}</strong>
+        </p>
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12.5, color: seasonStarted ? "#3d1f5c" : "#a09080", cursor: seasonStarted ? "not-allowed" : "pointer" }}>
+          <input
+            type="checkbox" checked={!!settings.aliasEnabled} disabled={seasonStarted}
+            onChange={(e) => saveSettings({ aliasEnabled: e.target.checked })}
+            style={{ marginTop: 2 }}
+          />
+          <span><strong style={{ color: seasonStarted ? "#3d1f5c" : "#f0e6d3" }}>Turn on Alias mode</strong> — players pick a codename that stands in for their real name.</span>
+        </label>
+      </Card>
+
+      <Card>
+        <h3 style={{ color: "#f0e6d3", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>⏳ Inactivity Strikes</h3>
+        <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+          Off by default. When on: starting round 2, anyone who neither votes at the Roundtable nor (if Chat is on)
+          sends a chat message that round gets a strike; 3 strikes removes them from the game. Strikes go down by 1
+          every 3rd round for everyone who has any. Unlike Panopticon (which always tracks votes AND mini-game
+          participation), this only checks Roundtable votes and chat — Traitors' 11 separate mini-games have no
+          single, uniform way to tell whether someone played.
+        </p>
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12.5, color: "#a09080", cursor: "pointer" }}>
+          <input
+            type="checkbox" checked={!!settings.inactivityEnabled}
+            onChange={(e) => saveSettings({ inactivityEnabled: e.target.checked })}
+            style={{ marginTop: 2 }}
+          />
+          <span><strong style={{ color: "#f0e6d3" }}>Turn on inactivity strikes</strong> — auto-remove players who go quiet at the Roundtable.</span>
+        </label>
       </Card>
 
       {/* Traitors never had a jury vote or finale mechanic at all (see

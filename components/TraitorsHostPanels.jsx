@@ -4,6 +4,10 @@ import { STORAGE_KEY_TRAITOR_ROLES } from "../lib/traitorData";
 import { fetchAllConfessionals, subscribeConfessionalsTable } from "../lib/confessionalsData";
 import { subscribeChallengeArchive } from "../lib/challengeArchive";
 import { fetchGloballyDisabledChallenges } from "../lib/platformSettings";
+import { DEFAULT_SETTINGS, subscribeSettings } from "../lib/gameState";
+import { resolveIdentitiesForHost } from "../lib/playerIdentity";
+import { resolveAvatars } from "../lib/avatarIdentity";
+import ChatHostPanel from "./ChatHostPanel";
 import {
   STORAGE_KEY_WORDS, STORAGE_KEY_CASINO, STORAGE_KEY_HOT_POTATO, STORAGE_KEY_ZOMBIE,
   STORAGE_KEY_PIGGY, STORAGE_KEY_MASQUERADE, STORAGE_KEY_ATTACK_DEFEND, STORAGE_KEY_VOODOO,
@@ -38,6 +42,7 @@ const BASE_TABS = [
   { key: "missions", label: "🎯 Missions" },
   { key: "challenges", label: "⚔️ Challenges" },
   { key: "confessionals", label: "🎥 Confessionals" },
+  { key: "chat", label: "💬 Chat" },
   { key: "history", label: "📜 History & Log" },
   { key: "admin", label: "🛠 Admin" },
 ];
@@ -53,10 +58,20 @@ export default function HostPanels({ gameId, players, adminExtra }) {
   const [unreadConfessionals, setUnreadConfessionals] = useState(0);
   const [challengeArchive, setChallengeArchive] = useState([]);
   const [globallyDisabled, setGloballyDisabled] = useState(null); // null = not loaded yet; see the "challenges" tab below
+  // Same shared, game-type-agnostic settings record TraitorsAdminHost.jsx
+  // reads/writes (see lib/gameState.js) — needed here too, for the
+  // chatEnabled tab gate below and to thread inactivityEnabled/
+  // aliasEnabled/chatEnabled down into RoundtableHost.
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
 
   useEffect(() => {
     fetchGloballyDisabledChallenges().then(setGloballyDisabled);
   }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeSettings(gameId, setSettings);
+    return unsubscribe;
+  }, [gameId]);
 
   useEffect(() => {
     const unsubscribe = subscribeChallengeArchive(gameId, setChallengeArchive);
@@ -98,11 +113,20 @@ export default function HostPanels({ gameId, players, adminExtra }) {
   const blackCount = tr ? alive.filter((p) => tr.roles[p.display_name] === "traitor-black").length : 0;
   const pendingCount = players.filter((p) => !p.approved).length;
 
-  const TABS = BASE_TABS.map((t) => {
-    if (t.key === "confessionals" && unreadConfessionals > 0) return { ...t, label: `${t.label} (${unreadConfessionals})` };
-    if (t.key === "admin" && pendingCount > 0) return { ...t, label: `${t.label} (${pendingCount})` };
-    return t;
-  });
+  // Real name with the alias alongside, baked right into display_name —
+  // same "hosts always see both" treatment HostPanels.jsx's identical
+  // hostRoster gives Project B. Only actually differs from `players`
+  // once aliasEnabled is on; a no-op list transform otherwise.
+  const hostRoster = resolveAvatars(resolveIdentitiesForHost(players, { settings }), settings);
+  const hostApprovedRoster = hostRoster.filter((p) => p.approved);
+
+  const TABS = BASE_TABS
+    .filter((t) => t.key !== "chat" || settings?.chatEnabled)
+    .map((t) => {
+      if (t.key === "confessionals" && unreadConfessionals > 0) return { ...t, label: `${t.label} (${unreadConfessionals})` };
+      if (t.key === "admin" && pendingCount > 0) return { ...t, label: `${t.label} (${pendingCount})` };
+      return t;
+    });
 
   return (
     <div>
@@ -139,7 +163,7 @@ export default function HostPanels({ gameId, players, adminExtra }) {
 
       {tab === "votes" && (
         <div style={{ display: "grid", gap: 16 }}>
-          <ChallengeErrorBoundary label="Roundtable"><RoundtableHost gameId={gameId} players={approvedPlayers} /></ChallengeErrorBoundary>
+          <ChallengeErrorBoundary label="Roundtable"><RoundtableHost gameId={gameId} players={approvedPlayers} settings={settings} /></ChallengeErrorBoundary>
         </div>
       )}
 
@@ -203,6 +227,12 @@ export default function HostPanels({ gameId, players, adminExtra }) {
       {tab === "confessionals" && (
         <ChallengeErrorBoundary label="Confessionals">
           <ConfessionalsHost gameId={gameId} round={tr?.round} />
+        </ChallengeErrorBoundary>
+      )}
+
+      {tab === "chat" && settings?.chatEnabled && (
+        <ChallengeErrorBoundary label="Chat">
+          <ChatHostPanel gameId={gameId} players={hostApprovedRoster} />
         </ChallengeErrorBoundary>
       )}
 

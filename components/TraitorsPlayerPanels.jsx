@@ -24,11 +24,13 @@ import IcebreakerPlayer from "./IcebreakerPlayer";
 import PandoraBoxPlayer from "./PandoraBoxPlayer";
 import ConfessionalPlayer from "./TraitorsConfessionalPlayer";
 import MurderVotePlayer from "./MurderVotePlayer";
+import ChatPanel from "./ChatPanel";
 
 const TABS = [
   { key: "challenge", label: "⚔️ Challenge" },
   { key: "vote", label: "⚖️ Vote" },
   { key: "confessional", label: "🎥 Confessional" },
+  { key: "chat", label: "💬 Chat" },
 ];
 
 // Player-side counterpart to TraitorsHostPanels.jsx — same tab layout as
@@ -42,7 +44,12 @@ const TABS = [
 // duplicate that "is this even running right now" check up here — this
 // only additionally skips a mini-game a platform admin has disabled
 // outright (see TraitorsHostPanels.jsx's own identical gate).
-export default function PlayerPanels({ gameId, player }) {
+// players/settings are both optional — pages/play.jsx passes them
+// (already computed there for its own use) so Chat, once the host
+// turns it on, has a real roster + settings.chatEnabled to key off of.
+// A caller that omits them just never sees the Chat tab, same as
+// before this was added.
+export default function PlayerPanels({ gameId, player, players, settings }) {
   const [tab, setTab] = useState("challenge");
   const [myRole, setMyRole] = useState("faithful");
   const [roundInfo, setRoundInfo] = useState(null);
@@ -76,7 +83,7 @@ export default function PlayerPanels({ gameId, player }) {
       <ChallengeErrorBoundary label="Pandora's Box"><PandoraBoxPlayer gameId={gameId} player={player} /></ChallengeErrorBoundary>
 
       <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #253550" }}>
-        {TABS.map((t) => (
+        {TABS.filter((t) => t.key !== "chat" || settings?.chatEnabled).map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)} style={{
             flex: 1, background: tab === t.key ? "rgba(201,168,76,0.13)" : "transparent",
             color: tab === t.key ? "#c9a84c" : "#a09080",
@@ -139,6 +146,20 @@ export default function PlayerPanels({ gameId, player }) {
       {tab === "confessional" && (
         <ChallengeErrorBoundary label="Confessional">
           <ConfessionalPlayer gameId={gameId} player={player} round={roundInfo?.round} />
+        </ChallengeErrorBoundary>
+      )}
+
+      {tab === "chat" && settings?.chatEnabled && (
+        <ChallengeErrorBoundary label="Chat">
+          <ChatPanel
+            gameId={gameId}
+            player={{ id: player.id, name: player.name }}
+            players={players || []}
+            realName={player.realName || player.name}
+            isExiled={player.alive === false}
+            round={null}
+            settings={settings}
+          />
         </ChallengeErrorBoundary>
       )}
     </div>
