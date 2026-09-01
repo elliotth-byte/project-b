@@ -3,6 +3,8 @@ import { Btn, Card, PausedBanner } from "./traitorsUi";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { VOODOO_HOUR, VOODOO_LIMBS, STORAGE_KEY_VOODOO } from "../lib/voodooData";
 import { logChallengeResult } from "../lib/challengeHistory";
+import { TRAITORS_GAME_REGISTRY } from "../lib/traitorsMiniGames";
+import TraitorsRulesGate from "./games/TraitorsRulesGate";
 
 // ─── Voodoo Doll: Player View ───
 export default function VoodooPlayer({ gameId, playerName }) {
@@ -98,8 +100,10 @@ export default function VoodooPlayer({ gameId, playerName }) {
 
   const renderEulogy = (doll) => doll.eulogy.split("").map((ch, i) => (!/[a-zA-Z]/.test(ch) || doll.revealedIndices.includes(i)) ? ch : "_").join("");
   const myGuesses = st.guesses?.[playerName] || [];
+  const registryEntry = TRAITORS_GAME_REGISTRY[STORAGE_KEY_VOODOO];
 
   return (
+    <TraitorsRulesGate icon={registryEntry.icon} label={registryEntry.label} blurb={registryEntry.blurb} resetKey={st.createdAt}>
     <Card style={{ marginBottom: 20, borderColor: "rgba(124,58,237,0.3)" }}>
       <h3 style={{ color: "#c9a84c", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🪆 Voodoo Doll</h3>
       {st.winner ? (
@@ -172,5 +176,6 @@ export default function VoodooPlayer({ gameId, playerName }) {
         </>
       )}
     </Card>
+    </TraitorsRulesGate>
   );
 }

@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Btn, Card, PausedBanner } from "./traitorsUi";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { STORAGE_KEY_PIGGY } from "../lib/piggyData";
+import { TRAITORS_GAME_REGISTRY } from "../lib/traitorsMiniGames";
+import TraitorsRulesGate from "./games/TraitorsRulesGate";
 
 // ─── Piggy Bank: Player View ───
 export default function PiggyPlayer({ gameId, playerName }) {
@@ -45,7 +47,10 @@ export default function PiggyPlayer({ gameId, playerName }) {
     if (res.ok) setSt(res.value);
   };
 
+  const registryEntry = TRAITORS_GAME_REGISTRY[STORAGE_KEY_PIGGY];
+
   return (
+    <TraitorsRulesGate icon={registryEntry.icon} label={registryEntry.label} blurb={registryEntry.blurb} resetKey={st.createdAt}>
     <Card style={{ marginBottom: 20, borderColor: "rgba(201,168,76,0.3)" }}>
       <h3 style={{ color: "#c9a84c", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🐷 Piggy Bank</h3>
       {submitted ? (
@@ -74,5 +79,6 @@ export default function PiggyPlayer({ gameId, playerName }) {
         </>
       )}
     </Card>
+    </TraitorsRulesGate>
   );
 }

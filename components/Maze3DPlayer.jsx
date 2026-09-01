@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import { Card, PausedBanner } from "./traitorsUi";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { generateMaze, firstPersonView, MAZE_DIRS, STORAGE_KEY_MAZE3D } from "../lib/mazeData";
+import { TRAITORS_GAME_REGISTRY } from "../lib/traitorsMiniGames";
+import TraitorsRulesGate from "./games/TraitorsRulesGate";
+import { getOrStartSession, peekSession } from "../lib/traitorsChallengeSession";
 
 // ─── 3D Maze: Player View ───
 export default function Maze3DPlayer({ gameId, playerName }) {
@@ -42,6 +45,23 @@ export default function Maze3DPlayer({ gameId, playerName }) {
     }
   }, [started, finish, startTime, st?.paused]);
 
+  // Resume an already-running clock on mount/remount — a tab switch or the
+  // browser backgrounding shouldn't silently hand this player a fresh
+  // "haven't moved yet" state if they'd already taken their first step.
+  // Deliberately read-only (peekSession, not getOrStartSession) — checking
+  // this must never itself start a clock for a player who hasn't actually
+  // moved yet, same reasoning as Match3Player's own identical check.
+  useEffect(() => {
+    if (!st?.createdAt) return;
+    let cancelled = false;
+    peekSession(gameId, STORAGE_KEY_MAZE3D, st.createdAt, playerName).then((existing) => {
+      if (cancelled || !existing) return;
+      setStarted(true);
+      setStartTime(existing);
+    });
+    return () => { cancelled = true; };
+  }, [gameId, st?.createdAt, playerName]);
+
   const maze = st ? generateMaze(st.rows, st.cols, st.seed) : null;
   const goalR = st ? st.rows - 1 : 0, goalC = st ? st.cols - 1 : 0;
 
@@ -65,16 +85,26 @@ export default function Maze3DPlayer({ gameId, playerName }) {
     }
   }, [pos]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The clock starts on this player's first real move, not the instant the
+  // maze goes active — getOrStartSession still makes that moment durable
+  // (first call wins), it just isn't called until there's actually a first
+  // move to make.
+  const beginClock = () => {
+    if (started) return;
+    setStarted(true);
+    getOrStartSession(gameId, STORAGE_KEY_MAZE3D, st.createdAt, playerName).then(setStartTime);
+  };
+
   const forward = () => {
     if (!maze || finish || st?.paused) return;
-    if (!started) { setStarted(true); setStartTime(Date.now()); }
+    beginClock();
     const [r, c] = pos;
     const dir = MAZE_DIRS[facing];
     if (!maze[r][c][dir.wall]) setPos([r + dir.dr, c + dir.dc]);
   };
   const back = () => {
     if (!maze || finish || st?.paused) return;
-    if (!started) { setStarted(true); setStartTime(Date.now()); }
+    beginClock();
     const [r, c] = pos;
     const bf = (facing + 2) % 4;
     const dir = MAZE_DIRS[bf];
@@ -120,8 +150,10 @@ export default function Maze3DPlayer({ gameId, playerName }) {
   const W = 300, H = 200;
   const DEPTH_COLORS = ["#1c2f52", "#24243f", "#3a2a4a", "#2a3f4a", "#472f3a", "#2f4a3a"];
   const WALL_HILITE = "#c9a84c";
+  const registryEntry = TRAITORS_GAME_REGISTRY[STORAGE_KEY_MAZE3D];
 
   return (
+    <TraitorsRulesGate icon={registryEntry.icon} label={registryEntry.label} blurb={registryEntry.blurb} resetKey={st.createdAt}>
     <Card style={{ marginBottom: 20, borderColor: "rgba(201,168,76,0.3)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         <h3 style={{ color: "#c9a84c", margin: 0, fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🧭 3D Maze</h3>
@@ -177,6 +209,7 @@ export default function Maze3DPlayer({ gameId, playerName }) {
         </>
       )}
     </Card>
+    </TraitorsRulesGate>
   );
 }
 

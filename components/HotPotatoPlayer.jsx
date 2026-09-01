@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Card, PausedBanner } from "./traitorsUi";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { fmtTime, tickHotPotato, STORAGE_KEY_HOT_POTATO } from "../lib/hotPotatoData";
+import { TRAITORS_GAME_REGISTRY } from "../lib/traitorsMiniGames";
+import TraitorsRulesGate from "./games/TraitorsRulesGate";
 
 // ─── Hot Potato: Player View ───
 export default function HotPotatoPlayer({ gameId, playerName }) {
@@ -57,7 +59,10 @@ export default function HotPotatoPlayer({ gameId, playerName }) {
     if (res.ok) setSt(res.value);
   };
 
+  const registryEntry = TRAITORS_GAME_REGISTRY[STORAGE_KEY_HOT_POTATO];
+
   return (
+    <TraitorsRulesGate icon={registryEntry.icon} label={registryEntry.label} blurb={registryEntry.blurb} resetKey={st.createdAt}>
     <Card style={{ marginBottom: 20, borderColor: "rgba(196,92,60,0.3)" }}>
       <h3 style={{ color: "#c9a84c", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🥔 Hot Potato</h3>
       {st.winner ? (
@@ -92,5 +97,6 @@ export default function HotPotatoPlayer({ gameId, playerName }) {
         </>
       )}
     </Card>
+    </TraitorsRulesGate>
   );
 }

@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { Btn, Card, Badge, PausedBanner } from "./traitorsUi";
 import { storageGet, storageSet, storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { STORAGE_KEY_ATTACK_DEFEND } from "../lib/attackDefendData";
+import { TRAITORS_GAME_REGISTRY } from "../lib/traitorsMiniGames";
+import TraitorsRulesGate from "./games/TraitorsRulesGate";
 
 // ─── Attack / Defend: Player View ───
 //
@@ -150,8 +152,10 @@ export default function AttackDefendPlayer({ gameId, playerName }) {
   };
 
   const displayedPoints = active ? active.points + (iAmAttacking ? localBonus : 0) : 0;
+  const registryEntry = TRAITORS_GAME_REGISTRY[STORAGE_KEY_ATTACK_DEFEND];
 
   return (
+    <TraitorsRulesGate icon={registryEntry.icon} label={registryEntry.label} blurb={registryEntry.blurb} resetKey={st.createdAt}>
     <Card style={{ marginBottom: 20, borderColor: myTeam === "red" ? "rgba(196,92,60,0.4)" : "rgba(74,122,196,0.4)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <h3 style={{ color: "#c9a84c", margin: 0, fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>⚔️ Attack / Defend</h3>
@@ -185,5 +189,6 @@ export default function AttackDefendPlayer({ gameId, playerName }) {
         </div>
       )}
     </Card>
+    </TraitorsRulesGate>
   );
 }

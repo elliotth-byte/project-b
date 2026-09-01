@@ -5,6 +5,9 @@ import {
   COFFIN_LAYOUTS, COFFIN_COLORS,
   coffinIsSolved, coffinCanMove, STORAGE_KEY_COFFIN,
 } from "../lib/coffinData";
+import { TRAITORS_GAME_REGISTRY } from "../lib/traitorsMiniGames";
+import TraitorsRulesGate from "./games/TraitorsRulesGate";
+import { useTraitorsPersistedStart } from "./games/useTraitorsPersistedStart";
 
 // ─── Coffin Slide (Escape from the Crypt): Player View ───
 export default function CoffinPlayer({ gameId, playerName }) {
@@ -12,7 +15,6 @@ export default function CoffinPlayer({ gameId, playerName }) {
   const [pieces, setPieces] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [moves, setMoves] = useState(0);
-  const [startTime, setStartTime] = useState(null);
   const [finishTime, setFinishTime] = useState(null);
   const [elapsed, setElapsed] = useState(0);
   const timerRef = useRef(null);
@@ -38,8 +40,13 @@ export default function CoffinPlayer({ gameId, playerName }) {
     else if (pauseStartRef.current) { pausedMsRef.current += Date.now() - pauseStartRef.current; pauseStartRef.current = null; }
   }, [st?.paused]);
 
+  // Durable start — survives a tab switch or remount instead of quietly
+  // restarting this player's own escape-time clock. Keyed to this
+  // specific run of the game (st?.createdAt), so a fresh restart by the
+  // host still gets a genuinely new clock.
+  const startTime = useTraitorsPersistedStart(gameId, STORAGE_KEY_COFFIN, st?.createdAt, playerName);
+
   useEffect(() => {
-    if (st?.active && !startTime && !finishTime) setStartTime(Date.now());
     if (st?.times?.[playerName] != null && !finishTime) setFinishTime(st.times[playerName]);
   }, [st?.active]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -108,8 +115,10 @@ export default function CoffinPlayer({ gameId, playerName }) {
   }
 
   const cell = Math.min(38, Math.floor(300 / layout.grid));
+  const registryEntry = TRAITORS_GAME_REGISTRY[STORAGE_KEY_COFFIN];
 
   return (
+    <TraitorsRulesGate icon={registryEntry.icon} label={registryEntry.label} blurb={registryEntry.blurb} resetKey={st.createdAt}>
     <Card style={{ marginBottom: 20, borderColor: "rgba(201,168,76,0.3)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <h3 style={{ color: "#c9a84c", margin: 0, fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>⚰️ Escape from the Crypt</h3>
@@ -160,5 +169,6 @@ export default function CoffinPlayer({ gameId, playerName }) {
         </>
       )}
     </Card>
+    </TraitorsRulesGate>
   );
 }

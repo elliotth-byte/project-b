@@ -3,6 +3,8 @@ import { Btn, Card, PausedBanner } from "./traitorsUi";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { STORAGE_KEY_ICEBREAKER } from "../lib/icebreakerData";
 import { logChallengeResult } from "../lib/challengeHistory";
+import { TRAITORS_GAME_REGISTRY } from "../lib/traitorsMiniGames";
+import TraitorsRulesGate from "./games/TraitorsRulesGate";
 
 // ─── Icebreaker: Player View ───
 export default function IcebreakerPlayer({ gameId, playerName }) {
@@ -83,8 +85,10 @@ export default function IcebreakerPlayer({ gameId, playerName }) {
   };
 
   const eliminated = st.eliminated.includes(playerName);
+  const registryEntry = TRAITORS_GAME_REGISTRY[STORAGE_KEY_ICEBREAKER];
 
   return (
+    <TraitorsRulesGate icon={registryEntry.icon} label={registryEntry.label} blurb={registryEntry.blurb} resetKey={st.createdAt}>
     <Card style={{ marginBottom: 20, borderColor: "rgba(74,122,196,0.3)" }}>
       <h3 style={{ color: "#c9a84c", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>❄️ Icebreaker</h3>
 
@@ -168,5 +172,6 @@ export default function IcebreakerPlayer({ gameId, playerName }) {
         )
       )}
     </Card>
+    </TraitorsRulesGate>
   );
 }

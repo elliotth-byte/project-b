@@ -5,6 +5,8 @@ import {
   freshDeck, bjValue, pokerRank, POKER_NAMES,
   ROULETTE_WHEEL_ORDER, ROULETTE_REDS, STORAGE_KEY_CASINO,
 } from "../lib/casinoData";
+import { TRAITORS_GAME_REGISTRY } from "../lib/traitorsMiniGames";
+import TraitorsRulesGate from "./games/TraitorsRulesGate";
 
 // ─── Casino: Player View ───
 // Game logic (Blackjack/Hold'em/Roulette) is unchanged from the original —
@@ -169,7 +171,10 @@ export default function CasinoPlayer({ gameId, playerName }) {
     }, 3200);
   };
 
+  const registryEntry = TRAITORS_GAME_REGISTRY[STORAGE_KEY_CASINO];
+
   return (
+    <TraitorsRulesGate icon={registryEntry.icon} label={registryEntry.label} blurb={registryEntry.blurb} resetKey={st.createdAt}>
     <Card style={{ marginBottom: 20, borderColor: "rgba(201,168,76,0.3)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <h3 style={{ color: "#c9a84c", margin: 0, fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🎰 Casino</h3>
@@ -322,5 +327,6 @@ export default function CasinoPlayer({ gameId, playerName }) {
         </div>
       )}
     </Card>
+    </TraitorsRulesGate>
   );
 }

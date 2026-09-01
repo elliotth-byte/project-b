@@ -5,6 +5,9 @@ import {
   WORDS_PER_SET, WORD_COLORS, WORD_FONTS,
   getPlayerWordSet, initFloatingLetters, STORAGE_KEY_WORDS,
 } from "../lib/wordGameData";
+import { TRAITORS_GAME_REGISTRY } from "../lib/traitorsMiniGames";
+import TraitorsRulesGate from "./games/TraitorsRulesGate";
+import { useTraitorsPersistedStart } from "./games/useTraitorsPersistedStart";
 
 // ─── Word Scramble: Player View ───
 // Same game logic and rendering as the original artifact. The only real
@@ -15,10 +18,8 @@ export default function WordPlayer({ gameId, playerName }) {
   const [wordState, setWordState] = useState(null);
   const [answers, setAnswers] = useState(Array(WORDS_PER_SET).fill(""));
   const [solved, setSolved] = useState(new Set());
-  const [startTime, setStartTime] = useState(null);
   const [finishTime, setFinishTime] = useState(null);
   const [elapsed, setElapsed] = useState(0);
-  const [submitted, setSubmitted] = useState(false);
   const lettersRef = useRef([]);
   const rafRef = useRef(null);
   const lastRenderRef = useRef(0);
@@ -33,7 +34,6 @@ export default function WordPlayer({ gameId, playerName }) {
     const unsubscribe = subscribeGameState(gameId, STORAGE_KEY_WORDS, (value) => {
       setWordState(value);
       if (value?.times?.[playerName]) {
-        setSubmitted(true);
         setFinishTime(value.times[playerName]);
       }
     });
@@ -53,10 +53,11 @@ export default function WordPlayer({ gameId, playerName }) {
   // Derive this player's unique word set
   const words = wordState?.seed ? getPlayerWordSet(playerName, wordState.seed).words : null;
 
-  // Auto-start timer on load
-  useEffect(() => {
-    if (words && !startTime && !submitted) setStartTime(Date.now());
-  }, [words, startTime, submitted]);
+  // Durable start — survives a tab switch or remount instead of quietly
+  // restarting this player's own race clock (see useTraitorsPersistedStart's
+  // own comment). Keyed to this specific run of the game (wordState?.createdAt),
+  // so a fresh restart by the host still gets a genuinely new clock.
+  const startTime = useTraitorsPersistedStart(gameId, STORAGE_KEY_WORDS, wordState?.createdAt, playerName);
 
   // Init letters when words are derived
   useEffect(() => {
@@ -95,13 +96,11 @@ export default function WordPlayer({ gameId, playerName }) {
       const time = Date.now() - startTime - pausedMsRef.current;
       setFinishTime(time); setElapsed(time);
       (async () => {
-        const res = await storageUpdate(gameId, STORAGE_KEY_WORDS, (fresh) => {
+        await storageUpdate(gameId, STORAGE_KEY_WORDS, (fresh) => {
           if (!fresh) return null;
           fresh.times = { ...(fresh.times || {}), [playerName]: time };
           return fresh;
         });
-        // keep the player's own finish locked in locally either way
-        setSubmitted(true);
       })();
     }
   }, [solved.size, wordState?.paused]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -130,8 +129,10 @@ export default function WordPlayer({ gameId, playerName }) {
   };
 
   const visibleLetters = lettersRef.current.filter((l) => !solved.has(l.wi));
+  const registryEntry = TRAITORS_GAME_REGISTRY[STORAGE_KEY_WORDS];
 
   return (
+    <TraitorsRulesGate icon={registryEntry.icon} label={registryEntry.label} blurb={registryEntry.blurb} resetKey={wordState.createdAt}>
     <Card style={{ marginBottom: 20, borderColor: "rgba(201,168,76,0.3)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <h3 style={{ color: "#c9a84c", margin: 0, fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🔤 Word Scramble</h3>
@@ -214,5 +215,6 @@ export default function WordPlayer({ gameId, playerName }) {
         </>
       )}
     </Card>
+    </TraitorsRulesGate>
   );
 }

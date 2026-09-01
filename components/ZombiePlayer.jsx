@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Btn, Card, Badge } from "./traitorsUi";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { ANTIDOTE_WINDOW, STORAGE_KEY_ZOMBIE, haveTouched, resolveTouch } from "../lib/zombieData";
+import { TRAITORS_GAME_REGISTRY } from "../lib/traitorsMiniGames";
+import TraitorsRulesGate from "./games/TraitorsRulesGate";
 
 // ─── Zombie Game: Player View ───
 //
@@ -133,7 +135,10 @@ export default function ZombiePlayer({ gameId, playerName }) {
     });
   };
 
+  const registryEntry = TRAITORS_GAME_REGISTRY[STORAGE_KEY_ZOMBIE];
+
   return (
+    <TraitorsRulesGate icon={registryEntry.icon} label={registryEntry.label} blurb={registryEntry.blurb} resetKey={st.createdAt}>
     <Card style={{ marginBottom: 20, borderColor: "rgba(201,168,76,0.4)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <h3 style={{ color: "#c9a84c", margin: 0, fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🧟 Zombie Game</h3>
@@ -219,5 +224,6 @@ export default function ZombiePlayer({ gameId, playerName }) {
         {(st.roundSummaries || []).map((s) => <div key={s.round}>Round {s.round}: {s.humans} humans, {s.zombies} zombies</div>)}
       </div>
     </Card>
+    </TraitorsRulesGate>
   );
 }
