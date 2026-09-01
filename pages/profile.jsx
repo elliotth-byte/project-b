@@ -6,6 +6,8 @@ import { supabase } from "../lib/supabaseClient";
 import { fetchProfile, fetchSeasonHistory, upsertProfile, searchSeasons } from "../lib/profiles";
 import { searchPeopleToDm } from "../lib/profileDms";
 import { uploadProfilePhoto, removeProfilePhoto } from "../lib/profilePhotoUpload";
+import { fetchMyFriendedUserIds, addFriend, removeFriend } from "../lib/friendships";
+import RelationshipWeb from "../components/RelationshipWeb";
 
 // ─── Profile ───
 // The first page in this app that isn't scoped to any one season — no
@@ -31,6 +33,8 @@ export default function ProfilePage() {
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState(null);
+  const [friended, setFriended] = useState(null); // null = not checked yet; Set of user_ids once loaded
+  const [friendBusy, setFriendBusy] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user || null));
@@ -54,6 +58,29 @@ export default function ProfilePage() {
     });
     fetchSeasonHistory(viewingUserId).then(setHistory);
   }, [viewingUserId]);
+
+  // Only meaningful when viewing someone else — this is what drives the
+  // Friend/Unfriend button below. See lib/friendships.js: one-directional
+  // and private, so this only ever checks the CURRENT user's own outgoing
+  // list, never the profile being viewed.
+  useEffect(() => {
+    if (!user || isOwnProfile) { setFriended(null); return; }
+    fetchMyFriendedUserIds(user.id).then((ids) => setFriended(new Set(ids)));
+  }, [user, isOwnProfile]);
+
+  const toggleFriend = async () => {
+    if (!user || !viewingUserId) return;
+    setFriendBusy(true);
+    const isFriended = friended?.has(viewingUserId);
+    const res = isFriended ? await removeFriend(user.id, viewingUserId) : await addFriend(user.id, viewingUserId);
+    setFriendBusy(false);
+    if (!res.ok) return;
+    setFriended((prev) => {
+      const next = new Set(prev);
+      if (isFriended) next.delete(viewingUserId); else next.add(viewingUserId);
+      return next;
+    });
+  };
 
   const saveName = async () => {
     const trimmed = nameDraft.trim();
@@ -166,6 +193,21 @@ export default function ProfilePage() {
         )}
 
         <div style={cardStyle}>
+          {!isOwnProfile && friended !== null && (
+            <div style={{ textAlign: "center", marginBottom: 12 }}>
+              <button
+                onClick={toggleFriend} disabled={friendBusy}
+                style={{
+                  padding: "6px 14px", borderRadius: 8, cursor: friendBusy ? "default" : "pointer", fontSize: 12, fontWeight: 700,
+                  background: friended.has(viewingUserId) ? "rgba(46,204,113,0.15)" : "#0d0618",
+                  border: `1px solid ${friended.has(viewingUserId) ? "#2ecc71" : "#3d1f5c"}`,
+                  color: friended.has(viewingUserId) ? "#2ecc71" : "#a68fd6",
+                }}
+              >
+                {friendBusy ? "..." : friended.has(viewingUserId) ? "💔 Unfriend" : "🤝 Add Friend"}
+              </button>
+            </div>
+          )}
           <div style={{ textAlign: "center", marginBottom: 16 }}>
             <div style={{
               width: 96, height: 96, borderRadius: "50%", margin: "0 auto 12px", overflow: "hidden",
@@ -279,6 +321,15 @@ export default function ProfilePage() {
             </div>
           )}
         </div>
+
+        {isOwnProfile && history !== null && history.length > 0 && (
+          <div style={cardStyle}>
+            <div style={{ fontSize: 12, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12, textAlign: "center" }}>
+              🕸 Relationship Web
+            </div>
+            <RelationshipWeb userId={user.id} />
+          </div>
+        )}
       </div>
     </div>
   );
