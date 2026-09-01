@@ -6,7 +6,7 @@ import { supabase } from "../lib/supabaseClient";
 import { fetchProfile, fetchSeasonHistory, upsertProfile, searchSeasons } from "../lib/profiles";
 import { searchPeopleToDm } from "../lib/profileDms";
 import { uploadProfilePhoto, removeProfilePhoto } from "../lib/profilePhotoUpload";
-import { fetchMyFriendedUserIds, addFriend, removeFriend } from "../lib/friendships";
+import { fetchFriendedUserIds, addFriend, removeFriend } from "../lib/friendships";
 import RelationshipWeb from "../components/RelationshipWeb";
 
 // ─── Profile ───
@@ -60,12 +60,13 @@ export default function ProfilePage() {
   }, [viewingUserId]);
 
   // Only meaningful when viewing someone else — this is what drives the
-  // Friend/Unfriend button below. See lib/friendships.js: one-directional
-  // and private, so this only ever checks the CURRENT user's own outgoing
-  // list, never the profile being viewed.
+  // Friend/Unfriend button below, so it always checks the CURRENT
+  // (logged-in) user's own outgoing list, never the profile being
+  // viewed — fetchFriendedUserIds itself works for any subject (see
+  // lib/friendships.js), this call site just always passes user.id.
   useEffect(() => {
     if (!user || isOwnProfile) { setFriended(null); return; }
-    fetchMyFriendedUserIds(user.id).then((ids) => setFriended(new Set(ids)));
+    fetchFriendedUserIds(user.id).then((ids) => setFriended(new Set(ids)));
   }, [user, isOwnProfile]);
 
   const toggleFriend = async () => {
@@ -322,12 +323,19 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {isOwnProfile && history !== null && history.length > 0 && (
+        {history !== null && history.length > 0 && (
           <div style={cardStyle}>
             <div style={{ fontSize: 12, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12, textAlign: "center" }}>
               🕸 Relationship Web
             </div>
-            <RelationshipWeb userId={user.id} />
+            {/* Not gated on isOwnProfile — an objective view of the
+                PROFILE SUBJECT's own network (who THEY friended, who
+                THEY had adversarial votes with), same regardless of who's
+                looking. Safe to show for anyone: friendships are public
+                (sql/add-player-friendships.sql) and adversarial votes
+                only ever reflect seasons that have actually ended (see
+                lib/relationshipWeb.js's header comment). */}
+            <RelationshipWeb userId={viewingUserId} />
           </div>
         )}
       </div>
