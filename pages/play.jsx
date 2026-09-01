@@ -56,6 +56,7 @@ import { useHasUnreadChat } from "../lib/useChatUnread";
 import { useNeedsAction } from "../lib/useNeedsAction";
 import { useRoundWatcher } from "../lib/useRoundWatcher";
 import { themeFor } from "../lib/uiTheme";
+import { SITE_THEME } from "../lib/siteTheme";
 
 // Flavor text for a traitors-type season's elimination banner — mirrors
 // the standalone Traitors app's own copy (see its pages/play.jsx); a
@@ -373,9 +374,9 @@ export default function PlayPage() {
 
   if (!gameId) {
     return (
-      <div style={pageStyle}>
-        <div style={{ position: "absolute", top: 20, right: 24 }}><LogoutButton /></div>
-        <p style={{ color: "#a68fd6" }}>Ask the host for your join link — it looks like <code>/play?game=...</code>.</p>
+      <div style={{ ...pageStyle, background: SITE_THEME.pageBg, fontFamily: SITE_THEME.font }}>
+        <div style={{ position: "absolute", top: 20, right: 24 }}><LogoutButton theme={SITE_THEME} /></div>
+        <p style={{ color: SITE_THEME.textMuted }}>Ask the host for your join link — it looks like <code>/play?game=...</code>.</p>
       </div>
     );
   }
@@ -471,7 +472,7 @@ export default function PlayPage() {
     <div style={{ ...pageStyle, alignItems: "flex-start", flexDirection: "column" }}>
       <div style={{ width: "100%", maxWidth: 400, margin: "0 auto" }}><UpdateBanner /></div>
       <div style={{ display: "flex", justifyContent: "space-between", width: "100%", maxWidth: 400, margin: "0 auto 12px" }}>
-        <HomeLink />
+        <HomeLink theme={theme} />
         <span style={{ color: theme.textMuted, fontSize: 13 }}>Playing as {effectivePlayerName || "..."}</span>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           {joined && myPlayer && !approved && (

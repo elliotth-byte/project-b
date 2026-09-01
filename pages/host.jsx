@@ -12,6 +12,7 @@ import HomeLink from "../components/HomeLink";
 import { useRoundWatcher } from "../lib/useRoundWatcher";
 import { initRound } from "../lib/gameState";
 import { themeFor } from "../lib/uiTheme";
+import { SITE_THEME } from "../lib/siteTheme";
 
 export default function HostPage() {
   const router = useRouter();
@@ -54,6 +55,12 @@ export default function HostPage() {
   const pageStyle = { minHeight: "100vh", background: theme.pageBg, color: theme.text, fontFamily: theme.font, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 };
   const inputStyle = { display: "block", width: "100%", background: theme.inputBg, border: `1px solid ${theme.border}`, borderRadius: 8, padding: "10px 14px", color: theme.text, fontSize: 14, outline: "none", marginBottom: 10, boxSizing: "border-box" };
   const btnStyle = { width: "100%", background: theme.accentGradient, color: theme.accentText, border: "none", borderRadius: 8, padding: "10px 18px", fontSize: 14, fontWeight: 700, cursor: "pointer" };
+  // Cruel Summer House's own brand, not a game's — used only for the
+  // three screens below the "no session yet" point, where there's no
+  // game_type to theme by at all (see lib/siteTheme.js).
+  const sitePageStyle = { minHeight: "100vh", background: SITE_THEME.pageBg, color: SITE_THEME.text, fontFamily: SITE_THEME.font, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 };
+  const siteInputStyle = { display: "block", width: "100%", background: SITE_THEME.inputBg, border: `1px solid ${SITE_THEME.border}`, borderRadius: 8, padding: "10px 14px", color: SITE_THEME.text, fontSize: 14, outline: "none", marginBottom: 10, boxSizing: "border-box" };
+  const siteBtnStyle = { width: "100%", background: SITE_THEME.accentGradient, color: SITE_THEME.accentText, border: "none", borderRadius: 8, padding: "10px 18px", fontSize: 14, fontWeight: 700, cursor: "pointer" };
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -353,21 +360,21 @@ export default function HostPage() {
     setEditing(false);
   };
 
-  if (user === undefined) return <div style={pageStyle}><p>Loading...</p></div>;
+  if (user === undefined) return <div style={sitePageStyle}><p>Loading...</p></div>;
 
   if (!user) {
     return (
-      <div style={pageStyle}>
+      <div style={sitePageStyle}>
         <form onSubmit={submitLogin} style={{ maxWidth: 320, width: "100%", textAlign: "center" }}>
-          <div style={{ marginBottom: 16 }}><HomeLink /></div>
-          <h2 style={{ fontFamily: theme.font, fontSize: 22, marginBottom: 4 }}>Host Access</h2>
-          <p style={{ color: theme.textMuted, fontSize: 13, marginBottom: 16, fontStyle: "italic" }}>
+          <div style={{ marginBottom: 16 }}><HomeLink theme={SITE_THEME} /></div>
+          <h2 style={{ fontFamily: SITE_THEME.font, fontSize: 22, marginBottom: 4 }}>Host Access</h2>
+          <p style={{ color: SITE_THEME.textMuted, fontSize: 13, marginBottom: 16, fontStyle: "italic" }}>
             Log in with the host account created in Supabase.
           </p>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Host email" style={inputStyle} autoFocus />
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" style={inputStyle} />
-          {error && <p style={{ color: theme.danger, fontSize: 13 }}>{error}</p>}
-          <button type="submit" style={btnStyle}>Enter</button>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Host email" style={siteInputStyle} autoFocus />
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" style={siteInputStyle} />
+          {error && <p style={{ color: SITE_THEME.danger, fontSize: 13 }}>{error}</p>}
+          <button type="submit" style={siteBtnStyle}>Enter</button>
         </form>
       </div>
     );
@@ -375,11 +382,11 @@ export default function HostPage() {
 
   if (!isHost(user)) {
     return (
-      <div style={pageStyle}>
+      <div style={sitePageStyle}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ marginBottom: 16 }}><HomeLink /></div>
+          <div style={{ marginBottom: 16 }}><HomeLink theme={SITE_THEME} /></div>
           <p>This account isn't marked as a host. Set <code>role: "host"</code> in this user's metadata in Supabase, or use a dedicated host account.</p>
-          <button onClick={signOut} style={{ background: "none", border: "none", color: theme.textDim, fontSize: 12, cursor: "pointer", marginTop: 12 }}>Log out and try a different account</button>
+          <button onClick={signOut} style={{ background: "none", border: "none", color: SITE_THEME.textDim, fontSize: 12, cursor: "pointer", marginTop: 12 }}>Log out and try a different account</button>
         </div>
       </div>
     );
@@ -391,7 +398,7 @@ export default function HostPage() {
         <UpdateBanner />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <HomeLink />
+            <HomeLink theme={theme} />
             <h1 style={{ fontFamily: theme.font, fontSize: 22, margin: 0 }}>Host Console</h1>
           </div>
           <button onClick={signOut} style={{ background: "none", border: "none", color: theme.textDim, fontSize: 12, cursor: "pointer" }}>Log out</button>

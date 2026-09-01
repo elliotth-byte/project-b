@@ -4,7 +4,7 @@ export default function App({ Component, pageProps }) {
   return (
     <>
       <Head>
-        <title>Project B</title>
+        <title>Cruel Summer House</title>
         {/* Locks pinch/double-tap zoom — without this, rapid taps on small
             game elements (Match 3 tiles, Whack-a-Mole holes, etc.) could
             get misread by the browser as a double-tap-zoom gesture
@@ -14,7 +14,7 @@ export default function App({ Component, pageProps }) {
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Orbitron:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Orbitron:wght@400;600;700;800;900&family=Playfair+Display:wght@400;600;700;800&display=swap" rel="stylesheet" />
       </Head>
       <style jsx global>{`
         * { box-sizing: border-box; }

@@ -1,30 +1,68 @@
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/router";
-import LogoutButton from "../components/LogoutButton";
+import { supabase } from "../lib/supabaseClient";
+import { signOut, isHost, displayNameFromUser } from "../lib/auth";
+import { SITE_THEME, LOGO_SRC } from "../lib/siteTheme";
 
+// ─── Cruel Summer House — the front door ───
+// This used to always show every entry point at once (signup, login,
+// profile, messages, host) regardless of whether you were logged in —
+// and always as "Project B", when that's just one of the game types
+// this platform now runs (see README.md's "Game types" section; Project
+// B and Traitors today, more later). Now it's session-gated: logged out,
+// you get the branded splash and nothing else (nothing past that point
+// works without an account anyway); logged in, you get the actual hub —
+// your game-agnostic profile/messages, plus a host console link if
+// you're a host. Which specific SEASON's colors take over from here is
+// still entirely lib/uiTheme.js's job, once you're actually in one.
 export default function Home() {
   const router = useRouter();
   const game = router.query.game;
   const withGame = (path) => (game ? `${path}?game=${game}` : path);
+  const [user, setUser] = useState(undefined); // undefined = still checking, null = logged out
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setUser(data.session?.user || null));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => setUser(session?.user || null));
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
   return (
     <div style={pageStyle}>
-      <div style={{ position: "absolute", top: 20, right: 24 }}><LogoutButton /></div>
-      <div style={{ textAlign: "center", maxWidth: 420 }}>
-        <div style={{ fontSize: 12, letterSpacing: 6, textTransform: "uppercase", color: "#ff2d95", marginBottom: 12 }}>✦</div>
-        <h1 style={{ fontFamily: "'Orbitron', 'Segoe UI', sans-serif", fontSize: 26, marginBottom: 6 }}>
-          Project B
-        </h1>
-        <p style={{ color: "#a68fd6", fontSize: 14, marginBottom: 28, fontStyle: "italic" }}>
-          Dominate the battles. Manipulate the vote. Build your own mythology.
-        </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <Link href={withGame("/signup")} style={linkBtn}>👤 New player — Create account</Link>
-          <Link href={withGame("/login")} style={linkBtn}>⚔️ Returning player — Log in</Link>
-          <Link href="/profile" style={linkBtn}>🪪 My Profile</Link>
-          <Link href="/messages" style={linkBtn}>💬 Messages</Link>
-          <Link href="/host" style={{ ...linkBtn, borderColor: "#ff2d95", color: "#ff2d95" }}>👑 I'm the Host</Link>
+      <div style={{ textAlign: "center", maxWidth: 420, width: "100%" }}>
+        <div style={{ position: "relative", width: 220, height: 275, margin: "0 auto 8px" }}>
+          <Image src={LOGO_SRC} alt="Cruel Summer House" fill style={{ objectFit: "contain" }} priority />
         </div>
+
+        {user === undefined ? (
+          <p style={{ color: SITE_THEME.textMuted, fontSize: 14, fontStyle: "italic" }}>Loading...</p>
+        ) : user === null ? (
+          <>
+            <p style={{ color: SITE_THEME.textMuted, fontSize: 14, marginBottom: 28, fontStyle: "italic" }}>
+              One house, every season. Log in to find out who's playing this time.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <Link href={withGame("/signup")} style={linkBtn}>👤 New player — Create account</Link>
+              <Link href={withGame("/login")} style={linkBtn}>🔑 Returning player — Log in</Link>
+              <Link href="/host" style={{ ...linkBtn, borderColor: SITE_THEME.accent, color: SITE_THEME.accent }}>👑 I'm the Host</Link>
+            </div>
+          </>
+        ) : (
+          <>
+            <p style={{ color: SITE_THEME.textMuted, fontSize: 14, marginBottom: 28, fontStyle: "italic" }}>
+              Welcome back, {displayNameFromUser(user)}.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {game && <Link href={`/play?game=${game}`} style={{ ...linkBtn, borderColor: SITE_THEME.accent, color: SITE_THEME.accent }}>▶️ Continue to Game</Link>}
+              <Link href="/profile" style={linkBtn}>🪪 My Profile</Link>
+              <Link href="/messages" style={linkBtn}>💬 Messages</Link>
+              {isHost(user) && <Link href="/host" style={{ ...linkBtn, borderColor: SITE_THEME.accent, color: SITE_THEME.accent }}>👑 Host Console</Link>}
+              <button onClick={signOut} style={{ ...linkBtn, background: "none", cursor: "pointer", color: SITE_THEME.textDim }}>Log out</button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -32,9 +70,9 @@ export default function Home() {
 
 const pageStyle = {
   minHeight: "100vh",
-  background: "linear-gradient(180deg, #05010f, #1a0a2e)",
-  color: "#f5f0ff",
-  fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
+  background: SITE_THEME.pageBg,
+  color: SITE_THEME.text,
+  fontFamily: SITE_THEME.font,
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -45,10 +83,11 @@ const linkBtn = {
   display: "block",
   padding: "12px 18px",
   borderRadius: 10,
-  border: "1px solid #3d1f5c",
-  background: "#150a28",
-  color: "#f5f0ff",
+  border: `1px solid ${SITE_THEME.border}`,
+  background: SITE_THEME.cardBg,
+  color: SITE_THEME.text,
   textDecoration: "none",
   fontSize: 14,
   fontWeight: 700,
+  width: "100%",
 };
