@@ -80,6 +80,10 @@ const BASE_TABS = [
 export default function PlayPage() {
   const router = useRouter();
   const { game: gameId } = router.query;
+  // Only used by the "no gameId at all" fallback screen further down —
+  // declared this early because it's a hook, and hooks can't be called
+  // conditionally after that screen's own early return.
+  const [codeInput, setCodeInput] = useState("");
   const [user, setUser] = useState(undefined);
   const [joined, setJoined] = useState(false);
   const [myPlayer, setMyPlayer] = useState(null);
@@ -373,10 +377,43 @@ export default function PlayPage() {
   if (!user) return null;
 
   if (!gameId) {
+    const submitCode = (e) => {
+      e.preventDefault();
+      const trimmed = codeInput.trim();
+      if (!trimmed) return;
+      // /play/[code] (components/JoinByCode.jsx) does the actual
+      // lookup + redirect to /play?game=<uuid> — same route the host's
+      // own shared /join/[code] link uses, just reached by typing
+      // instead of clicking.
+      router.push(`/play/${trimmed}`);
+    };
     return (
       <div style={{ ...pageStyle, background: SITE_THEME.pageBg, fontFamily: SITE_THEME.font }}>
         <div style={{ position: "absolute", top: 20, right: 24 }}><LogoutButton theme={SITE_THEME} /></div>
-        <p style={{ color: SITE_THEME.textMuted }}>Ask the host for your join link — it looks like <code>/play?game=...</code>.</p>
+        <div style={{ textAlign: "center", maxWidth: 280 }}>
+          <p style={{ color: SITE_THEME.textMuted }}>Ask the host for your join link — it looks like <code>/play?game=...</code>.</p>
+          <p style={{ color: SITE_THEME.textMuted, margin: "12px 0" }}>...or enter your four-letter code:</p>
+          <form onSubmit={submitCode} style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+            <input
+              value={codeInput}
+              onChange={(e) => setCodeInput(e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4))}
+              placeholder="ABCD"
+              autoCapitalize="characters"
+              style={{
+                width: 100, textAlign: "center", letterSpacing: 4, fontSize: 18, fontWeight: 700,
+                background: SITE_THEME.inputBg, border: `1px solid ${SITE_THEME.border}`, borderRadius: 8,
+                padding: "10px 8px", color: SITE_THEME.text, outline: "none",
+              }}
+            />
+            <button type="submit" disabled={codeInput.length !== 4} style={{
+              background: SITE_THEME.accentGradient, color: SITE_THEME.accentText, border: "none",
+              borderRadius: 8, padding: "10px 18px", fontSize: 14, fontWeight: 700,
+              cursor: codeInput.length === 4 ? "pointer" : "not-allowed", opacity: codeInput.length === 4 ? 1 : 0.5,
+            }}>
+              Go
+            </button>
+          </form>
+        </div>
       </div>
     );
   }
