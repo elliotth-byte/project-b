@@ -11,7 +11,7 @@ import TraitorRolesHost from "./TraitorRolesHost";
 import MurderVoteHost from "./MurderVoteHost";
 import AdminHost from "./TraitorsAdminHost";
 import HistoryTab from "./TraitorsHistoryTab";
-import ConfessionalsHost from "./ConfessionalsHost";
+import ConfessionalsHost from "./TraitorsConfessionalsHost";
 import RoundtableHost from "./RoundtableHost";
 import PandoraBoxHost from "./PandoraBoxHost";
 import WordHost from "./WordHost";
