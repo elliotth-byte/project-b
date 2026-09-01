@@ -41,7 +41,7 @@ const BASE_TABS = [
 // one long page of every panel stacked on top of each other. This is
 // purely a layout change — every component here is the same one used
 // elsewhere, just organized under tabs now.
-export default function HostPanels({ gameId, players }) {
+export default function HostPanels({ gameId, players, adminExtra }) {
   const [tab, setTab] = useState("traitor");
   const [tr, setTr] = useState(null);
   const [unreadConfessionals, setUnreadConfessionals] = useState(0);
@@ -174,6 +174,7 @@ export default function HostPanels({ gameId, players }) {
 
       {tab === "admin" && (
         <div style={{ display: "grid", gap: 16 }}>
+          {adminExtra}
           <ChallengeErrorBoundary label="Scheduled Slack Posts"><ScheduledPostsList gameId={gameId} /></ChallengeErrorBoundary>
           <ChallengeErrorBoundary label="Admin"><AdminHost gameId={gameId} players={players} /></ChallengeErrorBoundary>
         </div>

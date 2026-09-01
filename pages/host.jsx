@@ -3,9 +3,11 @@ import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 import { signInHost, signOut, isHost } from "../lib/auth";
 import HostPanels from "../components/HostPanels";
+import TraitorsHostPanels from "../components/TraitorsHostPanels";
 import GameAccessPanel from "../components/GameAccessPanel";
 import UpdateBanner from "../components/UpdateBanner";
 import MusicPlayer from "../components/MusicPlayer";
+import TraitorsMusicPlayer from "../components/TraitorsMusicPlayer";
 import HomeLink from "../components/HomeLink";
 import { useRoundWatcher } from "../lib/useRoundWatcher";
 import { initRound } from "../lib/gameState";
@@ -26,6 +28,7 @@ export default function HostPage() {
   const [newName, setNewName] = useState("");
   const [radioPortalNode, setRadioPortalNode] = useState(null);
   const [newSubtitle, setNewSubtitle] = useState("");
+  const [newGameType, setNewGameType] = useState("project_b");
 
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");
@@ -132,7 +135,9 @@ export default function HostPage() {
       autoCreateAttempted.current = true;
 
       // No seasons at all yet — create the first one automatically.
-      const created = await createSeason("Project B", "");
+      // Always Project B — a host who wants a Traitors season instead
+      // just uses "+ New Season" and picks it there.
+      const created = await createSeason("Project B", "", "project_b");
       if (created) {
         setActiveGameId(created.id);
         router.replace(`/host?game=${created.id}`, undefined, { shallow: true });
@@ -284,29 +289,35 @@ export default function HostPage() {
     if (!res.ok) setError(res.error);
   };
 
-  async function createSeason(name, subtitle) {
+  async function createSeason(name, subtitle, gameType) {
+    const type = gameType || "project_b";
     const { data: code } = await supabase.rpc("generate_join_code");
     const { data: created, error } = await supabase
       .from("games")
-      .insert({ name: name || "Project B", subtitle: subtitle || null, host_id: user.id, join_code: code })
+      .insert({ name: name || (type === "traitors" ? "The Traitors" : "Project B"), subtitle: subtitle || null, host_id: user.id, join_code: code, game_type: type })
       .select()
       .single();
     if (error) { setError(error.message); return null; }
     // Put the game straight into the Lobby phase — without this, `round`
     // stays null until the host later clicks "Start Round 1", and players
-    // can't reach any tab (including Confessionals) until then.
-    await initRound(created.id);
+    // can't reach any tab (including Confessionals) until then. Only
+    // meaningful for Project B's round engine (lib/gameState.js/
+    // roundEngine.js) — Traitors seasons have no equivalent bootstrap
+    // step; TraitorRolesHost/RoundtableHost etc. all handle "no state
+    // yet" as their own natural starting point.
+    if (type === "project_b") await initRound(created.id);
     setGames((prev) => [created, ...(prev || [])]);
     return created;
   }
 
   const submitNewSeason = async (e) => {
     e.preventDefault();
-    const created = await createSeason(newName.trim(), newSubtitle.trim());
+    const created = await createSeason(newName.trim(), newSubtitle.trim(), newGameType);
     if (created) {
       setCreating(false);
       setNewName("");
       setNewSubtitle("");
+      setNewGameType("project_b");
       router.push(`/host?game=${created.id}`, undefined, { shallow: true });
     }
   };
@@ -395,7 +406,7 @@ export default function HostPage() {
                   }}
                   title={g.subtitle || undefined}
                 >
-                  {g.name}
+                  {g.game_type === "traitors" ? "🏰" : "🃏"} {g.name}
                   {g.subtitle && (
                     <span style={{ fontWeight: 400, opacity: 0.8 }}> — {g.subtitle}</span>
                   )}
@@ -453,6 +464,32 @@ export default function HostPage() {
         {creating && (
           <form onSubmit={submitNewSeason} style={{ background: "#150a28", border: "1px solid #3d1f5c", borderRadius: 10, padding: 14, marginBottom: 16 }}>
             <div style={{ color: "#a68fd6", fontSize: 12, marginBottom: 8 }}>Start a new season</div>
+
+            {/* Locked in at creation — see createSeason's own comment on
+                why this can't change after the fact (Project B's and
+                Traitors' round engines are completely separate, so a
+                season needs to pick one bootstrap path up front). */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+              {[
+                { value: "project_b", label: "🃏 Project B", desc: "Challenge → Fates → Exile" },
+                { value: "traitors", label: "🏰 Traitors", desc: "Roundtable & Murder Vote" },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setNewGameType(opt.value)}
+                  style={{
+                    flex: 1, textAlign: "left", cursor: "pointer", borderRadius: 8, padding: "8px 10px",
+                    background: newGameType === opt.value ? "rgba(255,45,149,0.13)" : "transparent",
+                    border: `1px solid ${newGameType === opt.value ? "#ff2d95" : "#3d1f5c"}`,
+                  }}
+                >
+                  <div style={{ color: newGameType === opt.value ? "#ff2d95" : "#f5f0ff", fontSize: 13, fontWeight: 700 }}>{opt.label}</div>
+                  <div style={{ color: "#6b4f99", fontSize: 10.5, marginTop: 2 }}>{opt.desc}</div>
+                </button>
+              ))}
+            </div>
+
             <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Season name (e.g. Office Offsite 2026)" style={inputStyle} autoFocus />
             <input value={newSubtitle} onChange={(e) => setNewSubtitle(e.target.value)} placeholder="Subtitle — optional" style={{ ...inputStyle, marginBottom: 10 }} />
             <div style={{ display: "flex", gap: 8 }}>
@@ -503,8 +540,33 @@ export default function HostPage() {
 
         {/* key={game.id} forces a clean remount of all host panels/polling
             when switching seasons, instead of every tab's internal state
-            (and in-flight polls) carrying over from the previous season. */}
-        {game && (
+            (and in-flight polls) carrying over from the previous season.
+            Which panel/music-player mounts is decided once, by
+            game.game_type, and never changes for a season's lifetime
+            (see createSeason's own comment). */}
+        {game && game.game_type === "traitors" && (
+          <TraitorsHostPanels
+            key={game.id}
+            gameId={game.id}
+            players={players}
+            adminExtra={
+              <GameAccessPanel
+                game={game}
+                players={players}
+                isPrimaryHost={isPrimaryHost}
+                origin={origin}
+                userId={user?.id}
+                coHosts={coHosts}
+                inviteEmail={inviteEmail}
+                setInviteEmail={setInviteEmail}
+                inviteStatus={inviteStatus}
+                inviteCoHost={inviteCoHost}
+                removeCoHost={removeCoHost}
+              />
+            }
+          />
+        )}
+        {game && game.game_type !== "traitors" && (
           <HostPanels
             key={game.id}
             gameId={game.id}
@@ -528,14 +590,17 @@ export default function HostPage() {
                 {/* The music player's actual controls (see MusicPlayer.jsx)
                     get portaled into this div — MusicPlayer itself stays
                     mounted below, outside HostPanels, so the audio engine
-                    keeps running even when this tab isn't the active one. */}
+                    keeps running even when this tab isn't the active one.
+                    Traitors' own TraitorsMusicPlayer doesn't use a portal
+                    at all (see below), so this slot only exists here. */}
                 <div ref={setRadioPortalNode} />
               </>
             }
           />
         )}
       </div>
-      {game && <MusicPlayer key={`music-${game.id}`} gameId={game.id} isHost={true} portalTarget={radioPortalNode} />}
+      {game && game.game_type === "traitors" && <TraitorsMusicPlayer key={`music-${game.id}`} gameId={game.id} isHost={true} />}
+      {game && game.game_type !== "traitors" && <MusicPlayer key={`music-${game.id}`} gameId={game.id} isHost={true} portalTarget={radioPortalNode} />}
       <p style={{ fontSize: 10, color: "#3d1f5c", textAlign: "center", margin: "16px 0 0" }}>
         Version {process.env.NEXT_PUBLIC_APP_VERSION || "dev"}
       </p>
