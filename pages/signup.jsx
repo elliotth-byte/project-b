@@ -76,6 +76,11 @@ export default function Signup() {
             Log in
           </a>
         </p>
+        <p style={{ color: theme.textDim, fontSize: 12, marginTop: 6 }}>
+          <a href="/login" style={{ color: theme.accent }}>
+            Host a game instead
+          </a>
+        </p>
       </form>
     </div>
   );

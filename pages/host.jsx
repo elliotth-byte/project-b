@@ -387,7 +387,7 @@ export default function HostPage() {
       <div style={sitePageStyle}>
         <div style={{ textAlign: "center" }}>
           <div style={{ marginBottom: 16 }}><HomeLink theme={siteTheme} /></div>
-          <p>This account isn't marked as a host. Set <code>role: "host"</code> in this user's metadata in Supabase, or use a dedicated host account.</p>
+          <p>This account isn't marked as a host. Log out and use "Host a game instead" on the <a href="/login">login page</a> to create a dedicated host account, or set <code>role: "host"</code> in this user's metadata in Supabase.</p>
           <button onClick={signOut} style={{ background: "none", border: "none", color: siteTheme.textDim, fontSize: 12, cursor: "pointer", marginTop: 12 }}>Log out and try a different account</button>
         </div>
       </div>
