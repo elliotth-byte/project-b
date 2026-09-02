@@ -6,6 +6,12 @@ import { storageUpdate } from "../../lib/gameStorage";
 import {
   subscribePlinkoBracket, resolveDuelIfReady, pickNextChallenger, placementValueFor,
 } from "../../lib/games/plinkoBracketData";
+import { drawGlossHighlight } from "./canvasShapes";
+
+// One background color per scoring slot, warmer/brighter for the
+// higher-value center slots — purely visual, doesn't touch SLOTS'
+// actual point values.
+const SLOT_COLORS = ["#3d1f5c", "#5c2f7a", "#b829ff", "#ff2d95", "#ffd93d", "#ff2d95", "#b829ff", "#5c2f7a", "#3d1f5c"];
 
 const SLOTS = [100, 50, 25, 10, 5, 10, 25, 50, 100];
 const ROWS = SLOTS.length - 1;
@@ -123,28 +129,63 @@ export default function PlinkoPlayer({ gameId, round, challenge, player, players
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = "#3d1f5c";
+
+    // Pegs — a small glowing dot with a gradient instead of a flat fill,
+    // so the board reads as lit rather than just dark bumps.
     for (let r = 0; r < ROWS; r++) {
       const pegsInRow = r + 3;
       for (let p = 0; p < pegsInRow; p++) {
         const x = (W / (pegsInRow + 1)) * (p + 1);
         const y = 30 + r * ((H - 90) / ROWS);
+        ctx.save();
+        ctx.shadowColor = "#b829ff";
+        ctx.shadowBlur = 4;
+        const pegGrad = ctx.createRadialGradient(x - 1, y - 1, 0, x, y, 3);
+        pegGrad.addColorStop(0, "#e0c3ff");
+        pegGrad.addColorStop(1, "#5c2f7a");
+        ctx.fillStyle = pegGrad;
         ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
       }
     }
-    ctx.fillStyle = "#150a28";
-    ctx.fillRect(0, H - 34, W, 34);
+
+    // Scoring slots — each its own gradient-colored zone (warmer toward
+    // the high-value center slots), not one flat dark bar with plain
+    // pink text.
+    const slotW = W / SLOTS.length;
     SLOTS.forEach((v, i) => {
-      ctx.fillStyle = "#ff2d95";
+      const x = i * slotW;
+      ctx.save();
+      const zoneGrad = ctx.createLinearGradient(x, H - 34, x, H);
+      zoneGrad.addColorStop(0, SLOT_COLORS[i] + "55");
+      zoneGrad.addColorStop(1, SLOT_COLORS[i] + "22");
+      ctx.fillStyle = zoneGrad;
+      ctx.fillRect(x + 1, H - 34, slotW - 2, 34);
+      ctx.restore();
+      ctx.fillStyle = "#f5f0ff";
       ctx.font = "bold 11px sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(String(v), colX(i), H - 14);
     });
+
+    // Chip — a coin-like token (outer ring + gradient face + gloss)
+    // instead of a flat filled dot.
     const b = ballRef.current;
     const y = 30 + b.row * ((H - 90) / ROWS);
     const x = colX(b.col);
-    ctx.fillStyle = "#ff3860";
+    ctx.save();
+    ctx.shadowColor = "#ff3860";
+    ctx.shadowBlur = 6;
+    const chipGrad = ctx.createRadialGradient(x - 2, y - 2, 0, x, y, 6);
+    chipGrad.addColorStop(0, "#ffb3c4");
+    chipGrad.addColorStop(1, "#ff3860");
+    ctx.fillStyle = chipGrad;
     ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#ffe0e9";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+    drawGlossHighlight(ctx, x, y, 6, 0.45);
   };
 
   useEffect(() => {

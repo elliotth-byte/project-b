@@ -89,8 +89,17 @@ export default function WhackMolePlayer({ gameId, round, challenge, player }) {
               key={i} onClick={() => whack(i)}
               style={{
                 width: 70, height: 70, borderRadius: "50%", fontSize: 32, cursor: "pointer", position: "relative",
-                background: style ? style.bg : "#0d0618", border: "3px solid #3d1f5c", overflow: "hidden",
-                boxShadow: style ? style.glow : "none", transition: "background 0.05s, box-shadow 0.05s",
+                // A dark radial gradient (lighter rim, near-black center)
+                // instead of a flat fill — reads as an actual hole to
+                // pop out of rather than a plain dark circle. The
+                // per-type glow (style.bg/glow) still layers on top via
+                // the box-shadow below, unchanged.
+                background: style
+                  ? `radial-gradient(circle at 50% 40%, ${style.bg}, #050108 75%)`
+                  : "radial-gradient(circle at 50% 40%, #1a0a2e, #050108 75%)",
+                border: "3px solid #3d1f5c", overflow: "hidden",
+                boxShadow: style ? `inset 0 4px 8px rgba(0,0,0,0.6), ${style.glow}` : "inset 0 4px 8px rgba(0,0,0,0.6)",
+                transition: "background 0.05s, box-shadow 0.05s",
               }}
             >
               {style ? style.emoji : ""}
