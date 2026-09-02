@@ -34,7 +34,15 @@ export default function StereoTypesPlayerPanels({ gameId, player, players }) {
   }, [gameId]);
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    // See StereoTypesHostPanels.jsx's identical fix for why
+    // gridTemplateColumns is explicit here — without it, the
+    // fullscreen title screen's own 100vw width inflates this grid's
+    // implicit column (and therefore every sibling stacked in it,
+    // like StereoTypesASidePlayer below) out to near-full window
+    // width, regardless of the item-level min-width:0 already set on
+    // the title screen wrapper itself (that alone isn't enough for
+    // grid track sizing, only for flex rows).
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16 }}>
       <StereoTypesTitleScreen fullscreen reactive={!!nowPlaying?.isPlaying} intensity={nowPlaying?.intensity || 0} bpm={nowPlaying?.bpm || null} />
 
       <Card style={{ borderColor: "#f4c430", textAlign: "center" }}>

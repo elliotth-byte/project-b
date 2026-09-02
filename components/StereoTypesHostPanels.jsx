@@ -40,7 +40,20 @@ export default function StereoTypesHostPanels({ gameId, roomCode, players, admin
   };
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    // gridTemplateColumns explicitly set (rather than left as the
+    // implicit default) matters here specifically because of the
+    // fullscreen title screen below: CSS Grid's default "auto" column
+    // sizing takes an item's own SPECIFIED width (100vw, from
+    // StereoTypesTitleScreen's fullscreen breakout) as that column's
+    // max-content contribution regardless of the item's own min-width
+    // — a min-width:0 fix on the item itself (already applied in
+    // StereoTypesTitleScreen.jsx) only helps flex rows, not grid track
+    // sizing. minmax(0, 1fr) caps the track at the container's actual
+    // available width, so the 100vw item just paints outside its own
+    // track (the intended full-bleed effect) instead of inflating the
+    // track — and every sibling stacked in this column (Spotify
+    // widget, A Side round cards, roster) — to near-full window width.
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16 }}>
       <StereoTypesTitleScreen
         roomCode={roomCode}
         playerCount={approvedPlayers.length}
