@@ -3,21 +3,29 @@ import { Card, Btn } from "./ui";
 import { supabase } from "../lib/supabaseClient";
 import Boombox from "./Boombox";
 import StereoTypesTitleScreen from "./StereoTypesTitleScreen";
+import StereoTypesSpotifyWidget from "./StereoTypesSpotifyWidget";
 
-// ─── Stereo Types — host console (Phase 2-3) ───
+// ─── Stereo Types — host console (Phase 2-4) ───
 // Still "plumbing before rounds" scope (see this file's own Phase 1
 // history) — Phase 2 added the real boombox graphic per roster row
-// instead of a bare name/status line; Phase 3 swaps the old plain-text
-// banner for the actual title screen (scrolling cityscape + blocky
-// logo). A player who hasn't gone through StereoTypesIdentityPicker.jsx
-// yet has no color set (p.color is null), which Boombox.jsx already
-// renders as a real-looking boombox in the theme's own yellow rather
-// than a broken/blank state — nothing special needed here for that
-// case. approvePlayer is the same plain players-table update
+// instead of a bare name/status line; Phase 3 swapped the old
+// plain-text banner for the actual title screen (scrolling cityscape +
+// blocky logo). Phase 4 (StereoTypesSpotifyWidget below) is what
+// actually plays music through the host's own Spotify — nowPlaying
+// here is that widget's own state, lifted up just far enough to feed
+// the host's own title screen's reactive/intensity props; the widget
+// separately broadcasts the same thing into game_state for every other
+// player's copy of the title screen to react to. A player who hasn't
+// gone through StereoTypesIdentityPicker.jsx yet has no color set
+// (p.color is null), which Boombox.jsx already renders as a
+// real-looking boombox in the theme's own yellow rather than a
+// broken/blank state — nothing special needed here for that case.
+// approvePlayer is the same plain players-table update
 // AdminHost.jsx/TraitorsAdminHost.jsx each already do — nothing shared
 // to reuse there, just the same one-liner a third time.
 export default function StereoTypesHostPanels({ gameId, roomCode, players, adminExtra }) {
   const [busyId, setBusyId] = useState(null);
+  const [nowPlaying, setNowPlaying] = useState(null);
   const approvedPlayers = players.filter((p) => p.approved);
   const pendingPlayers = players.filter((p) => !p.approved);
 
@@ -29,7 +37,15 @@ export default function StereoTypesHostPanels({ gameId, roomCode, players, admin
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <StereoTypesTitleScreen roomCode={roomCode} playerCount={approvedPlayers.length} fullscreen />
+      <StereoTypesTitleScreen
+        roomCode={roomCode}
+        playerCount={approvedPlayers.length}
+        fullscreen
+        reactive={!!nowPlaying?.isPlaying}
+        intensity={nowPlaying?.intensity || 0}
+      />
+
+      <StereoTypesSpotifyWidget gameId={gameId} onStateChange={setNowPlaying} />
 
       <Card style={{ borderColor: "#f4c430" }}>
         <p style={{ color: "#c9b98a", fontSize: 13, margin: 0, fontStyle: "italic" }}>
