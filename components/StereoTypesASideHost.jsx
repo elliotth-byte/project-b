@@ -3,6 +3,7 @@ import { Card, Btn } from "./ui";
 import {
   subscribeASideRound, startASide, maybeAdvanceASideToReveal, maybeScoreASide, persistASideRoundScores,
 } from "../lib/stereoTypesASide";
+import { startRemix } from "../lib/stereoTypesRemix";
 import StereoTypesASideResults from "./StereoTypesASideResults";
 
 // ─── Stereo Types — Round 1 ("A Side"), host console ───
@@ -54,6 +55,27 @@ export default function StereoTypesASideHost({ gameId, players }) {
   const handleForceScore = async () => {
     setBusy(true);
     await maybeScoreASide(gameId, 1, { force: true });
+    setBusy(false);
+  };
+
+  // Round 2's actual start trigger — see lib/stereoTypesRemix.js's
+  // startRemix. This is the exact spot the original Phase-5 placeholder
+  // ("Round 2 coming soon", disabled) was left for; wiring it here means
+  // this component's own successful click is also the moment
+  // KEY_STEREO_TYPES_ROUND flips to 2, which is what tells
+  // StereoTypesHostPanels.jsx/StereoTypesPlayerPanels.jsx to swap from
+  // this component (and StereoTypesASidePlayer.jsx) over to
+  // StereoTypesRemixHost.jsx/StereoTypesRemixPlayer.jsx for everyone.
+  // Not gating this button on approvedPlayers.length the way Round 1's
+  // own "Start A Side" button gates itself — by the time Round 1 is
+  // "scored", the round's own playerIds already proved at least 2
+  // approved players exist; nothing about entering "scored" allows that
+  // count to drop back below 2 mid-game (players.jsx has no way to
+  // un-approve someone).
+  const handleStartRemix = async () => {
+    setBusy(true);
+    const res = await startRemix(gameId, approvedPlayers);
+    if (!res.ok && res.error) window.alert(res.error);
     setBusy(false);
   };
 
@@ -128,7 +150,7 @@ export default function StereoTypesASideHost({ gameId, players }) {
           <StereoTypesASideResults round={round} players={players} />
           <Card style={{ textAlign: "center" }}>
             <div style={{ fontSize: 11, color: "#c9b98a", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Round 2 — The Remix</div>
-            <Btn disabled>Round 2 coming soon</Btn>
+            <Btn onClick={handleStartRemix} disabled={busy}>Start Round 2 — The Remix</Btn>
           </Card>
         </>
       )}

@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, Btn } from "./ui";
 import { supabase } from "../lib/supabaseClient";
 import Boombox from "./Boombox";
 import StereoTypesTitleScreen from "./StereoTypesTitleScreen";
 import StereoTypesSpotifyWidget from "./StereoTypesSpotifyWidget";
 import StereoTypesASideHost from "./StereoTypesASideHost";
+import StereoTypesRemixHost from "./StereoTypesRemixHost";
+import { subscribeStereoTypesRound } from "../lib/stereoTypesASide";
 
-// ─── Stereo Types — host console (Phase 2-5) ───
+// ─── Stereo Types — host console (Phase 2-6) ───
 // Phase 2 added the real boombox graphic per roster row instead of a
 // bare name/status line; Phase 3 swapped the old plain-text banner for
 // the actual title screen (scrolling cityscape + blocky logo). Phase 4
@@ -27,11 +29,31 @@ import StereoTypesASideHost from "./StereoTypesASideHost";
 // approvePlayer is the same plain players-table update
 // AdminHost.jsx/TraitorsAdminHost.jsx each already do — nothing shared
 // to reuse there, just the same one-liner a third time.
+//
+// Phase 6 adds Round 2 ("The Remix"): currentRound (subscribed here via
+// subscribeStereoTypesRound — the SAME KEY_STEREO_TYPES_ROUND key
+// lib/stereoTypesASide.js's startASide and lib/stereoTypesRemix.js's
+// startRemix each set on their own round's start) decides which round's
+// host component mounts below. It's read here, once, rather than inside
+// either round's own component, specifically so mounting is a single
+// switch in one place instead of each round component having to guess
+// whether it's the "current" one from its own round's status alone —
+// round.status only exists once that round's own game_state row exists,
+// which is exactly the ambiguity this avoids. currentRound defaults to
+// 0 (falsy) before Round 1 has ever started; StereoTypesASideHost.jsx
+// covers that "not started yet" case itself (its own `!round` branch
+// renders the "Start A Side" button), so 0/1 share the same branch below.
 export default function StereoTypesHostPanels({ gameId, roomCode, players, adminExtra }) {
   const [busyId, setBusyId] = useState(null);
   const [nowPlaying, setNowPlaying] = useState(null);
+  const [currentRound, setCurrentRound] = useState(0);
   const approvedPlayers = players.filter((p) => p.approved);
   const pendingPlayers = players.filter((p) => !p.approved);
+
+  useEffect(() => {
+    if (!gameId) return;
+    return subscribeStereoTypesRound(gameId, setCurrentRound);
+  }, [gameId]);
 
   const approvePlayer = async (p) => {
     setBusyId(p.id);
@@ -65,7 +87,8 @@ export default function StereoTypesHostPanels({ gameId, roomCode, players, admin
 
       <StereoTypesSpotifyWidget gameId={gameId} onStateChange={setNowPlaying} />
 
-      <StereoTypesASideHost gameId={gameId} players={players} />
+      {(!currentRound || currentRound === 1) && <StereoTypesASideHost gameId={gameId} players={players} />}
+      {currentRound === 2 && <StereoTypesRemixHost gameId={gameId} players={players} />}
 
       <Card>
         <div style={{ fontSize: 11, color: "#c9b98a", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>

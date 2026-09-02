@@ -3,9 +3,11 @@ import { Card } from "./ui";
 import Boombox from "./Boombox";
 import StereoTypesTitleScreen from "./StereoTypesTitleScreen";
 import StereoTypesASidePlayer from "./StereoTypesASidePlayer";
+import StereoTypesRemixPlayer from "./StereoTypesRemixPlayer";
 import { subscribeStereoTypesNowPlaying } from "../lib/stereoTypesNowPlaying";
+import { subscribeStereoTypesRound } from "../lib/stereoTypesASide";
 
-// ─── Stereo Types — player view (Phase 2-5) ───
+// ─── Stereo Types — player view (Phase 2-6) ───
 // By the time this mounts, StereoTypesIdentityPicker.jsx (see
 // pages/play.jsx's needsStereoTypesIdentity gate) has already run, so
 // player.color is always set here — Phase 2 built the boombox that
@@ -23,14 +25,30 @@ import { subscribeStereoTypesNowPlaying } from "../lib/stereoTypesNowPlaying";
 // list every approved player by name) is threaded straight through from
 // pages/play.jsx's own `allPlayers`. No roomCode/playerCount here —
 // this is one player's own screen, not the shared room view
-// StereoTypesHostPanels.jsx is.
+// StereoTypesHostPanels.jsx is. Phase 6 adds Round 2
+// (StereoTypesRemixPlayer below), mounted instead of Round 1's own
+// component once currentRound flips to 2 — see the currentRound state
+// below and StereoTypesHostPanels.jsx's matching comment for why that
+// switch lives here rather than inside either round component.
 export default function StereoTypesPlayerPanels({ gameId, player, players }) {
   const [nowPlaying, setNowPlaying] = useState(null);
+  // Phase 6 adds Round 2 ("The Remix") — same currentRound switch as
+  // StereoTypesHostPanels.jsx's own, see that file's comment for the
+  // full reasoning (identical here: KEY_STEREO_TYPES_ROUND is the one
+  // signal that's meaningful both before either round has started and
+  // once either has, so it's read once here rather than each round
+  // component inferring "am I current" from its own round.status).
+  const [currentRound, setCurrentRound] = useState(0);
 
   useEffect(() => {
     if (!gameId) return;
     const unsubscribe = subscribeStereoTypesNowPlaying(gameId, setNowPlaying);
     return unsubscribe;
+  }, [gameId]);
+
+  useEffect(() => {
+    if (!gameId) return;
+    return subscribeStereoTypesRound(gameId, setCurrentRound);
   }, [gameId]);
 
   return (
@@ -57,7 +75,8 @@ export default function StereoTypesPlayerPanels({ gameId, player, players }) {
         )}
       </Card>
 
-      <StereoTypesASidePlayer gameId={gameId} player={player} players={players} />
+      {(!currentRound || currentRound === 1) && <StereoTypesASidePlayer gameId={gameId} player={player} players={players} />}
+      {currentRound === 2 && <StereoTypesRemixPlayer gameId={gameId} player={player} players={players} />}
     </div>
   );
 }
