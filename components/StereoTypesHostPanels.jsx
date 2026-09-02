@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabaseClient";
 import Boombox from "./Boombox";
 import StereoTypesTitleScreen from "./StereoTypesTitleScreen";
 import StereoTypesSpotifyWidget from "./StereoTypesSpotifyWidget";
+import StereoTypesScoreboard from "./StereoTypesScoreboard";
 import StereoTypesASideHost from "./StereoTypesASideHost";
 import StereoTypesRemixHost from "./StereoTypesRemixHost";
 import StereoTypesOnBlastHost from "./StereoTypesOnBlastHost";
@@ -47,6 +48,13 @@ import { subscribeStereoTypesRound } from "../lib/stereoTypesASide";
 //
 // Phase 7 adds Round 3 ("On Blast", StereoTypesOnBlastHost below) and
 // the game's actual end — same currentRound switch, third branch.
+//
+// StereoTypesScoreboard (below, right above the currentRound switch)
+// is a live running total across whichever rounds have actually
+// finished so far — unlike StereoTypesFinalStandings.jsx, which only
+// ever mounts once Round 3 itself is fully scored, this is visible the
+// whole game through, on both this console and StereoTypesPlayerPanels.jsx's
+// matching mount.
 export default function StereoTypesHostPanels({ gameId, roomCode, players, adminExtra }) {
   const [busyId, setBusyId] = useState(null);
   const [nowPlaying, setNowPlaying] = useState(null);
@@ -90,6 +98,8 @@ export default function StereoTypesHostPanels({ gameId, roomCode, players, admin
       />
 
       <StereoTypesSpotifyWidget gameId={gameId} onStateChange={setNowPlaying} />
+
+      <StereoTypesScoreboard gameId={gameId} players={players} />
 
       {(!currentRound || currentRound === 1) && <StereoTypesASideHost gameId={gameId} players={players} />}
       {currentRound === 2 && <StereoTypesRemixHost gameId={gameId} players={players} />}

@@ -124,17 +124,38 @@ export default function StereoTypesASidePlayer({ gameId, player, players }) {
   const alreadyGuessed = !!round.guesses?.[player.id];
 
   const anonEntries = round.status !== "ranking" ? Object.entries(round.anonMap || {}) : [];
+  // A player already knows which anonymized ranking is their own — they
+  // wrote it — so it's not a real guess, and offering it as one let a
+  // player "guess" (i.e. just pick) themselves for full credit on a
+  // label that was never actually ambiguous to them. myLabel is that
+  // one label, resolved straight from anonMap rather than anything the
+  // player has to work out; it's rendered read-only below instead of as
+  // an active dropdown, and excluded from otherAnonEntries/ownerIds so
+  // it's never part of what gets submitted or offered as an answer on
+  // every OTHER label either. (myAnonEntry can come back undefined if
+  // this player never actually submitted a ranking and the host force-
+  // advanced past them — nothing to lock in that case, so every entry
+  // just behaves as "other" for them.)
+  const myAnonEntry = anonEntries.find(([, ownerId]) => ownerId === player.id);
+  const myLabel = myAnonEntry?.[0] || null;
+  const otherAnonEntries = anonEntries.filter(([label]) => label !== myLabel);
   // The pool of real names a guess can be assigned to is exactly whoever
-  // actually has a ranking to guess (anonMap's own values) — NOT
-  // round.playerIds wholesale. Those normally match exactly, but if the
-  // host force-advanced past someone who never submitted a ranking (see
+  // actually has a ranking to guess (anonMap's own values), MINUS this
+  // player's own name (see myLabel above) — NOT round.playerIds
+  // wholesale. Those normally match exactly, but if the host
+  // force-advanced past someone who never submitted a ranking (see
   // maybeAdvanceASideToReveal), that person simply isn't a guessable
   // name at all this round; there's no ranking of theirs to assign.
-  const ownerIds = anonEntries.map(([, ownerId]) => ownerId);
+  const ownerIds = otherAnonEntries.map(([, ownerId]) => ownerId);
   const usedElsewhere = (label) => new Set(Object.entries(assignments).filter(([l]) => l !== label).map(([, v]) => v));
-  const validPermutation = anonEntries.length > 0
-    && anonEntries.every(([label]) => !!assignments[label])
-    && new Set(Object.values(assignments)).size === anonEntries.length;
+  // A full permutation across only the OTHER (N-1) labels/names now —
+  // myLabel isn't submitted as a guess at all, so it's not part of what
+  // "every label assigned" means anymore. If there are no other labels
+  // at all (a degenerate 1-submitter-only edge case), there's nothing to
+  // guess and nothing blocking submission either.
+  const validPermutation = otherAnonEntries.length === 0
+    || (otherAnonEntries.every(([label]) => !!assignments[label])
+      && new Set(Object.values(assignments)).size === otherAnonEntries.length);
 
   const move = (i, dir) => {
     setOrder((prev) => {
@@ -196,39 +217,47 @@ export default function StereoTypesASidePlayer({ gameId, player, players }) {
             Guess whose ranking is whose
           </div>
           <p style={{ color: "#6b6558", fontSize: 12, marginTop: 0 }}>
-            Every real player's name must be used exactly once — including working out your own. Flag ONE guess with "pump up the
-            volume" for double points if it's right.
+            Every OTHER player's name must be used exactly once — you already know which one's yours. Flag ONE guess with "pump up
+            the volume" for double points if it's right.
           </p>
           <div style={{ display: "grid", gap: 12 }}>
             {anonEntries.map(([label, ownerId]) => {
               const superlative = round.superlatives?.[ownerId];
               const rankedOrder = round.rankings?.[ownerId] || [];
               const used = usedElsewhere(label);
+              const isMine = label === myLabel;
               return (
-                <div key={label} style={{ background: "#0a0e18", borderRadius: 8, padding: 10 }}>
+                <div key={label} style={{ background: "#0a0e18", borderRadius: 8, padding: 10, border: isMine ? "1px solid #f4c430" : "none" }}>
                   <div style={{ color: "#c9b98a", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
                   <div style={{ color: "#f4c430", fontWeight: 700, fontSize: 13, margin: "2px 0 6px" }}>{superlative}</div>
                   <ol style={{ margin: "0 0 8px", paddingLeft: 18, color: "#f5eddc", fontSize: 12 }}>
                     {rankedOrder.map((pid) => <li key={pid}>{nameFor(players, pid)}</li>)}
                   </ol>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <select
-                      value={assignments[label] || ""}
-                      onChange={(e) => setAssignment(label, e.target.value)}
-                      style={{ background: "#0f1420", color: "#f5eddc", border: "1px solid #2a3040", borderRadius: 6, padding: "4px 8px", fontSize: 12 }}
-                    >
-                      <option value="">Who wrote this?</option>
-                      {ownerIds.map((pid) => (
-                        <option key={pid} value={pid} disabled={used.has(pid) && assignments[label] !== pid}>
-                          {nameFor(players, pid)}
-                        </option>
-                      ))}
-                    </select>
-                    <label style={{ display: "flex", alignItems: "center", gap: 4, color: "#c9b98a", fontSize: 11 }}>
-                      <input type="radio" name="pump" checked={pumpedLabel === label} onChange={() => setPumpedLabel(label)} />
-                      ⚡ Pump up the volume
-                    </label>
-                  </div>
+                  {isMine ? (
+                    // Auto-resolved, not an active guess — see this
+                    // file's own comment above myLabel for why. Nothing
+                    // to submit for this one at all.
+                    <p style={{ color: "#f4c430", fontSize: 12, fontWeight: 700, margin: 0 }}>✓ This one's yours — no guess needed.</p>
+                  ) : (
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <select
+                        value={assignments[label] || ""}
+                        onChange={(e) => setAssignment(label, e.target.value)}
+                        style={{ background: "#0f1420", color: "#f5eddc", border: "1px solid #2a3040", borderRadius: 6, padding: "4px 8px", fontSize: 12 }}
+                      >
+                        <option value="">Who wrote this?</option>
+                        {ownerIds.map((pid) => (
+                          <option key={pid} value={pid} disabled={used.has(pid) && assignments[label] !== pid}>
+                            {nameFor(players, pid)}
+                          </option>
+                        ))}
+                      </select>
+                      <label style={{ display: "flex", alignItems: "center", gap: 4, color: "#c9b98a", fontSize: 11 }}>
+                        <input type="radio" name="pump" checked={pumpedLabel === label} onChange={() => setPumpedLabel(label)} />
+                        ⚡ Pump up the volume
+                      </label>
+                    </div>
+                  )}
                 </div>
               );
             })}

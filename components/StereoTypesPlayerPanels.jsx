@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Card } from "./ui";
 import Boombox from "./Boombox";
 import StereoTypesTitleScreen from "./StereoTypesTitleScreen";
+import StereoTypesScoreboard from "./StereoTypesScoreboard";
 import StereoTypesASidePlayer from "./StereoTypesASidePlayer";
 import StereoTypesRemixPlayer from "./StereoTypesRemixPlayer";
 import StereoTypesOnBlastPlayer from "./StereoTypesOnBlastPlayer";
@@ -31,8 +32,22 @@ import { subscribeStereoTypesRound } from "../lib/stereoTypesASide";
 // component once currentRound flips to 2 — see the currentRound state
 // below and StereoTypesHostPanels.jsx's matching comment for why that
 // switch lives here rather than inside either round component.
+//
+// Two more additions sit above the round switch: StereoTypesScoreboard
+// (live running totals, not just the once-at-the-end
+// StereoTypesFinalStandings.jsx) and an "everyone's boombox" card — a
+// player previously only ever saw their OWN boombox here, never the
+// rest of the room's, even though `players` (used today only for
+// name lookups inside the round components) already carries everyone's
+// color/sticker. Both mirror something StereoTypesHostPanels.jsx's own
+// "🎧 Roster" card already does for the host; see that file's matching
+// comment.
 export default function StereoTypesPlayerPanels({ gameId, player, players }) {
   const [nowPlaying, setNowPlaying] = useState(null);
+  // Same "approved" filter StereoTypesHostPanels.jsx's own roster card
+  // uses — pending (not-yet-approved) players don't have a real boombox
+  // worth showing here either.
+  const approvedPlayers = (players || []).filter((p) => p.approved);
   // Phase 6 adds Round 2 ("The Remix") — same currentRound switch as
   // StereoTypesHostPanels.jsx's own, see that file's comment for the
   // full reasoning (identical here: KEY_STEREO_TYPES_ROUND is the one
@@ -78,6 +93,29 @@ export default function StereoTypesPlayerPanels({ gameId, player, players }) {
           </p>
         )}
       </Card>
+
+      {/* Everyone's boombox, not just your own — same roster this
+          player's own card above already comes from, just rendered for
+          the whole room the way StereoTypesHostPanels.jsx's "🎧 Roster"
+          card already does. Sits alongside the player's own boombox
+          card above, doesn't replace it. */}
+      <Card>
+        <div style={{ fontSize: 11, color: "#c9b98a", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+          🎧 Everyone's boombox
+        </div>
+        <div style={{ display: "grid", gap: 8 }}>
+          {approvedPlayers.map((p) => (
+            <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#0a0e18", borderRadius: 6, padding: "6px 10px" }}>
+              <Boombox color={p.color} stickerId={p.equipped_sticker} size={56} />
+              <span style={{ color: "#f5eddc", fontSize: 13 }}>
+                {p.display_name}{p.id === player?.id && <span style={{ color: "#6b6558" }}> (you)</span>}
+              </span>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <StereoTypesScoreboard gameId={gameId} players={players} myPlayerId={player?.id} />
 
       {(!currentRound || currentRound === 1) && <StereoTypesASidePlayer gameId={gameId} player={player} players={players} />}
       {currentRound === 2 && <StereoTypesRemixPlayer gameId={gameId} player={player} players={players} />}

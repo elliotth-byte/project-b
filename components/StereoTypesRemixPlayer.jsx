@@ -100,16 +100,27 @@ export default function StereoTypesRemixPlayer({ gameId, player, players }) {
   const alreadyGuessed = !!round.guesses?.[player.id];
 
   const anonEntries = round.status !== "picking" ? Object.entries(round.anonMap || {}) : [];
+  // Same "don't offer a self-guess" fix as StereoTypesASidePlayer.jsx's
+  // own myLabel/otherAnonEntries — see that file's comment for the full
+  // reasoning, unchanged here: a player already knows which anonymized
+  // (ranking, pick) pair is their own, so it's auto-resolved/locked
+  // rather than offered as a dropdown, and excluded from both what gets
+  // submitted and what's offered as an answer on every other label.
+  const myAnonEntry = anonEntries.find(([, ownerId]) => ownerId === player.id);
+  const myLabel = myAnonEntry?.[0] || null;
+  const otherAnonEntries = anonEntries.filter(([label]) => label !== myLabel);
   // Same reasoning as StereoTypesASidePlayer.jsx's ownerIds: the
   // guessable pool is exactly whoever actually has a submitted pick
-  // (anonMap's own values), not round.playerIds wholesale — a
-  // force-advanced AFK player who never picked simply isn't a guessable
-  // name this round.
-  const ownerIds = anonEntries.map(([, ownerId]) => ownerId);
+  // (anonMap's own values), minus this player's own name, not
+  // round.playerIds wholesale — a force-advanced AFK player who never
+  // picked simply isn't a guessable name this round.
+  const ownerIds = otherAnonEntries.map(([, ownerId]) => ownerId);
   const usedElsewhere = (label) => new Set(Object.entries(assignments).filter(([l]) => l !== label).map(([, v]) => v));
-  const validPermutation = anonEntries.length > 0
-    && anonEntries.every(([label]) => !!assignments[label])
-    && new Set(Object.values(assignments)).size === anonEntries.length;
+  // A full permutation across only the OTHER (N-1) labels/names — same
+  // reasoning as StereoTypesASidePlayer.jsx's own validPermutation.
+  const validPermutation = otherAnonEntries.length === 0
+    || (otherAnonEntries.every(([label]) => !!assignments[label])
+      && new Set(Object.values(assignments)).size === otherAnonEntries.length);
 
   const setAssignment = (label, guessedPlayerId) => setAssignments((prev) => ({ ...prev, [label]: guessedPlayerId }));
 
@@ -172,39 +183,46 @@ export default function StereoTypesRemixPlayer({ gameId, player, players }) {
             Guess whose ranking is whose
           </div>
           <p style={{ color: "#6b6558", fontSize: 12, marginTop: 0 }}>
-            Every real player's name must be used exactly once — including working out your own. Flag ONE guess with "pump up the
-            volume" for quadruple points if it's right.
+            Every OTHER player's name must be used exactly once — you already know which one's yours. Flag ONE guess with "pump up
+            the volume" for quadruple points if it's right.
           </p>
           <div style={{ display: "grid", gap: 12 }}>
             {anonEntries.map(([label, ownerId]) => {
               const chosenSuperlative = round.picks?.[ownerId];
               const rankedOrder = round.rankings?.[ownerId] || [];
               const used = usedElsewhere(label);
+              const isMine = label === myLabel;
               return (
-                <div key={label} style={{ background: "#0a0e18", borderRadius: 8, padding: 10 }}>
+                <div key={label} style={{ background: "#0a0e18", borderRadius: 8, padding: 10, border: isMine ? "1px solid #f4c430" : "none" }}>
                   <div style={{ color: "#c9b98a", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
                   <div style={{ color: "#f4c430", fontWeight: 700, fontSize: 13, margin: "2px 0 6px" }}>{chosenSuperlative}</div>
                   <ol style={{ margin: "0 0 8px", paddingLeft: 18, color: "#f5eddc", fontSize: 12 }}>
                     {rankedOrder.map((pid) => <li key={pid}>{nameFor(players, pid)}</li>)}
                   </ol>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <select
-                      value={assignments[label] || ""}
-                      onChange={(e) => setAssignment(label, e.target.value)}
-                      style={{ background: "#0f1420", color: "#f5eddc", border: "1px solid #2a3040", borderRadius: 6, padding: "4px 8px", fontSize: 12 }}
-                    >
-                      <option value="">Who got this ranking?</option>
-                      {ownerIds.map((pid) => (
-                        <option key={pid} value={pid} disabled={used.has(pid) && assignments[label] !== pid}>
-                          {nameFor(players, pid)}
-                        </option>
-                      ))}
-                    </select>
-                    <label style={{ display: "flex", alignItems: "center", gap: 4, color: "#c9b98a", fontSize: 11 }}>
-                      <input type="radio" name="pump" checked={pumpedLabel === label} onChange={() => setPumpedLabel(label)} />
-                      ⚡ Pump up the volume
-                    </label>
-                  </div>
+                  {isMine ? (
+                    // Auto-resolved, not an active guess — see this
+                    // file's own myLabel comment above.
+                    <p style={{ color: "#f4c430", fontSize: 12, fontWeight: 700, margin: 0 }}>✓ This one's yours — no guess needed.</p>
+                  ) : (
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <select
+                        value={assignments[label] || ""}
+                        onChange={(e) => setAssignment(label, e.target.value)}
+                        style={{ background: "#0f1420", color: "#f5eddc", border: "1px solid #2a3040", borderRadius: 6, padding: "4px 8px", fontSize: 12 }}
+                      >
+                        <option value="">Who got this ranking?</option>
+                        {ownerIds.map((pid) => (
+                          <option key={pid} value={pid} disabled={used.has(pid) && assignments[label] !== pid}>
+                            {nameFor(players, pid)}
+                          </option>
+                        ))}
+                      </select>
+                      <label style={{ display: "flex", alignItems: "center", gap: 4, color: "#c9b98a", fontSize: 11 }}>
+                        <input type="radio" name="pump" checked={pumpedLabel === label} onChange={() => setPumpedLabel(label)} />
+                        ⚡ Pump up the volume
+                      </label>
+                    </div>
+                  )}
                 </div>
               );
             })}
