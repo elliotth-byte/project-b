@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, Btn } from "./ui";
 import { fetchStereoTypesFinalStandings, claimStereoTypesWinSticker } from "../lib/stereoTypesFinale";
 import { STICKER_CATALOG, fetchUnlockedStickerIds } from "../lib/stereoTypesStickers";
+import { submitSuperlative } from "../lib/stereoTypesSubmissions";
 import StereoTypesSticker from "./StereoTypesSticker";
 
 function nameFor(players, id) {
@@ -32,6 +33,10 @@ export default function StereoTypesFinalStandings({ gameId, players, myPlayerId 
   const [claiming, setClaiming] = useState(false);
   const [claimed, setClaimed] = useState(false);
   const [claimError, setClaimError] = useState(null);
+  const [suggestionText, setSuggestionText] = useState("");
+  const [suggestionSubmitting, setSuggestionSubmitting] = useState(false);
+  const [suggestionSubmitted, setSuggestionSubmitted] = useState(false);
+  const [suggestionError, setSuggestionError] = useState(null);
 
   useEffect(() => {
     if (!gameId) return;
@@ -74,6 +79,15 @@ export default function StereoTypesFinalStandings({ gameId, players, myPlayerId 
     setClaiming(false);
     if (!res.ok) { setClaimError(res.error); return; }
     setClaimed(true);
+  };
+
+  const handleSuggestionSubmit = async () => {
+    setSuggestionSubmitting(true);
+    setSuggestionError(null);
+    const res = await submitSuperlative(suggestionText);
+    setSuggestionSubmitting(false);
+    if (!res.ok) { setSuggestionError(res.error); return; }
+    setSuggestionSubmitted(true);
   };
 
   return (
@@ -156,6 +170,48 @@ export default function StereoTypesFinalStandings({ gameId, players, myPlayerId 
           <p style={{ color: "#f4c430", fontSize: 13, fontWeight: 700, margin: 0 }}>
             ✓ Sticker unlocked! You'll be able to equip it next time you build your boombox.
           </p>
+        </Card>
+      )}
+
+      {/* Phase 8 — "Player's should also be prompted to submit a
+          superlative for future games (this will be sent to the global
+          admin panel for moderation)," per the original spec. This is
+          the required minimum placement: the finale, once Round 3 is
+          scored, is the one moment guaranteed to reach every player
+          without competing with any in-round UI, and "for future games"
+          reads naturally as an after-this-game ask. Not gated on
+          isWinner/myPlayerId at all, unlike the sticker flow above — this
+          card renders for literally everyone looking at this screen
+          (including the host's own view, since a host is also a logged-
+          in user with just as much standing to suggest a superlative),
+          entirely optional, and doesn't block or delay anything else on
+          this screen. See lib/stereoTypesSubmissions.js for the actual
+          submit call, and that file's own sql migration for the 140-char
+          limit and one-pending-submission-per-person rule enforced
+          server-side. */}
+      {!suggestionSubmitted && (
+        <Card style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 11, color: "#c9b98a", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+            💡 Got a superlative idea for next time?
+          </div>
+          <p style={{ color: "#6b6558", fontSize: 12, marginTop: 0, marginBottom: 12 }}>
+            Totally optional — send it to the mods for a future game. It won't show up anywhere unless it's approved.
+          </p>
+          <input
+            type="text" value={suggestionText} onChange={(e) => setSuggestionText(e.target.value)} maxLength={140}
+            placeholder="Most likely to..."
+            style={{ width: "100%", boxSizing: "border-box", background: "#0a0e18", border: "1px solid #2a3040", borderRadius: 8, padding: "10px 12px", color: "#f5eddc", fontSize: 13, marginBottom: 10 }}
+          />
+          {suggestionError && <p style={{ color: "#ff6b6b", fontSize: 12, marginBottom: 10 }}>{suggestionError}</p>}
+          <Btn onClick={handleSuggestionSubmit} disabled={!suggestionText.trim() || suggestionSubmitting}>
+            {suggestionSubmitting ? "Sending..." : "Submit for review"}
+          </Btn>
+        </Card>
+      )}
+
+      {suggestionSubmitted && (
+        <Card style={{ textAlign: "center" }}>
+          <p style={{ color: "#6b6558", fontSize: 12, margin: 0 }}>✓ Sent for review — thanks! It'll show up in a future game if approved.</p>
         </Card>
       )}
     </div>
