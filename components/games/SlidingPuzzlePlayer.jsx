@@ -104,8 +104,13 @@ export default function SlidingPuzzlePlayer({ gameId, challenge, round, player }
               onClick={() => slide(i)}
               style={{
                 width: 62, height: 62, fontSize: 20, fontWeight: 900, borderRadius: 8, cursor: "pointer",
-                background: isCorrect ? "rgba(0,255,157,0.12)" : "#150a28",
+                // A raised bevel (light top-left, dark bottom-right)
+                // so tiles read as physical sliding pieces instead of
+                // flat colored squares — same trick as Minesweeper's
+                // unrevealed cells.
+                background: isCorrect ? "linear-gradient(160deg, rgba(0,255,157,0.22), rgba(0,255,157,0.08))" : "linear-gradient(160deg, #211a38, #0f0a1e)",
                 border: `2px solid ${isCorrect ? "#00ff9d" : "#3d1f5c"}`,
+                boxShadow: "inset 1px 1px 0 rgba(255,255,255,0.08), inset -2px -2px 4px rgba(0,0,0,0.5)",
                 color: isCorrect ? "#00ff9d" : "#f5f0ff",
                 fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
               }}

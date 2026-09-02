@@ -167,16 +167,28 @@ export default function TorchedPlayer({ gameId, round, challenge, player, player
           const isMine = myMarkerHas(r, c);
           let bg = "#0d0618";
           let border = "#3d1f5c";
-          if (shot?.hitPlayerId) { bg = "rgba(255,56,96,0.5)"; border = "#ff3860"; }
-          else if (shot) { bg = "rgba(107,79,153,0.35)"; border = "#6b4f99"; }
-          else if (isMine) { bg = "rgba(0,255,157,0.18)"; border = "#00ff9d"; }
+          let boxShadow = "none";
+          if (shot?.hitPlayerId) {
+            // A scorch/ember burst — a hot orange-white core fading to
+            // red, with a glow — instead of a flat red tint, so a hit
+            // actually reads as something that just caught fire.
+            bg = "radial-gradient(circle at 50% 40%, #fff3c4, #ff9f4d 40%, #ff3860 75%)";
+            border = "#ff3860";
+            boxShadow = "0 0 8px rgba(255,56,96,0.7)";
+          } else if (shot) {
+            bg = "radial-gradient(circle at 50% 40%, rgba(107,79,153,0.55), rgba(107,79,153,0.2))";
+            border = "#6b4f99";
+          } else if (isMine) {
+            bg = "radial-gradient(circle at 50% 40%, rgba(0,255,157,0.3), rgba(0,255,157,0.1))";
+            border = "#00ff9d";
+          }
           const canFire = myTurn && !shot;
           return (
             <button
               key={`${r}-${c}`}
               onClick={() => canFire && fireShot(gameId, round.round, player.id, r, c)}
               disabled={!canFire}
-              style={{ aspectRatio: "1", borderRadius: 3, padding: 0, background: bg, border: `1px solid ${border}`, cursor: canFire ? "pointer" : "default" }}
+              style={{ aspectRatio: "1", borderRadius: 3, padding: 0, background: bg, border: `1px solid ${border}`, boxShadow, cursor: canFire ? "pointer" : "default" }}
             />
           );
         })}
