@@ -6,6 +6,7 @@ import { useSwipeControls } from "../../lib/games/useSwipeControls";
 import { reportScore } from "../../lib/challengeScores";
 import DPad from "./DPad";
 import SwipeControlsCallout from "./SwipeControlsCallout";
+import { roundedRectPath } from "./canvasShapes";
 
 const COLS = 16, ROWS = 16, CELL = 18;
 const W = COLS * CELL, H = ROWS * CELL;
@@ -104,11 +105,48 @@ export default function SnakePlayer({ gameId, round, challenge, player }) {
 
       if (ctx) {
         ctx.clearRect(0, 0, W, H);
-        ctx.fillStyle = "#ff2d95";
-        ctx.fillRect(st.food.x * CELL + 2, st.food.y * CELL + 2, CELL - 4, CELL - 4);
+
+        // Food — a glowing pink orb (radial gradient + shadow blur)
+        // instead of a flat filled square, so it reads as something
+        // worth eating rather than just another tile.
+        const fx = st.food.x * CELL + CELL / 2, fy = st.food.y * CELL + CELL / 2;
+        const foodR = (CELL - 6) / 2;
+        ctx.save();
+        ctx.shadowColor = "#ff2d95";
+        ctx.shadowBlur = 8;
+        const foodGrad = ctx.createRadialGradient(fx - foodR * 0.3, fy - foodR * 0.3, 1, fx, fy, foodR);
+        foodGrad.addColorStop(0, "#ff8ac8");
+        foodGrad.addColorStop(1, "#ff2d95");
+        ctx.fillStyle = foodGrad;
+        ctx.beginPath();
+        ctx.arc(fx, fy, foodR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // Snake — rounded segments instead of sharp squares, a
+        // brighter glowing head so the direction of travel is obvious
+        // at a glance, body segments in a flat gradient so the whole
+        // thing doesn't compete visually with the head.
         st.snake.forEach((seg, i) => {
-          ctx.fillStyle = i === 0 ? "#00ff9d" : "#00d9ff";
-          ctx.fillRect(seg.x * CELL + 1, seg.y * CELL + 1, CELL - 2, CELL - 2);
+          const isHead = i === 0;
+          const x = seg.x * CELL + 1, y = seg.y * CELL + 1, s = CELL - 2;
+          ctx.save();
+          if (isHead) {
+            ctx.shadowColor = "#00ff9d";
+            ctx.shadowBlur = 6;
+            const headGrad = ctx.createLinearGradient(x, y, x + s, y + s);
+            headGrad.addColorStop(0, "#baffe6");
+            headGrad.addColorStop(1, "#00ff9d");
+            ctx.fillStyle = headGrad;
+          } else {
+            const bodyGrad = ctx.createLinearGradient(x, y, x + s, y + s);
+            bodyGrad.addColorStop(0, "#6ff0ff");
+            bodyGrad.addColorStop(1, "#00d9ff");
+            ctx.fillStyle = bodyGrad;
+          }
+          roundedRectPath(ctx, x, y, s, s, isHead ? 6 : 4);
+          ctx.fill();
+          ctx.restore();
         });
       }
       raf = requestAnimationFrame(loop);
