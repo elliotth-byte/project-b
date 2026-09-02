@@ -78,9 +78,13 @@ export default function BloomPlayer({ gameId, round, challenge, player }) {
           <div
             key={i}
             style={{
-              aspectRatio: "1", background: COLORS[colorIdx],
-              outline: patchIndices.includes(i) ? "2px solid rgba(255,255,255,0.6)" : "none",
-              outlineOffset: -2,
+              aspectRatio: "1", background: COLORS[colorIdx], borderRadius: 3,
+              // A soft glow (not just a flat white outline) on cells
+              // that are part of the bloomed patch, and a gentle color
+              // transition instead of an instant flat swap when a
+              // sweep changes this cell's color.
+              boxShadow: patchIndices.includes(i) ? "inset 0 0 0 2px rgba(255,255,255,0.7), 0 0 6px rgba(255,255,255,0.5)" : "none",
+              transition: "background-color 0.35s ease, box-shadow 0.35s ease",
             }}
           />
         ))}
@@ -91,8 +95,10 @@ export default function BloomPlayer({ gameId, round, challenge, player }) {
           <button
             key={i} onClick={() => tapColor(i)} disabled={i === patchColor}
             style={{
-              width: 44, height: 44, borderRadius: "50%", background: hex, cursor: i === patchColor ? "default" : "pointer",
+              width: 44, height: 44, borderRadius: "50%", cursor: i === patchColor ? "default" : "pointer",
+              background: `radial-gradient(circle at 35% 30%, rgba(255,255,255,0.55) 0%, ${hex} 40%, ${hex} 100%)`,
               border: i === patchColor ? "3px solid rgba(255,255,255,0.8)" : "2px solid rgba(255,255,255,0.2)",
+              boxShadow: i === patchColor ? "none" : `0 2px 5px ${hex}55`,
               opacity: i === patchColor ? 0.6 : 1,
             }}
           />

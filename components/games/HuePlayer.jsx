@@ -66,15 +66,15 @@ export default function HuePlayer({ gameId, round, challenge, player }) {
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <div style={{ flex: 1, borderRadius: 10, overflow: "hidden" }}>
+        <div style={{ flex: 1, borderRadius: 10, overflow: "hidden", border: "1px solid #3d1f5c", boxShadow: "0 3px 8px rgba(0,0,0,0.35)" }}>
           <div style={{ height: 90, background: rgbToHex(target.r, target.g, target.b) }} />
           <div style={{ background: "#0d0618", padding: "6px 4px" }}>
             <p style={{ fontSize: 10, color: "#6b4f99", margin: 0, textTransform: "uppercase" }}>Target</p>
             <p style={{ fontSize: 12, color: "#f5f0ff", margin: 0, fontWeight: 700 }}>{target.name}</p>
           </div>
         </div>
-        <div style={{ flex: 1, borderRadius: 10, overflow: "hidden" }}>
-          <div style={{ height: 90, background: rgbToHex(mix.r, mix.g, mix.b) }} />
+        <div style={{ flex: 1, borderRadius: 10, overflow: "hidden", border: "1px solid #3d1f5c", boxShadow: "0 3px 8px rgba(0,0,0,0.35)" }}>
+          <div style={{ height: 90, background: rgbToHex(mix.r, mix.g, mix.b), transition: "background 0.1s" }} />
           <div style={{ background: "#0d0618", padding: "6px 4px" }}>
             <p style={{ fontSize: 10, color: "#6b4f99", margin: 0, textTransform: "uppercase" }}>Your Mix</p>
             <p style={{ fontSize: 12, color: "#f5f0ff", margin: 0, fontWeight: 700 }}>{rgbToHex(mix.r, mix.g, mix.b)}</p>

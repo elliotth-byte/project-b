@@ -121,8 +121,9 @@ export default function OperatorPlayer({ gameId, round, challenge, player }) {
             key={t.id} onClick={() => selectTile(t.id)}
             style={{
               minWidth: 56, height: 56, borderRadius: 10, cursor: "pointer",
-              background: t.id === selectedId ? "rgba(0,255,157,0.15)" : "#0d0618",
+              background: t.id === selectedId ? "linear-gradient(160deg, rgba(0,255,157,0.28), rgba(0,255,157,0.1))" : "linear-gradient(160deg, #1c1230, #0a0614)",
               border: `2px solid ${t.id === selectedId ? "#00ff9d" : "#3d1f5c"}`,
+              boxShadow: t.id === selectedId ? "0 0 8px rgba(0,255,157,0.4)" : "inset 1px 1px 0 rgba(255,255,255,0.06), inset -2px -2px 3px rgba(0,0,0,0.4)",
               color: "#f5f0ff", fontSize: 18, fontWeight: 800, padding: "0 10px",
             }}
           >
@@ -137,8 +138,9 @@ export default function OperatorPlayer({ gameId, round, challenge, player }) {
             key={op} onClick={() => pickOperator(op)} disabled={selectedId == null}
             style={{
               width: 48, height: 48, borderRadius: 10, cursor: selectedId == null ? "default" : "pointer",
-              background: op === pendingOp ? "rgba(0,255,157,0.15)" : "#0d0618",
+              background: op === pendingOp ? "linear-gradient(160deg, rgba(0,255,157,0.28), rgba(0,255,157,0.1))" : "linear-gradient(160deg, #1c1230, #0a0614)",
               border: `2px solid ${op === pendingOp ? "#00ff9d" : "#3d1f5c"}`,
+              boxShadow: op === pendingOp ? "0 0 8px rgba(0,255,157,0.4)" : "inset 1px 1px 0 rgba(255,255,255,0.06), inset -2px -2px 3px rgba(0,0,0,0.4)",
               color: selectedId == null ? "#3d1f5c" : "#00ff9d", fontSize: 20, fontWeight: 800,
             }}
           >
