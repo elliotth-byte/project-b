@@ -253,7 +253,24 @@ export default function StereoTypesCityscape({ height = 200, fullscreen = false,
   );
 
   return (
-    <div style={{ position: "relative", width: "100%", height: effectiveHeight, overflow: "hidden", background: `linear-gradient(180deg, ${SKY_TOP} 0%, ${SKY_BOTTOM} 100%)` }}>
+    // zIndex: 0 here (not just position: relative) matters more than it
+    // looks like it should: the buildings track below has its own
+    // explicit zIndex: 1 (to guarantee it paints above the static
+    // starfield behind it — see that div's own comment), and
+    // position:relative WITHOUT a z-index does NOT establish a real
+    // stacking context. Without this, that inner z-index:1 has nothing
+    // local to be contained by, so it bubbles up and gets compared
+    // against whatever this whole component is composited with
+    // upstream — which is exactly what broke
+    // StereoTypesTitleScreen.jsx's logo overlay (a plain
+    // position:absolute sibling with no z-index of its own, rendered
+    // AFTER this component in the DOM): the buildings' stray z-index:1
+    // was outranking it and painting on top, despite coming earlier in
+    // the DOM. Setting zIndex here turns THIS div into a genuine
+    // stacking context, so the star/building ordering stays fully
+    // self-contained and can never again leak out to out-rank whatever
+    // any caller layers on top of this component.
+    <div style={{ position: "relative", zIndex: 0, width: "100%", height: effectiveHeight, overflow: "hidden", background: `linear-gradient(180deg, ${SKY_TOP} 0%, ${SKY_BOTTOM} 100%)` }}>
       {/* Static starfield, sat behind the scrolling skyline and never
           itself animated — real stars don't visibly drift alongside a
           foreground skyline at this scale, so leaving them put (while

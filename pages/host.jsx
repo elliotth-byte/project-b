@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
-import { signInHost, signOut, isHost, canHostGameType } from "../lib/auth";
+import { signInHost, signOut, isHost, canHostGameType, becomeHost } from "../lib/auth";
 import HostPanels from "../components/HostPanels";
 import TraitorsHostPanels from "../components/TraitorsHostPanels";
 import StereoTypesHostPanels from "../components/StereoTypesHostPanels";
@@ -22,6 +22,8 @@ export default function HostPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [becomingHost, setBecomingHost] = useState(false);
+  const [becomeHostError, setBecomeHostError] = useState("");
 
   const [games, setGames] = useState(null); // null = not loaded yet, [] = loaded, no seasons
   const [activeGameId, setActiveGameId] = useState(null);
@@ -311,6 +313,22 @@ export default function HostPage() {
     if (!res.ok) setError(res.error);
   };
 
+  const submitBecomeHost = async () => {
+    if (!confirm("This adds hosting to your current account — you'll be able to create and run Stereo Types seasons with the same login you already use to play. Continue?")) return;
+    setBecomingHost(true);
+    setBecomeHostError("");
+    const res = await becomeHost("stereo_types");
+    setBecomingHost(false);
+    if (!res.ok) { setBecomeHostError(res.error); return; }
+    // becomeHost's own updateUser call already refreshed the session's
+    // JWT with the new role/hostScope baked in (see that function's own
+    // comment on why that matters for the games-insert RLS policy) — no
+    // reload needed; the onAuthStateChange subscription above already
+    // picked up the USER_UPDATED event and updated `user`, so this
+    // component just re-renders straight into the real host console
+    // below on its own.
+  };
+
   async function createSeason(name, subtitle, gameType) {
     const type = gameType || "project_b";
     const { data: code } = await supabase.rpc("generate_join_code");
@@ -386,9 +404,19 @@ export default function HostPage() {
   if (!isHost(user)) {
     return (
       <div style={sitePageStyle}>
-        <div style={{ textAlign: "center" }}>
+        <div style={{ textAlign: "center", maxWidth: 340 }}>
           <div style={{ marginBottom: 16 }}><HomeLink theme={siteTheme} /></div>
-          <p>This account isn't marked as a host. Log out and use "Host a game instead" on the <a href="/login">login page</a> to create a dedicated host account, or set <code>role: "host"</code> in this user's metadata in Supabase.</p>
+          <p style={{ marginBottom: 14 }}>You're signed in, but this account isn't set up to host yet.</p>
+          <button onClick={submitBecomeHost} disabled={becomingHost} style={siteBtnStyle}>
+            {becomingHost ? "..." : "👑 Become a host"}
+          </button>
+          <p style={{ color: siteTheme.textMuted, fontSize: 11, marginTop: 8, fontStyle: "italic" }}>
+            Uses this same account — you'll still play with it exactly as before, just with the option to run your own Stereo Types seasons too.
+          </p>
+          {becomeHostError && <p style={{ color: siteTheme.danger, fontSize: 13, marginTop: 8 }}>{becomeHostError}</p>}
+          <p style={{ color: siteTheme.textDim, fontSize: 12, marginTop: 20 }}>
+            Prefer a separate host account instead? Log out and use "Host a game instead" on the <a href="/login">login page</a>, or have a platform admin set <code>role: "host"</code> in this account's metadata in Supabase.
+          </p>
           <button onClick={signOut} style={{ background: "none", border: "none", color: siteTheme.textDim, fontSize: 12, cursor: "pointer", marginTop: 12 }}>Log out and try a different account</button>
         </div>
       </div>
