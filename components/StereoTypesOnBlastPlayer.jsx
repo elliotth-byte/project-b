@@ -173,7 +173,7 @@ export default function StereoTypesOnBlastPlayer({ gameId, player, players }) {
     setBusy(true);
     await submitOnBlastBid(gameId, 3, player.id, bidInput);
     setBusy(false);
-    setGuess(null); // a new/updated bid means a fresh hardened option list — don't carry a stale guess forward
+    setGuess(null); // clear any stale local draft before the hardened option list renders for the first time
   };
 
   const handleSubmitGuess = async () => {
@@ -231,25 +231,30 @@ export default function StereoTypesOnBlastPlayer({ gameId, player, players }) {
         </Card>
       )}
 
-      {round.status === "bidding" && myPartnerId && (
+      {/* Bidding must be BLIND — per direct correction from the game's
+          designer after playtesting, a bidder places their bid knowing
+          only WHO their partner is, never the partner's ranking or
+          options. So this renders as two mutually-exclusive Cards: one
+          with nothing but the bid input (no puzzle content at all) while
+          !myBid, and — only once submitOnBlastBid has actually locked a
+          bid in and computed hardening against it — a second Card with
+          the (now-hardened) ranking and guess options. There's no path
+          back from the second Card to the first: submitOnBlastBid itself
+          refuses any bid once one is already on file (see its own
+          comment), and there's deliberately no "Change bid" button here
+          to suggest otherwise. */}
+      {round.status === "bidding" && myPartnerId && !myBid && (
         <Card>
           <div style={{ fontSize: 11, color: "#c9b98a", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
-            Your bid — guessing {nameFor(players, myPartnerId)}'s superlative
+            Your bid — you'll be guessing {nameFor(players, myPartnerId)}'s superlative
           </div>
           <p style={{ color: "#6b6558", fontSize: 12, marginTop: 0, marginBottom: 10 }}>
-            This is the ranking {nameFor(players, myPartnerId)} submitted, and the 3 options they were choosing between. Bid any
-            number of points — the bigger the bid, the more your OWN view of this gets hardened (extra fake options mixed in,
-            some names blanked out) before you guess. Guess right and you win your bid, plus your partner gets 3 points. Guess
-            wrong and you lose your bid.
+            Bid blind: you won't see {nameFor(players, myPartnerId)}'s ranking or the options to guess from until AFTER you
+            lock this bid in. Bid any number of points — the bigger the bid, the more your OWN view gets hardened (extra
+            fake options mixed in, some names blanked out) once it's revealed. Guess right and you win your bid, plus your
+            partner gets 3 points. Guess wrong and you lose your bid. Once locked in, this bid can't be changed.
           </p>
-
-          {!myBid ? (
-            <RedactedRanking order={round.submissions?.[myPartnerId]?.order} players={players} struckIds={null} />
-          ) : (
-            <RedactedRanking order={round.submissions?.[myPartnerId]?.order} players={players} struckIds={myBid.hardening?.struckPlayerIds} />
-          )}
-
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: myBid ? 14 : 0, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <input
               type="number"
               min="0"
@@ -260,32 +265,42 @@ export default function StereoTypesOnBlastPlayer({ gameId, player, players }) {
               style={{ background: "#0f1420", color: "#f5eddc", border: "1px solid #2a3040", borderRadius: 6, padding: "6px 10px", fontSize: 13, width: 100 }}
             />
             <Btn small onClick={handlePlaceBid} disabled={busy || bidInput === ""}>
-              {myBid ? "Change bid" : "Place bid"}
+              Lock in bid
             </Btn>
-            {myBid && <span style={{ color: "#f4c430", fontSize: 11, fontWeight: 700 }}>Current bid: {myBid.bid} pts</span>}
           </div>
+        </Card>
+      )}
 
-          {myBid && (
-            <>
-              <div style={{ fontSize: 11, color: "#c9b98a", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
-                Which was really their pick?
-              </div>
-              <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
-                {(myBid.hardening?.optionsShown || []).map((s, i) => (
-                  <label key={`${s}-${i}`} style={{ display: "flex", alignItems: "center", gap: 8, background: "#0a0e18", borderRadius: 6, padding: "8px 10px", cursor: "pointer" }}>
-                    <input type="radio" name="on-blast-guess" checked={guess === s} onChange={() => setGuess(s)} />
-                    <span style={{ color: "#f5eddc", fontSize: 13 }}>{s}</span>
-                  </label>
-                ))}
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <Btn small onClick={handleSubmitGuess} disabled={busy || !guess}>
-                  {myBid.guess ? "Update guess" : "Submit guess"}
-                </Btn>
-                {myBid.guess && <span style={{ color: "#f4c430", fontSize: 11, fontWeight: 700 }}>✓ Guess locked in</span>}
-              </div>
-            </>
-          )}
+      {round.status === "bidding" && myPartnerId && myBid && (
+        <Card>
+          <div style={{ fontSize: 11, color: "#c9b98a", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+            Your bid — guessing {nameFor(players, myPartnerId)}'s superlative
+          </div>
+          <p style={{ color: "#6b6558", fontSize: 12, marginTop: 0, marginBottom: 10 }}>
+            You bid <strong>{myBid.bid} pts</strong>, locked in for good. This is the ranking {nameFor(players, myPartnerId)}{" "}
+            submitted (hardened against your own bid) and the options to guess from. Guess right and you win your bid, plus
+            your partner gets 3 points. Guess wrong and you lose your bid.
+          </p>
+
+          <RedactedRanking order={round.submissions?.[myPartnerId]?.order} players={players} struckIds={myBid.hardening?.struckPlayerIds} />
+
+          <div style={{ fontSize: 11, color: "#c9b98a", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, marginTop: 14 }}>
+            Which was really their pick?
+          </div>
+          <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
+            {(myBid.hardening?.optionsShown || []).map((s, i) => (
+              <label key={`${s}-${i}`} style={{ display: "flex", alignItems: "center", gap: 8, background: "#0a0e18", borderRadius: 6, padding: "8px 10px", cursor: "pointer" }}>
+                <input type="radio" name="on-blast-guess" checked={guess === s} onChange={() => setGuess(s)} />
+                <span style={{ color: "#f5eddc", fontSize: 13 }}>{s}</span>
+              </label>
+            ))}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Btn small onClick={handleSubmitGuess} disabled={busy || !guess}>
+              {myBid.guess ? "Update guess" : "Submit guess"}
+            </Btn>
+            {myBid.guess && <span style={{ color: "#f4c430", fontSize: 11, fontWeight: 700 }}>✓ Guess locked in</span>}
+          </div>
         </Card>
       )}
 
