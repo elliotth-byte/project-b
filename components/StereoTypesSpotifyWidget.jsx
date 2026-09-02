@@ -137,9 +137,12 @@ export default function StereoTypesSpotifyWidget({ gameId, onStateChange }) {
   // created app (like whatever Client ID this env var points at) can
   // be assumed to still reach — so rather than write code against an
   // endpoint that may just 403, this is deliberately isPlaying-only:
-  // a fixed, moderate "the room is alive" intensity while something's
-  // actually playing, 0 the moment it's not.
-  const intensity = isPlaying ? 0.55 : 0;
+  // a fixed "the room is alive" intensity while something's actually
+  // playing, 0 the moment it's not. Bumped up from the original 0.55 —
+  // at that level the (also since-strengthened) pulse in
+  // StereoTypesCityscape.jsx still read as too subtle to clearly
+  // register as "reacting to music" rather than just ambient drift.
+  const intensity = isPlaying ? 0.75 : 0;
 
   // Broadcast + bubble up to the host's own title screen. The
   // dependency list is the actual fields, not playbackState itself —

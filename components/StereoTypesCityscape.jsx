@@ -24,10 +24,13 @@ function mulberry32(seed) {
   };
 }
 
-// Three shades of the theme's own yellow (lib/uiTheme.js's stereo_types
-// palette) — depth/variety in the lit windows without introducing any
-// color outside that palette.
-const YELLOWS = ["#f4c430", "#ffdf6b", "#c99a1e"];
+// A wider mix of window colors than just the theme's own yellow — real
+// skylines (and music visualizers) read as more alive with variety in
+// the light color, not a single hue repeated everywhere. Still leads
+// with the theme's gold/pale-yellow so the skyline doesn't stop feeling
+// like "this app's" city, but rounds it out with warmer ambers/corals
+// and a few cooler tones for contrast.
+const WINDOW_COLORS = ["#f4c430", "#ffdf6b", "#c99a1e", "#ff9a3d", "#ff5f6d", "#ff6ec7", "#4dd9ff", "#7dffb0"];
 const LIT_RATIO = 0.68; // ~60-75% of windows lit, per spec
 const SKY_TOP = "#05070d";
 const SKY_BOTTOM = "#0d1220";
@@ -49,7 +52,17 @@ export function buildSkyline(seed = SEED, count = BUILDING_COUNT, maxHeight = 20
   let x = 0;
   for (let i = 0; i < count; i++) {
     const width = 50 + Math.floor(rand() * 60); // 50-110
-    const height = Math.min(maxHeight - 10, 70 + Math.floor(rand() * 120)); // 70-190, capped to leave sky room
+    // Scales with the actual canvas height instead of a flat 70-190
+    // range — that flat range looked fine against the old fixed 200px
+    // banner, but capped every building at the same modest height even
+    // in fullscreen mode, where the canvas can be 800px+ tall. Floor is
+    // proportional (12% of the available height, min 50px) so shorter
+    // buildings still read as short relative to the skyline, while the
+    // ceiling reaches almost all the way up — a genuinely dramatic,
+    // varied silhouette rather than a uniform short row.
+    const minHeight = Math.max(50, Math.floor(maxHeight * 0.12));
+    const maxHeightForBuilding = maxHeight - 10;
+    const height = Math.min(maxHeightForBuilding, minHeight + Math.floor(rand() * (maxHeightForBuilding - minHeight)));
     const gap = 4 + Math.floor(rand() * 10);
     const cols = Math.max(1, Math.floor((width - WIN_PAD * 2) / WIN_PITCH_X));
     const rows = Math.max(1, Math.floor((height - WIN_PAD * 2) / WIN_PITCH_Y));
@@ -61,7 +74,7 @@ export function buildSkyline(seed = SEED, count = BUILDING_COUNT, maxHeight = 20
           x: WIN_PAD + c * WIN_PITCH_X,
           y: WIN_PAD + r * WIN_PITCH_Y,
           lit,
-          color: lit ? YELLOWS[Math.floor(rand() * YELLOWS.length)] : null,
+          color: lit ? WINDOW_COLORS[Math.floor(rand() * WINDOW_COLORS.length)] : null,
           // Only meaningful for lit windows — a deterministic 0-1 draw
           // used as this window's own animation-delay offset when
           // reactive mode pulses the skyline, so every lit window
@@ -119,10 +132,14 @@ export default function StereoTypesCityscape({ height = 200, fullscreen = false,
   // is playing") down to 18s at full intensity, floored so it never
   // scrolls fast enough to look broken rather than lively.
   const scrollSeconds = reactive ? Math.max(18, 50 - clampedIntensity * 32) : 80;
-  // How far lit windows dim on each pulse, and how fast — both scale
-  // with intensity. Only ever applied when reactive; non-reactive
-  // windows stay exactly as before (opacity 1, no animation at all).
-  const pulseMinOpacity = Math.max(0.15, 0.55 - clampedIntensity * 0.4);
+  // How far lit windows dim (and now also shrink) on each pulse, and
+  // how fast — both scale with intensity. Only ever applied when
+  // reactive; non-reactive windows stay exactly as before (opacity 1,
+  // scale 1, no animation at all). Deeper dip and a scale "pop" than
+  // the original pass — the opacity-only version read as too subtle
+  // to register as a beat rather than as a wobble.
+  const pulseMinOpacity = Math.max(0.05, 0.6 - clampedIntensity * 0.55);
+  const pulseScale = Math.max(1.08, 1 + clampedIntensity * 0.4);
   const pulseSeconds = Math.max(0.6, 1.6 - clampedIntensity * 1.0);
 
   const skyline = (copyKey) => (
@@ -168,6 +185,7 @@ export default function StereoTypesCityscape({ height = 200, fullscreen = false,
           "--stereo-scroll-seconds": `${scrollSeconds}s`,
           "--stereo-pulse-seconds": `${pulseSeconds}s`,
           "--stereo-pulse-min-opacity": pulseMinOpacity,
+          "--stereo-pulse-scale": pulseScale,
         }}
       >
         {skyline("a")}
@@ -183,10 +201,17 @@ export default function StereoTypesCityscape({ height = 200, fullscreen = false,
         }
         .stereo-window {
           animation: stereo-window-pulse var(--stereo-pulse-seconds, 1.2s) ease-in-out infinite;
+          /* Rects scale from their top-left corner by default — fine
+             for opacity alone, but scaling a window from its corner
+             instead of its center reads as it sliding sideways rather
+             than pulsing in place. transform-box/transform-origin here
+             fix that. */
+          transform-box: fill-box;
+          transform-origin: center;
         }
         @keyframes stereo-window-pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: var(--stereo-pulse-min-opacity, 0.4); }
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: var(--stereo-pulse-min-opacity, 0.4); transform: scale(var(--stereo-pulse-scale, 1.15)); }
         }
       `}</style>
     </div>

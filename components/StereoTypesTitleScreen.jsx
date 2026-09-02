@@ -20,6 +20,18 @@ import StereoTypesLogo from "./StereoTypesLogo";
 // without touching the column itself (which every other Stereo Types
 // panel still wants to keep, for the roster/admin controls that scroll
 // in below this).
+//
+// minWidth: 0 here matters more than it looks like it should: both
+// StereoTypesHostPanels.jsx and StereoTypesPlayerPanels.jsx mount this
+// inside a `display: grid` wrapper with no explicit column width, and
+// grid items default to `min-width: auto` — which lets an item's own
+// specified width (100vw, right above) inflate the whole grid track to
+// match it, dragging every sibling in that column (the Spotify widget,
+// the roster card, etc.) out to near-full window width instead of
+// staying in the intended ~640px column. Overriding min-width back to
+// 0 stops the track from following this element's size; the visual
+// full-bleed effect itself still works exactly the same, since that
+// comes entirely from left/width/transform above, not from the grid.
 export default function StereoTypesTitleScreen({ roomCode, playerCount, fullscreen = false, reactive = false, intensity = 0 }) {
   const hasFooter = !!roomCode || playerCount != null;
 
@@ -27,7 +39,7 @@ export default function StereoTypesTitleScreen({ roomCode, playerCount, fullscre
     <div
       style={
         fullscreen
-          ? { position: "relative", left: "50%", width: "100vw", transform: "translateX(-50%)", marginBottom: 4, overflow: "hidden" }
+          ? { position: "relative", left: "50%", width: "100vw", minWidth: 0, transform: "translateX(-50%)", marginBottom: 4, overflow: "hidden" }
           : { position: "relative", borderRadius: 12, overflow: "hidden", marginBottom: 4 }
       }
     >
