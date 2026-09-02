@@ -555,7 +555,7 @@ function MessagesView({ gameId, player, players, byId, openThread, setOpenThread
 // member groups, both the same underlying model — see
 // sql/add-group-chat.sql). Only shown at all when the host has turned
 // chat on for this season (settings.chatEnabled).
-export default function ChatPanel({ gameId, player, players, realName, isExiled, readOnly = false, round, settings }) {
+export default function ChatPanel({ gameId, player, players, realName, isExiled, readOnly = false, round, settings, groupChatLabel = "💬 Panopticon" }) {
   const [mode, setMode] = useState(isExiled ? "exile" : "group"); // "group" | "exile" | "messages"
   const [openThread, setOpenThread] = useState(null);
   const [groupReadAt, setGroupReadAt] = useState(null);
@@ -630,7 +630,7 @@ export default function ChatPanel({ gameId, player, players, realName, isExiled,
   // not just de-emphasized. That only holds DURING the season, though —
   // see gameEnded above for why it's reinstated once the season ends.
   const tabs = [
-    ...(isExiled && !gameEnded ? [] : [{ key: "group", label: "💬 Panopticon", unread: groupUnread }]),
+    ...(isExiled && !gameEnded ? [] : [{ key: "group", label: groupChatLabel, unread: groupUnread }]),
     ...(isExiled ? [{ key: "exile", label: "🔥 Exile" }] : []),
     { key: "messages", label: "✉️ Messages", unread: anyThreadUnread },
   ];

@@ -12,7 +12,7 @@ function fmtTime(ts) {
 // here on purpose — the host can see every conversation (same bar as
 // confessionals — see sql/add-dms.sql), but never send AS a player; RLS
 // enforces that even if this UI didn't.
-export default function ChatHostPanel({ gameId, players }) {
+export default function ChatHostPanel({ gameId, players, groupChatLabel = "💬 Panopticon" }) {
   const [mode, setMode] = useState("group");
   const [messages, setMessages] = useState([]);
   const [threads, setThreads] = useState([]);
@@ -76,7 +76,7 @@ export default function ChatHostPanel({ gameId, players }) {
   return (
     <Card>
       <div style={{ display: "flex", gap: 4, marginBottom: 12, borderBottom: "1px solid #3d1f5c" }}>
-        {[{ key: "group", label: "💬 Panopticon" }, { key: "dm", label: `✉️ Threads (${threads.length})` }].map((t) => (
+        {[{ key: "group", label: groupChatLabel }, { key: "dm", label: `✉️ Threads (${threads.length})` }].map((t) => (
           <button key={t.key} onClick={() => { setMode(t.key); setOpenThreadId(null); }} style={{
             background: mode === t.key ? "rgba(255,45,149,0.13)" : "transparent",
             color: mode === t.key ? "#ff2d95" : "#a68fd6",

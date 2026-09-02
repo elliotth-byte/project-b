@@ -922,6 +922,7 @@ export default function PlayPage() {
               isExiled={false}
               round={null}
               settings={settings}
+              groupChatLabel="💬 Chat"
             />
           </ChallengeErrorBoundary>
         )}

@@ -665,7 +665,7 @@ export default function HostPage() {
                 admin toggle for that setting anywhere (see the matching
                 comment on the player-side mount in pages/play.jsx), so
                 gating on it would just mean chat never appears. */}
-            <ChatHostPanel key={`chat-${game.id}`} gameId={game.id} players={players.filter((p) => p.approved)} />
+            <ChatHostPanel key={`chat-${game.id}`} gameId={game.id} players={players.filter((p) => p.approved)} groupChatLabel="💬 Chat" />
           </>
         )}
       </div>
