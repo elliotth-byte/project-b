@@ -34,6 +34,7 @@ export default function StereoTypesSpotifyWidget({ gameId, onStateChange }) {
   const [deviceId, setDeviceId] = useState(null);
   const [playbackState, setPlaybackState] = useState(null);
   const [error, setError] = useState(null);
+  const [bpm, setBpm] = useState(null);
   const playerRef = useRef(null);
 
   useEffect(() => {
@@ -124,23 +125,60 @@ export default function StereoTypesSpotifyWidget({ gameId, onStateChange }) {
   }, [connected]);
 
   const track = playbackState?.track_window?.current_track || null;
+  const trackId = track?.id || null;
   const isPlaying = !!playbackState && !playbackState.paused;
+
+  // Real tempo, attempted best-effort: Spotify's Audio Features
+  // endpoint returns the track's actual BPM, which is exactly what
+  // "make the scroll speed match the bpm" needs — but that endpoint
+  // was locked behind Extended Quota Mode for apps without
+  // pre-existing access starting Nov 2024 (the same restriction this
+  // widget already flagged for the intensity signal below). Rather
+  // than assume this app has that access, this just tries the call and
+  // quietly falls back to null on any failure (403 included) — the
+  // cityscape already has an intensity-only fallback for exactly that
+  // case, so a 403 here degrades gracefully instead of surfacing an
+  // error the host can't do anything about. One fetch per distinct
+  // track id, not per player_state_changed tick (that event can fire
+  // far more often than the track actually changes, e.g. on a seek).
+  useEffect(() => {
+    if (!trackId) {
+      setBpm(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await getAccessToken();
+        if (!token) return;
+        const res = await fetch(`https://api.spotify.com/v1/audio-features/${trackId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          if (!cancelled) setBpm(null);
+          return;
+        }
+        const data = await res.json();
+        if (!cancelled) setBpm(typeof data?.tempo === "number" && data.tempo > 0 ? data.tempo : null);
+      } catch {
+        if (!cancelled) setBpm(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [trackId]);
+
   const trackName = track?.name || null;
   const artistName = track?.artists?.map((a) => a.name).join(", ") || null;
   const albumArt = track?.album?.images?.[0]?.url || null;
 
-  // Honest baseline, not a real audio-analysis number: Spotify's
-  // /v1/audio-features endpoint (tempo/energy) would be the obvious
-  // way to make `intensity` actually reflect the song, but access to
-  // that endpoint was restricted for apps without pre-existing
-  // extended access starting Nov 2024, and it's not something a newly
-  // created app (like whatever Client ID this env var points at) can
-  // be assumed to still reach — so rather than write code against an
-  // endpoint that may just 403, this is deliberately isPlaying-only:
-  // a fixed "the room is alive" intensity while something's actually
-  // playing, 0 the moment it's not. Bumped up from the original 0.55 —
-  // at that level the (also since-strengthened) pulse in
-  // StereoTypesCityscape.jsx still read as too subtle to clearly
+  // isPlaying-only fallback signal for everything BPM doesn't cover
+  // (pulse depth/scale always use this; scroll speed only falls back
+  // to it when the audio-features fetch above came back null — see
+  // that effect's own comment for why it might). Bumped up from the
+  // original 0.55 — at that level the (also since-strengthened) pulse
+  // in StereoTypesCityscape.jsx still read as too subtle to clearly
   // register as "reacting to music" rather than just ambient drift.
   const intensity = isPlaying ? 0.75 : 0;
 
@@ -151,11 +189,11 @@ export default function StereoTypesSpotifyWidget({ gameId, onStateChange }) {
   // keeps the game_state write (and the parent's re-render) tied to
   // things that actually look different on screen, not every SDK tick.
   useEffect(() => {
-    const payload = { isPlaying, intensity, trackName, artistName, albumArt, updatedAt: Date.now() };
+    const payload = { isPlaying, intensity, bpm, trackName, artistName, albumArt, updatedAt: Date.now() };
     onStateChange?.(payload);
     if (gameId) publishNowPlaying(gameId, payload);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameId, isPlaying, intensity, trackName, artistName, albumArt]);
+  }, [gameId, isPlaying, intensity, bpm, trackName, artistName, albumArt]);
 
   const togglePlay = () => playerRef.current?.togglePlay();
   const skipNext = () => playerRef.current?.nextTrack();
@@ -217,6 +255,15 @@ export default function StereoTypesSpotifyWidget({ gameId, onStateChange }) {
             </div>
             {artistName && (
               <div style={{ color: "#c9b98a", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{artistName}</div>
+            )}
+            {/* Only shown when the audio-features fetch actually
+                succeeded — its absence (rather than showing "—" or a
+                placeholder) is itself the signal that this Spotify app
+                doesn't have the Extended Quota Mode access that
+                endpoint needs, and the cityscape has silently fallen
+                back to the isPlaying-only scroll speed instead. */}
+            {bpm && (
+              <div style={{ color: "#f4c430", fontSize: 10, fontWeight: 700, marginTop: 2 }}>♪ {Math.round(bpm)} BPM</div>
             )}
           </div>
           <Btn small variant="ghost" onClick={togglePlay}>{isPlaying ? "⏸" : "▶️"}</Btn>

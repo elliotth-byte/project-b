@@ -32,7 +32,7 @@ import StereoTypesLogo from "./StereoTypesLogo";
 // 0 stops the track from following this element's size; the visual
 // full-bleed effect itself still works exactly the same, since that
 // comes entirely from left/width/transform above, not from the grid.
-export default function StereoTypesTitleScreen({ roomCode, playerCount, fullscreen = false, reactive = false, intensity = 0 }) {
+export default function StereoTypesTitleScreen({ roomCode, playerCount, fullscreen = false, reactive = false, intensity = 0, bpm = null }) {
   const hasFooter = !!roomCode || playerCount != null;
 
   return (
@@ -43,7 +43,7 @@ export default function StereoTypesTitleScreen({ roomCode, playerCount, fullscre
           : { position: "relative", borderRadius: 12, overflow: "hidden", marginBottom: 4 }
       }
     >
-      <StereoTypesCityscape height={200} fullscreen={fullscreen} reactive={reactive} intensity={intensity} />
+      <StereoTypesCityscape height={200} fullscreen={fullscreen} reactive={reactive} intensity={intensity} bpm={bpm} />
       <div
         style={{
           position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",

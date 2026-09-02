@@ -90,19 +90,28 @@ export function buildSkyline(seed = SEED, count = BUILDING_COUNT, maxHeight = 20
   return { buildings, totalWidth: x };
 }
 
-// reactive/intensity: driven by whatever's actually playing on the
+// reactive/intensity/bpm: driven by whatever's actually playing on the
 // host's Spotify (StereoTypesSpotifyWidget.jsx broadcasts it, either
 // straight to the host's own title screen or via the
 // stereo_types:now-playing game_state key for every other player).
 // reactive=true speeds the ambient auto-scroll up and starts the lit
-// windows pulsing; intensity (0-1) controls how far both of those go.
+// windows pulsing; intensity (0-1) controls how far both of those go
+// when real tempo isn't available; bpm (nullable) is the track's real
+// tempo when Spotify's Audio Features endpoint answered it.
 //
-// This is deliberately isPlaying-only, not tempo/energy-driven: Spotify
-// gates real per-track audio data (the /v1/audio-features endpoint)
-// behind extended API access that a newly created app can't be assumed
-// to have (see StereoTypesSpotifyWidget.jsx's own comment on this), so
-// intensity here is just "is music playing right now," not "how
-// energetic is this specific song." Honest baseline over a guess.
+// intensity is the isPlaying-only fallback signal, not tempo/energy-
+// driven: that endpoint is gated behind extended API access that a
+// newly created app can't be assumed to have (see
+// StereoTypesSpotifyWidget.jsx's own comment on this), so this
+// component can't assume bpm will ever actually arrive. When it does,
+// scroll speed locks to the real beat instead of the flat isPlaying
+// heuristic; when it doesn't (bpm is null — restricted access, no
+// track playing, or the fetch just failed), scroll speed falls back to
+// the exact same intensity-based formula this always used. Window
+// pulse timing still comes from intensity/pulseSeconds either way —
+// syncing THAT to the literal beat as well risked looking frantic at
+// fast tempos rather than lively, so only scroll speed (what was
+// actually asked for) takes bpm directly.
 //
 // fullscreen: ignores `height` and measures the real viewport instead
 // (window.innerHeight, kept live via a resize listener) — "make the
@@ -111,7 +120,7 @@ export function buildSkyline(seed = SEED, count = BUILDING_COUNT, maxHeight = 20
 // client's first measurement lands, same one-render "slightly wrong
 // then corrects itself" tradeoff this app's own useSiteTheme already
 // makes for the same reason (no window object on the server).
-export default function StereoTypesCityscape({ height = 200, fullscreen = false, reactive = false, intensity = 0 }) {
+export default function StereoTypesCityscape({ height = 200, fullscreen = false, reactive = false, intensity = 0, bpm = null }) {
   const [viewportHeight, setViewportHeight] = useState(800);
 
   useEffect(() => {
@@ -130,8 +139,21 @@ export default function StereoTypesCityscape({ height = 200, fullscreen = false,
   // as intensity climbs — 50s at intensity 0 (still visibly livelier
   // than pure ambient, since reactive=true already implies "something
   // is playing") down to 18s at full intensity, floored so it never
-  // scrolls fast enough to look broken rather than lively.
-  const scrollSeconds = reactive ? Math.max(18, 50 - clampedIntensity * 32) : 80;
+  // scrolls fast enough to look broken rather than lively. This is the
+  // fallback used whenever bpm isn't available.
+  const fallbackScrollSeconds = reactive ? Math.max(18, 50 - clampedIntensity * 32) : 80;
+  // Real-tempo path: 120 BPM (a common mid-tempo reference) maps to
+  // the same 30s scroll this formula already lands near at moderate
+  // intensity, and everything else scales inversely from there — a
+  // 180 BPM track scrolls noticeably faster, a 60 BPM ballad noticeably
+  // slower. Clamped on both ends so a very slow or very fast outlier
+  // track can't make the loop look frozen or turn into a blur.
+  const BPM_REFERENCE = 120;
+  const BPM_REFERENCE_SCROLL_SECONDS = 30;
+  const scrollSeconds =
+    reactive && bpm
+      ? Math.max(12, Math.min(60, BPM_REFERENCE_SCROLL_SECONDS * (BPM_REFERENCE / bpm)))
+      : fallbackScrollSeconds;
   // How far lit windows dim (and now also shrink) on each pulse, and
   // how fast — both scale with intensity. Only ever applied when
   // reactive; non-reactive windows stay exactly as before (opacity 1,
