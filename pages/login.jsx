@@ -57,7 +57,12 @@ export default function Login() {
       return;
     }
     setLoading(true);
-    const res = await signUpHost(hostEmail, hostPassword);
+    // Self-serve accounts are always scoped to Stereo Types only — see
+    // lib/auth.js's signUpHost/canHostGameType and
+    // sql/add-host-scope.sql. A host who needs full multi-game-type
+    // access still goes through the Supabase-dashboard path this page's
+    // own dead-end message (pages/host.jsx) still mentions.
+    const res = await signUpHost(hostEmail, hostPassword, "stereo_types");
     setLoading(false);
     if (!res.ok) { setError(res.error); return; }
     router.push("/host");

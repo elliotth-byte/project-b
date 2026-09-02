@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
-import { signInHost, signOut, isHost } from "../lib/auth";
+import { signInHost, signOut, isHost, canHostGameType } from "../lib/auth";
 import HostPanels from "../components/HostPanels";
 import TraitorsHostPanels from "../components/TraitorsHostPanels";
 import StereoTypesHostPanels from "../components/StereoTypesHostPanels";
@@ -504,7 +504,16 @@ export default function HostPage() {
                 { value: "project_b", label: "🃏 Panopticon", desc: "Challenge → Fates → Exile" },
                 { value: "traitors", label: "🏰 Traitors", desc: "Roundtable & Murder Vote" },
                 { value: "stereo_types", label: "📻 Stereo Types", desc: "A Side → The Remix → On Blast" },
-              ].map((opt) => {
+              ]
+                // A self-serve, Stereo-Types-scoped host account (see
+                // lib/auth.js's canHostGameType) never even sees the
+                // other two options — not just disabled, not offered at
+                // all. The real enforcement is server-side
+                // (sql/add-host-scope.sql's games-insert policy); this
+                // is purely so the UI doesn't dangle an option that
+                // would just fail on submit.
+                .filter((opt) => canHostGameType(user, opt.value))
+                .map((opt) => {
                 const optTheme = themeFor(opt.value);
                 const selected = newGameType === opt.value;
                 return (
