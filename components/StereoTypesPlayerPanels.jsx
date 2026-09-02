@@ -35,7 +35,7 @@ export default function StereoTypesPlayerPanels({ gameId, player, players }) {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <StereoTypesTitleScreen fullscreen reactive={!!nowPlaying?.isPlaying} intensity={nowPlaying?.intensity || 0} />
+      <StereoTypesTitleScreen fullscreen reactive={!!nowPlaying?.isPlaying} intensity={nowPlaying?.intensity || 0} bpm={nowPlaying?.bpm || null} />
 
       <Card style={{ borderColor: "#f4c430", textAlign: "center" }}>
         <div style={{ marginBottom: 12 }}>

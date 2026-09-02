@@ -47,6 +47,7 @@ export default function StereoTypesHostPanels({ gameId, roomCode, players, admin
         fullscreen
         reactive={!!nowPlaying?.isPlaying}
         intensity={nowPlaying?.intensity || 0}
+        bpm={nowPlaying?.bpm || null}
       />
 
       <StereoTypesSpotifyWidget gameId={gameId} onStateChange={setNowPlaying} />
