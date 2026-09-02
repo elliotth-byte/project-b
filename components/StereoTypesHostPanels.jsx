@@ -2,19 +2,21 @@ import { useState } from "react";
 import { Card, Btn } from "./ui";
 import { supabase } from "../lib/supabaseClient";
 import Boombox from "./Boombox";
+import StereoTypesTitleScreen from "./StereoTypesTitleScreen";
 
-// ─── Stereo Types — host console (Phase 2) ───
+// ─── Stereo Types — host console (Phase 2-3) ───
 // Still "plumbing before rounds" scope (see this file's own Phase 1
-// history) — Phase 2 just adds the real boombox graphic per roster row
-// instead of a bare name/status line. A player who hasn't gone through
-// StereoTypesIdentityPicker.jsx yet has no color set (p.color is null),
-// which Boombox.jsx already renders as a real-looking boombox in the
-// theme's own yellow rather than a broken/blank state — nothing special
-// needed here for that case. approvePlayer is the same plain
-// players-table update AdminHost.jsx/TraitorsAdminHost.jsx each already
-// do — nothing shared to reuse there, just the same one-liner a third
-// time.
-export default function StereoTypesHostPanels({ gameId, players, adminExtra }) {
+// history) — Phase 2 added the real boombox graphic per roster row
+// instead of a bare name/status line; Phase 3 swaps the old plain-text
+// banner for the actual title screen (scrolling cityscape + blocky
+// logo). A player who hasn't gone through StereoTypesIdentityPicker.jsx
+// yet has no color set (p.color is null), which Boombox.jsx already
+// renders as a real-looking boombox in the theme's own yellow rather
+// than a broken/blank state — nothing special needed here for that
+// case. approvePlayer is the same plain players-table update
+// AdminHost.jsx/TraitorsAdminHost.jsx each already do — nothing shared
+// to reuse there, just the same one-liner a third time.
+export default function StereoTypesHostPanels({ gameId, roomCode, players, adminExtra }) {
   const [busyId, setBusyId] = useState(null);
   const approvedPlayers = players.filter((p) => p.approved);
   const pendingPlayers = players.filter((p) => !p.approved);
@@ -27,10 +29,9 @@ export default function StereoTypesHostPanels({ gameId, players, adminExtra }) {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
+      <StereoTypesTitleScreen roomCode={roomCode} playerCount={approvedPlayers.length} />
+
       <Card style={{ borderColor: "#f4c430" }}>
-        <h3 style={{ color: "#f4c430", margin: "0 0 6px", fontSize: 15, fontFamily: "'Anton', 'Arial Narrow', sans-serif", letterSpacing: 0.5 }}>
-          📻 STEREO TYPES
-        </h3>
         <p style={{ color: "#c9b98a", fontSize: 13, margin: 0, fontStyle: "italic" }}>
           A Side, The Remix, and On Blast are still being built — for now
           this just gets players into the room. Share the join code

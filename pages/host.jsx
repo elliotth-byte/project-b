@@ -636,6 +636,7 @@ export default function HostPage() {
           <StereoTypesHostPanels
             key={game.id}
             gameId={game.id}
+            roomCode={game.join_code}
             players={players}
             adminExtra={
               <GameAccessPanel

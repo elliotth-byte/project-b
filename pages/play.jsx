@@ -20,6 +20,7 @@ import TraitorsMusicPlayer from "../components/TraitorsMusicPlayer";
 import TraitorsPlayerPanels from "../components/TraitorsPlayerPanels";
 import StereoTypesPlayerPanels from "../components/StereoTypesPlayerPanels";
 import StereoTypesIdentityPicker from "../components/StereoTypesIdentityPicker";
+import StereoTypesLogo from "../components/StereoTypesLogo";
 import HelpPanel from "../components/HelpPanel";
 import FinalWordsPrompt from "../components/FinalWordsPrompt";
 import { hasResolvedFinalWords } from "../lib/finalWords";
@@ -620,6 +621,10 @@ export default function PlayPage() {
             background: theme.cardBg,
             border: `2px solid ${theme.accent}`, borderRadius: 12,
           }}>
+            {/* Same brand moment StereoTypesPlayerPanels/HostPanels show
+                once approved — a Stereo Types player waiting on approval
+                still gets it, not just a bare hourglass. */}
+            {isStereoTypes && <div style={{ marginBottom: 14 }}><StereoTypesLogo size="small" /></div>}
             <div style={{ fontSize: 32, marginBottom: 8 }}>⏳</div>
             <p style={{ color: theme.text, fontSize: 16, fontWeight: 600, margin: "0 0 6px", fontFamily: theme.font }}>
               Waiting for the host to let you in
