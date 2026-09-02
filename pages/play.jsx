@@ -890,6 +890,7 @@ export default function PlayPage() {
             <StereoTypesPlayerPanels
               gameId={gameId}
               player={{ id: myPlayer.id, name: playerName, color: myPlayer.color, equippedSticker: myPlayer.equippedSticker }}
+              players={allPlayers}
             />
           </ChallengeErrorBoundary>
         )}
