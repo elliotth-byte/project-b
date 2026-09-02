@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 // ─── Stereo Types — the scrolling night skyline ───
 // "The title page should be a slowly scrolling cityscape at night, with
@@ -77,13 +77,32 @@ export function buildSkyline(seed = SEED, count = BUILDING_COUNT, maxHeight = 20
 // beat-driven behavior instead. Keeping both in the signature now means
 // Phase 4 only has to change what's INSIDE this component, not any of
 // its call sites.
-export default function StereoTypesCityscape({ height = 200, reactive = false, intensity = 0 }) {
-  const { buildings, totalWidth } = useMemo(() => buildSkyline(SEED, BUILDING_COUNT, height), [height]);
+//
+// fullscreen: ignores `height` and measures the real viewport instead
+// (window.innerHeight, kept live via a resize listener) — "make the
+// city take up the entire screen" needs the actual screen, not a fixed
+// guess at one. Starts at a sane SSR-safe fallback (800) before the
+// client's first measurement lands, same one-render "slightly wrong
+// then corrects itself" tradeoff this app's own useSiteTheme already
+// makes for the same reason (no window object on the server).
+export default function StereoTypesCityscape({ height = 200, fullscreen = false, reactive = false, intensity = 0 }) {
+  const [viewportHeight, setViewportHeight] = useState(800);
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    const measure = () => setViewportHeight(window.innerHeight);
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [fullscreen]);
+
+  const effectiveHeight = fullscreen ? viewportHeight : height;
+  const { buildings, totalWidth } = useMemo(() => buildSkyline(SEED, BUILDING_COUNT, effectiveHeight), [effectiveHeight]);
 
   const skyline = (copyKey) => (
-    <svg key={copyKey} width={totalWidth} height={height} viewBox={`0 0 ${totalWidth} ${height}`} style={{ display: "block", flexShrink: 0 }}>
+    <svg key={copyKey} width={totalWidth} height={effectiveHeight} viewBox={`0 0 ${totalWidth} ${effectiveHeight}`} style={{ display: "block", flexShrink: 0 }}>
       {buildings.map((b, i) => {
-        const by = height - b.height;
+        const by = effectiveHeight - b.height;
         return (
           <g key={i} transform={`translate(${b.x}, ${by})`}>
             <rect width={b.width} height={b.height} fill={BUILDING_FILL} />
@@ -95,13 +114,13 @@ export default function StereoTypesCityscape({ height = 200, reactive = false, i
   );
 
   return (
-    <div style={{ position: "relative", width: "100%", height, overflow: "hidden", background: `linear-gradient(180deg, ${SKY_TOP} 0%, ${SKY_BOTTOM} 100%)` }}>
+    <div style={{ position: "relative", width: "100%", height: effectiveHeight, overflow: "hidden", background: `linear-gradient(180deg, ${SKY_TOP} 0%, ${SKY_BOTTOM} 100%)` }}>
       {/* Rendered twice, side by side, in a track exactly double the
           artwork's own width — animating that track to -50% (half of
           ITS width, i.e. exactly one skyline-width) is what makes the
           loop seamless: by the time copy A has scrolled fully off,
           copy B is sitting in exactly the position A started in. */}
-      <div className="stereo-cityscape-track" style={{ display: "flex", width: totalWidth * 2, height }}>
+      <div className="stereo-cityscape-track" style={{ display: "flex", width: totalWidth * 2, height: effectiveHeight }}>
         {skyline("a")}
         {skyline("b")}
       </div>

@@ -8,12 +8,30 @@ import StereoTypesLogo from "./StereoTypesLogo";
 // while the logo keeps enough contrast to read clearly against
 // whichever mix of dark building silhouette / bright windows happens
 // to be behind it at any given scroll position.
-export default function StereoTypesTitleScreen({ roomCode, playerCount, height = 200 }) {
+//
+// fullscreen: "make the city take up the entire screen" — the skyline
+// itself already measures the real viewport height (see
+// StereoTypesCityscape's own fullscreen prop), but that alone isn't
+// enough: every page this mounts on (host.jsx/play.jsx) wraps its
+// content in a centered, ~400px-max-width column, same as everywhere
+// else in this app. The `left: 50%; transform: translateX(-50%);
+// width: 100vw` trick below is what actually breaks OUT of that column
+// for just this one element, regardless of how deep it's nested,
+// without touching the column itself (which every other Stereo Types
+// panel still wants to keep, for the roster/admin controls that scroll
+// in below this).
+export default function StereoTypesTitleScreen({ roomCode, playerCount, fullscreen = false }) {
   const hasFooter = !!roomCode || playerCount != null;
 
   return (
-    <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", marginBottom: 4 }}>
-      <StereoTypesCityscape height={height} />
+    <div
+      style={
+        fullscreen
+          ? { position: "relative", left: "50%", width: "100vw", transform: "translateX(-50%)", marginBottom: 4, overflow: "hidden" }
+          : { position: "relative", borderRadius: 12, overflow: "hidden", marginBottom: 4 }
+      }
+    >
+      <StereoTypesCityscape height={200} fullscreen={fullscreen} />
       <div
         style={{
           position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",

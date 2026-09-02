@@ -15,7 +15,7 @@ import StereoTypesTitleScreen from "./StereoTypesTitleScreen";
 export default function StereoTypesPlayerPanels({ gameId, player }) {
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <StereoTypesTitleScreen height={140} />
+      <StereoTypesTitleScreen fullscreen />
 
       <Card style={{ borderColor: "#f4c430", textAlign: "center" }}>
         <div style={{ marginBottom: 12 }}>

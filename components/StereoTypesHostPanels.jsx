@@ -29,7 +29,7 @@ export default function StereoTypesHostPanels({ gameId, roomCode, players, admin
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <StereoTypesTitleScreen roomCode={roomCode} playerCount={approvedPlayers.length} />
+      <StereoTypesTitleScreen roomCode={roomCode} playerCount={approvedPlayers.length} fullscreen />
 
       <Card style={{ borderColor: "#f4c430" }}>
         <p style={{ color: "#c9b98a", fontSize: 13, margin: 0, fontStyle: "italic" }}>
