@@ -6,6 +6,7 @@ import HostPanels from "../components/HostPanels";
 import TraitorsHostPanels from "../components/TraitorsHostPanels";
 import StereoTypesHostPanels from "../components/StereoTypesHostPanels";
 import GameAccessPanel from "../components/GameAccessPanel";
+import ChatHostPanel from "../components/ChatHostPanel";
 import UpdateBanner from "../components/UpdateBanner";
 import MusicPlayer from "../components/MusicPlayer";
 import TraitorsMusicPlayer from "../components/TraitorsMusicPlayer";
@@ -633,27 +634,39 @@ export default function HostPage() {
           />
         )}
         {game && game.game_type === "stereo_types" && (
-          <StereoTypesHostPanels
-            key={game.id}
-            gameId={game.id}
-            roomCode={game.join_code}
-            players={players}
-            adminExtra={
-              <GameAccessPanel
-                game={game}
-                players={players}
-                isPrimaryHost={isPrimaryHost}
-                origin={origin}
-                userId={user?.id}
-                coHosts={coHosts}
-                inviteEmail={inviteEmail}
-                setInviteEmail={setInviteEmail}
-                inviteStatus={inviteStatus}
-                inviteCoHost={inviteCoHost}
-                removeCoHost={removeCoHost}
-              />
-            }
-          />
+          <>
+            <StereoTypesHostPanels
+              key={game.id}
+              gameId={game.id}
+              roomCode={game.join_code}
+              players={players}
+              adminExtra={
+                <GameAccessPanel
+                  game={game}
+                  players={players}
+                  isPrimaryHost={isPrimaryHost}
+                  origin={origin}
+                  userId={user?.id}
+                  coHosts={coHosts}
+                  inviteEmail={inviteEmail}
+                  setInviteEmail={setInviteEmail}
+                  inviteStatus={inviteStatus}
+                  inviteCoHost={inviteCoHost}
+                  removeCoHost={removeCoHost}
+                />
+              }
+            />
+            {/* StereoTypesHostPanels has no tab bar (and no chat surface)
+                of its own, unlike HostPanels/TraitorsHostPanels which
+                already tuck ChatHostPanel behind their own "chat" tab —
+                mounted here instead, same component, same reused group
+                chat + DM-thread infrastructure. Always-visible rather
+                than gated on settings.chatEnabled: Stereo Types has no
+                admin toggle for that setting anywhere (see the matching
+                comment on the player-side mount in pages/play.jsx), so
+                gating on it would just mean chat never appears. */}
+            <ChatHostPanel key={`chat-${game.id}`} gameId={game.id} players={players.filter((p) => p.approved)} />
+          </>
         )}
       </div>
       {game && game.game_type === "traitors" && <TraitorsMusicPlayer key={`music-${game.id}`} gameId={game.id} isHost={true} />}

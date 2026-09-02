@@ -20,6 +20,20 @@ import { sendPushToGame, sendPushToPlayers, sendPushToHosts } from "../../../lib
 
 const PREVIEW_LENGTH = 100;
 
+// Only Project B's own group chat is actually branded "Panopticon" — the
+// other game types' own UIs just call it "Chat" (see e.g.
+// TraitorsPlayerPanels.jsx's "💬 Chat" tab), so their host-side push
+// title shouldn't say "Panopticon" either. Explicit three-way check
+// (matching this codebase's established convention) rather than just
+// special-casing project_b and calling everything else "Chat" via a
+// negation.
+function groupChatLabel(gameType) {
+  if (gameType === "project_b") return "(Panopticon)";
+  if (gameType === "traitors") return "(Chat)";
+  if (gameType === "stereo_types") return "(Chat)";
+  return "(Chat)"; // unknown/future game type — generic fallback, never Project B's own branding
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
@@ -45,12 +59,16 @@ export default async function handler(req, res) {
   const preview = body.length > PREVIEW_LENGTH ? body.slice(0, PREVIEW_LENGTH) + "…" : body;
 
   if (kind === "group") {
+    // Looked up fresh per send rather than threaded through from the
+    // client — this route already needs to trust nothing the client
+    // claims about the game beyond gameId itself.
+    const { data: gameRow } = await userClient.from("games").select("game_type").eq("id", gameId).maybeSingle();
     await sendPushToGame(gameId, {
       title: `💬 ${senderName}`, body: preview, url: `/play?game=${gameId}`, tag: "chat-group",
       filterColumn: "notify_public_messages", excludePlayerId: senderId,
     });
     await sendPushToHosts(gameId, {
-      title: `💬 ${senderName} (Panopticon)`, body: preview, url: `/host?game=${gameId}`, tag: "chat-group",
+      title: `💬 ${senderName} ${groupChatLabel(gameRow?.game_type)}`, body: preview, url: `/host?game=${gameId}`, tag: "chat-group",
       filterColumn: "notify_chat_activity",
     });
     return res.status(200).json({ ok: true });

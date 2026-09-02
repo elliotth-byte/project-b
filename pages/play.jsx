@@ -894,6 +894,37 @@ export default function PlayPage() {
             />
           </ChallengeErrorBoundary>
         )}
+
+        {/* Stereo Types has no tab bar of its own (StereoTypesPlayerPanels
+            is one continuous scroll of cards, not a tabbed layout like
+            Traitors'/Project B's), so Chat is mounted here as one more
+            card rather than inventing a tab concept just for this. Reuses
+            the exact same group-chat infrastructure (lib/chatData.js's
+            game_state-backed group chat, plus the real chat_threads/
+            chat_messages tables for DMs) as every other game type — none
+            of it is actually game-type-specific. round={null}/isExiled=
+            {false} because Stereo Types has neither Project B's round
+            phases nor an exile mechanic; ChatPanel's Poseidon/Hera
+            deliberation-blocking checks (both gated on a real `round`)
+            naturally no-op on a null round rather than throwing, same as
+            TraitorsPlayerPanels.jsx's own round={null} chat mount above
+            already relies on. Always-visible (not gated on
+            settings.chatEnabled) since Stereo Types has no admin toggle
+            for it — unlike Project B/Traitors, there's nowhere for a host
+            to turn this off. */}
+        {isStereoTypes && approved && playerName && (
+          <ChallengeErrorBoundary label="Chat">
+            <ChatPanel
+              gameId={gameId}
+              player={{ id: myPlayer.id, name: playerName }}
+              players={allPlayers}
+              realName={playerName}
+              isExiled={false}
+              round={null}
+              settings={settings}
+            />
+          </ChallengeErrorBoundary>
+        )}
       </div>
       {approved && isTraitors && <TraitorsMusicPlayer gameId={gameId} isHost={false} />}
       {approved && !isTraitors && !isStereoTypes && <MusicPlayer gameId={gameId} isHost={false} portalTarget={radioPortalNode} />}
