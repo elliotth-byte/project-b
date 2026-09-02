@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { Card, Btn } from "./ui";
 import { supabase } from "../lib/supabaseClient";
+import Boombox from "./Boombox";
 
-// ─── Stereo Types — host console (Phase 1 placeholder) ───
-// This is deliberately just plumbing right now — proving game_type
-// branching, the join-code flow, player approval, and the admin/co-host
-// panel all work for a Stereo Types season before any actual round
-// logic exists. A Side / The Remix / On Blast each land here as their
-// own round in later phases, same incremental order Traitors itself
-// followed (schema + branching first, TraitorRolesHost/RoundtableHost/
-// etc. after). approvePlayer is the same plain players-table update
-// AdminHost.jsx/TraitorsAdminHost.jsx each already do — nothing shared
-// to reuse there, just the same one-liner a third time.
+// ─── Stereo Types — host console (Phase 2) ───
+// Still "plumbing before rounds" scope (see this file's own Phase 1
+// history) — Phase 2 just adds the real boombox graphic per roster row
+// instead of a bare name/status line. A player who hasn't gone through
+// StereoTypesIdentityPicker.jsx yet has no color set (p.color is null),
+// which Boombox.jsx already renders as a real-looking boombox in the
+// theme's own yellow rather than a broken/blank state — nothing special
+// needed here for that case. approvePlayer is the same plain
+// players-table update AdminHost.jsx/TraitorsAdminHost.jsx each already
+// do — nothing shared to reuse there, just the same one-liner a third
+// time.
 export default function StereoTypesHostPanels({ gameId, players, adminExtra }) {
   const [busyId, setBusyId] = useState(null);
   const approvedPlayers = players.filter((p) => p.approved);
@@ -44,10 +46,13 @@ export default function StereoTypesHostPanels({ gameId, players, adminExtra }) {
         {players.length === 0 ? (
           <p style={{ color: "#6b6558", fontSize: 12, fontStyle: "italic", margin: 0 }}>Nobody's joined yet — share the join code.</p>
         ) : (
-          <div style={{ display: "grid", gap: 6 }}>
+          <div style={{ display: "grid", gap: 8 }}>
             {players.map((p) => (
               <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a0e18", borderRadius: 6, padding: "6px 10px" }}>
-                <span style={{ color: "#f5eddc", fontSize: 13 }}>{p.display_name}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <Boombox color={p.color} stickerId={p.equipped_sticker} size={56} />
+                  <span style={{ color: "#f5eddc", fontSize: 13 }}>{p.display_name}</span>
+                </div>
                 {p.approved ? (
                   <span style={{ color: "#f4c430", fontSize: 11, fontWeight: 700 }}>✓ Approved</span>
                 ) : (

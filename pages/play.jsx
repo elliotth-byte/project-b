@@ -19,6 +19,7 @@ import MusicPlayer from "../components/MusicPlayer";
 import TraitorsMusicPlayer from "../components/TraitorsMusicPlayer";
 import TraitorsPlayerPanels from "../components/TraitorsPlayerPanels";
 import StereoTypesPlayerPanels from "../components/StereoTypesPlayerPanels";
+import StereoTypesIdentityPicker from "../components/StereoTypesIdentityPicker";
 import HelpPanel from "../components/HelpPanel";
 import FinalWordsPrompt from "../components/FinalWordsPrompt";
 import { hasResolvedFinalWords } from "../lib/finalWords";
@@ -310,13 +311,13 @@ export default function PlayPage() {
     (async () => {
       const { data: existing } = await supabase
         .from("players")
-        .select("id, display_name, alive, elimination_type, elimination_round, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes")
+        .select("id, display_name, alive, elimination_type, elimination_round, approved, color, equipped_sticker, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes")
         .eq("game_id", gameId)
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (existing) {
-        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, eliminationRound: existing.elimination_round, approved: existing.approved, color: existing.color, alias: existing.alias, avatarUrl: existing.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(existing.game_prefs || {}) }, battleBanRound: existing.battle_ban_round, torchedPreset: existing.torched_preset, powerState: existing.power_state, inactivityStrikes: existing.inactivity_strikes });
+        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, eliminationRound: existing.elimination_round, approved: existing.approved, color: existing.color, equippedSticker: existing.equipped_sticker, alias: existing.alias, avatarUrl: existing.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(existing.game_prefs || {}) }, battleBanRound: existing.battle_ban_round, torchedPreset: existing.torched_preset, powerState: existing.power_state, inactivityStrikes: existing.inactivity_strikes });
         setJoined(true);
         return;
       }
@@ -347,12 +348,12 @@ export default function PlayPage() {
       const { data: created, error } = await supabase
         .from("players")
         .insert({ game_id: gameId, user_id: session.user.id, display_name: displayNameFromUser(user), approved: false })
-        .select("id, display_name, alive, elimination_type, elimination_round, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes")
+        .select("id, display_name, alive, elimination_type, elimination_round, approved, color, equipped_sticker, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes")
         .single();
       if (error) {
         setJoinError(`Couldn't join this game: ${error.message}${error.code ? ` [code=${error.code}]` : ""}${error.details ? ` — ${error.details}` : ""} (user_id=${session.user.id})`);
       } else {
-        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, eliminationRound: created.elimination_round, approved: created.approved, color: created.color, alias: created.alias, avatarUrl: created.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(created.game_prefs || {}) }, battleBanRound: created.battle_ban_round, torchedPreset: created.torched_preset, powerState: created.power_state, inactivityStrikes: created.inactivity_strikes });
+        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, eliminationRound: created.elimination_round, approved: created.approved, color: created.color, equippedSticker: created.equipped_sticker, alias: created.alias, avatarUrl: created.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(created.game_prefs || {}) }, battleBanRound: created.battle_ban_round, torchedPreset: created.torched_preset, powerState: created.power_state, inactivityStrikes: created.inactivity_strikes });
         setJoined(true);
         // Fire-and-forget — a host notification failing to send should
         // never block the join itself, which already succeeded. Uses
@@ -387,8 +388,8 @@ export default function PlayPage() {
   useEffect(() => {
     if (!myPlayer?.id) return;
     const load = async () => {
-      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, elimination_round, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes").eq("id", myPlayer.id).maybeSingle();
-      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, eliminationRound: data.elimination_round, approved: data.approved, color: data.color, alias: data.alias, avatarUrl: data.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(data.game_prefs || {}) }, battleBanRound: data.battle_ban_round, torchedPreset: data.torched_preset, powerState: data.power_state, inactivityStrikes: data.inactivity_strikes }));
+      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, elimination_round, approved, color, equipped_sticker, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes").eq("id", myPlayer.id).maybeSingle();
+      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, eliminationRound: data.elimination_round, approved: data.approved, color: data.color, equippedSticker: data.equipped_sticker, alias: data.alias, avatarUrl: data.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(data.game_prefs || {}) }, battleBanRound: data.battle_ban_round, torchedPreset: data.torched_preset, powerState: data.power_state, inactivityStrikes: data.inactivity_strikes }));
     };
     const channel = supabase
       .channel(`self-player-${myPlayer.id}`)
@@ -515,6 +516,11 @@ export default function PlayPage() {
   // in the season as Project B's needsIdentity: resolved before the
   // "waiting for host approval" screen, once, right after joining.
   const needsTraitorsAlias = isTraitors && joined && myPlayer && !traitorsIdentityComplete(myPlayer, settings);
+  // Stereo Types' own identity step — boombox color (reusing
+  // players.color as-is) plus an optional sticker, see
+  // components/StereoTypesIdentityPicker.jsx. Same placement in the
+  // season as the other two identity gates above.
+  const needsStereoTypesIdentity = isStereoTypes && joined && myPlayer && !myPlayer.color;
   // Once the game's over, the whole point of keeping exiled players
   // separated from the main chat (protecting the still-competing
   // players from anything an exiled player might reveal or pressure
@@ -599,7 +605,16 @@ export default function PlayPage() {
           />
         )}
 
-        {joined && myPlayer && !needsIdentity && !needsOnboardingPrefs && !needsTraitorsAlias && !myPlayer.approved && (
+        {joined && myPlayer && needsStereoTypesIdentity && (
+          <StereoTypesIdentityPicker
+            player={myPlayer}
+            allPlayers={allPlayers}
+            userId={user?.id}
+            onPicked={(row) => setMyPlayer((p) => p && ({ ...p, color: row.color, equippedSticker: row.equipped_sticker }))}
+          />
+        )}
+
+        {joined && myPlayer && !needsIdentity && !needsOnboardingPrefs && !needsTraitorsAlias && !needsStereoTypesIdentity && !myPlayer.approved && (
           <div style={{
             marginBottom: 20, textAlign: "center", padding: "28px 20px",
             background: theme.cardBg,
@@ -867,7 +882,10 @@ export default function PlayPage() {
 
         {isStereoTypes && approved && playerName && (
           <ChallengeErrorBoundary label="Stereo Types">
-            <StereoTypesPlayerPanels gameId={gameId} player={{ id: myPlayer.id, name: playerName }} />
+            <StereoTypesPlayerPanels
+              gameId={gameId}
+              player={{ id: myPlayer.id, name: playerName, color: myPlayer.color, equippedSticker: myPlayer.equippedSticker }}
+            />
           </ChallengeErrorBoundary>
         )}
       </div>

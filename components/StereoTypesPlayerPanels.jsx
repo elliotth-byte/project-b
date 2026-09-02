@@ -1,17 +1,18 @@
 import { Card } from "./ui";
+import Boombox from "./Boombox";
 
-// ─── Stereo Types — player view (Phase 1 placeholder) ───
-// Mounted once a player is approved (see pages/play.jsx) — same
-// "plumbing before rounds" scope as StereoTypesHostPanels.jsx. Boombox
-// identity (color + stickers), the title-screen cityscape, and A
-// Side/The Remix/On Blast each replace this in later phases.
+// ─── Stereo Types — player view (Phase 2) ───
+// By the time this mounts, StereoTypesIdentityPicker.jsx (see
+// pages/play.jsx's needsStereoTypesIdentity gate) has already run, so
+// player.color is always set here — this just shows the boombox that
+// step built. A Side/The Remix/On Blast each replace the "still being
+// built" note below in later phases.
 export default function StereoTypesPlayerPanels({ gameId, player }) {
   return (
     <Card style={{ borderColor: "#f4c430", textAlign: "center" }}>
-      <div style={{ fontSize: 28, marginBottom: 8 }}>📻</div>
-      <h3 style={{ color: "#f4c430", margin: "0 0 8px", fontSize: 18, fontFamily: "'Anton', 'Arial Narrow', sans-serif", letterSpacing: 0.5 }}>
-        You're in, {player?.name}
-      </h3>
+      <div style={{ marginBottom: 12 }}>
+        <Boombox color={player?.color} stickerId={player?.equippedSticker} label={player?.name} size={160} />
+      </div>
       <p style={{ color: "#c9b98a", fontSize: 13, margin: 0, fontStyle: "italic" }}>
         Stereo Types is still being built — A Side, The Remix, and On
         Blast aren't live yet. Sit tight, the host will let you know
