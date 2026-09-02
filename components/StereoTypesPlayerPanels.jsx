@@ -4,6 +4,7 @@ import Boombox from "./Boombox";
 import StereoTypesTitleScreen from "./StereoTypesTitleScreen";
 import StereoTypesASidePlayer from "./StereoTypesASidePlayer";
 import StereoTypesRemixPlayer from "./StereoTypesRemixPlayer";
+import StereoTypesOnBlastPlayer from "./StereoTypesOnBlastPlayer";
 import { subscribeStereoTypesNowPlaying } from "../lib/stereoTypesNowPlaying";
 import { subscribeStereoTypesRound } from "../lib/stereoTypesASide";
 
@@ -38,6 +39,9 @@ export default function StereoTypesPlayerPanels({ gameId, player, players }) {
   // signal that's meaningful both before either round has started and
   // once either has, so it's read once here rather than each round
   // component inferring "am I current" from its own round.status).
+  //
+  // Phase 7 adds Round 3 ("On Blast", StereoTypesOnBlastPlayer below) and
+  // the game's actual end — same currentRound switch, third branch.
   const [currentRound, setCurrentRound] = useState(0);
 
   useEffect(() => {
@@ -77,6 +81,7 @@ export default function StereoTypesPlayerPanels({ gameId, player, players }) {
 
       {(!currentRound || currentRound === 1) && <StereoTypesASidePlayer gameId={gameId} player={player} players={players} />}
       {currentRound === 2 && <StereoTypesRemixPlayer gameId={gameId} player={player} players={players} />}
+      {currentRound === 3 && <StereoTypesOnBlastPlayer gameId={gameId} player={player} players={players} />}
     </div>
   );
 }

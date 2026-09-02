@@ -6,6 +6,7 @@ import StereoTypesTitleScreen from "./StereoTypesTitleScreen";
 import StereoTypesSpotifyWidget from "./StereoTypesSpotifyWidget";
 import StereoTypesASideHost from "./StereoTypesASideHost";
 import StereoTypesRemixHost from "./StereoTypesRemixHost";
+import StereoTypesOnBlastHost from "./StereoTypesOnBlastHost";
 import { subscribeStereoTypesRound } from "../lib/stereoTypesASide";
 
 // ─── Stereo Types — host console (Phase 2-6) ───
@@ -43,6 +44,9 @@ import { subscribeStereoTypesRound } from "../lib/stereoTypesASide";
 // 0 (falsy) before Round 1 has ever started; StereoTypesASideHost.jsx
 // covers that "not started yet" case itself (its own `!round` branch
 // renders the "Start A Side" button), so 0/1 share the same branch below.
+//
+// Phase 7 adds Round 3 ("On Blast", StereoTypesOnBlastHost below) and
+// the game's actual end — same currentRound switch, third branch.
 export default function StereoTypesHostPanels({ gameId, roomCode, players, adminExtra }) {
   const [busyId, setBusyId] = useState(null);
   const [nowPlaying, setNowPlaying] = useState(null);
@@ -89,6 +93,7 @@ export default function StereoTypesHostPanels({ gameId, roomCode, players, admin
 
       {(!currentRound || currentRound === 1) && <StereoTypesASideHost gameId={gameId} players={players} />}
       {currentRound === 2 && <StereoTypesRemixHost gameId={gameId} players={players} />}
+      {currentRound === 3 && <StereoTypesOnBlastHost gameId={gameId} players={players} />}
 
       <Card>
         <div style={{ fontSize: 11, color: "#c9b98a", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>

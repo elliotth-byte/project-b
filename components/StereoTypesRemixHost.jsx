@@ -3,6 +3,7 @@ import { Card, Btn } from "./ui";
 import {
   subscribeRemixRound, maybeAdvanceRemixToReveal, maybeScoreRemix, persistRemixRoundScores,
 } from "../lib/stereoTypesRemix";
+import { startOnBlast } from "../lib/stereoTypesOnBlast";
 import StereoTypesRemixResults from "./StereoTypesRemixResults";
 
 // ─── Stereo Types — Round 2 ("The Remix"), host console ───
@@ -50,6 +51,23 @@ export default function StereoTypesRemixHost({ gameId, players }) {
   const handleForceScore = async () => {
     setBusy(true);
     await maybeScoreRemix(gameId, 2, { force: true });
+    setBusy(false);
+  };
+
+  // Round 3's actual start trigger — see lib/stereoTypesOnBlast.js's
+  // startOnBlast. Same relationship StereoTypesASideHost.jsx's own
+  // "Start Round 2" button has to startRemix: this button's successful
+  // click is also the moment KEY_STEREO_TYPES_ROUND flips to 3, which is
+  // what tells StereoTypesHostPanels.jsx/StereoTypesPlayerPanels.jsx to
+  // swap over to StereoTypesOnBlastHost.jsx/StereoTypesOnBlastPlayer.jsx
+  // for everyone. Not gating this on player count the same way
+  // StereoTypesASideHost.jsx's own "Start A Side" button gates itself —
+  // by the time Round 2 is "scored", at least 2 approved players already
+  // exist and nothing in this app lets that count drop back below 2.
+  const handleStartOnBlast = async () => {
+    setBusy(true);
+    const res = await startOnBlast(gameId, players.filter((p) => p.approved));
+    if (!res.ok && res.error) window.alert(res.error);
     setBusy(false);
   };
 
@@ -117,7 +135,7 @@ export default function StereoTypesRemixHost({ gameId, players }) {
           <StereoTypesRemixResults round={round} players={players} />
           <Card style={{ textAlign: "center" }}>
             <div style={{ fontSize: 11, color: "#c9b98a", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Round 3 — On Blast</div>
-            <Btn disabled>Round 3 coming soon</Btn>
+            <Btn onClick={handleStartOnBlast} disabled={busy}>Start Round 3 — On Blast</Btn>
           </Card>
         </>
       )}
