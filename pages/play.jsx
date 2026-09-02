@@ -26,6 +26,7 @@ import FinalWordsPrompt from "../components/FinalWordsPrompt";
 import { hasResolvedFinalWords } from "../lib/finalWords";
 import OptionsPanel from "../components/OptionsPanel";
 import UpdateBanner from "../components/UpdateBanner";
+import ProfilePhotoPrompt from "../components/ProfilePhotoPrompt";
 import NavTourOverlay from "../components/NavTourOverlay";
 import { hasSeenNavTour } from "../lib/navTour";
 import ChatPanel from "../components/ChatPanel";
@@ -556,7 +557,10 @@ export default function PlayPage() {
 
   return (
     <div style={{ ...pageStyle, alignItems: "flex-start", flexDirection: "column" }}>
-      <div style={{ width: "100%", maxWidth: 400, margin: "0 auto" }}><UpdateBanner /></div>
+      <div style={{ width: "100%", maxWidth: 400, margin: "0 auto" }}>
+        <UpdateBanner />
+        {approved && !gameEnded && <ProfilePhotoPrompt userId={user?.id} />}
+      </div>
       <div style={{ display: "flex", justifyContent: "space-between", width: "100%", maxWidth: 400, margin: "0 auto 12px" }}>
         <HomeLink theme={theme} />
         <span style={{ color: theme.textMuted, fontSize: 13 }}>Playing as {effectivePlayerName || "..."}</span>

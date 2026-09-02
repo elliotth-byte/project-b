@@ -59,8 +59,19 @@ export default function StereoTypesHostPanels({ gameId, roomCode, players, admin
   const [busyId, setBusyId] = useState(null);
   const [nowPlaying, setNowPlaying] = useState(null);
   const [currentRound, setCurrentRound] = useState(0);
-  const approvedPlayers = players.filter((p) => p.approved);
-  const pendingPlayers = players.filter((p) => !p.approved);
+  // Optimistic-approval overlay — same fix AdminHost.jsx/TraitorsAdminHost.jsx
+  // already apply to their own approvePlayer: `players` here is only ever
+  // updated once host.jsx's realtime subscription (or its 45s poll
+  // fallback) actually delivers the change back down, so without this a
+  // click on "Approve" could sit there for several seconds looking like
+  // it did nothing before the row visibly flips. Cleared automatically
+  // once the real update lands and `players` reflects it (the player
+  // naturally drops out of `pendingPlayers` at that point on its own);
+  // only restored if the write itself actually failed, so a real failure
+  // still shows the button rather than silently swallowing it.
+  const [optimisticallyApproved, setOptimisticallyApproved] = useState(new Set());
+  const approvedPlayers = players.filter((p) => p.approved || optimisticallyApproved.has(p.id));
+  const pendingPlayers = players.filter((p) => !p.approved && !optimisticallyApproved.has(p.id));
 
   useEffect(() => {
     if (!gameId) return;
@@ -69,8 +80,12 @@ export default function StereoTypesHostPanels({ gameId, roomCode, players, admin
 
   const approvePlayer = async (p) => {
     setBusyId(p.id);
-    await supabase.from("players").update({ approved: true }).eq("id", p.id);
+    setOptimisticallyApproved((prev) => new Set(prev).add(p.id));
+    const { error } = await supabase.from("players").update({ approved: true }).eq("id", p.id);
     setBusyId(null);
+    if (error) {
+      setOptimisticallyApproved((prev) => { const next = new Set(prev); next.delete(p.id); return next; });
+    }
   };
 
   return (
@@ -119,7 +134,7 @@ export default function StereoTypesHostPanels({ gameId, roomCode, players, admin
                   <Boombox color={p.color} stickerId={p.equipped_sticker} size={56} />
                   <span style={{ color: "#f5eddc", fontSize: 13 }}>{p.display_name}</span>
                 </div>
-                {p.approved ? (
+                {p.approved || optimisticallyApproved.has(p.id) ? (
                   <span style={{ color: "#f4c430", fontSize: 11, fontWeight: 700 }}>✓ Approved</span>
                 ) : (
                   <Btn small onClick={() => approvePlayer(p)} disabled={busyId === p.id}>

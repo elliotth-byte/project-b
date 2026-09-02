@@ -207,7 +207,50 @@ export function IdentityRevealCard({ players }) {
   );
 }
 
-export function FinaleCard({ finale, rows, byId, showComments, qa }) {
+// Small circular tiles for the finalists — profile pictures (see
+// lib/profiles.js's fetchProfilePhotos) rather than any season-scoped
+// avatar (lib/avatarIdentity.js's effectiveAvatarUrl, which the
+// interactive MemoryWall/PlayerMemoryWall tiles already use elsewhere):
+// by the time this renders, the game has already ended and real names
+// are already unmasked (see lib/playerIdentity.js's own comment on
+// aliasActive), so there's no identity-leak concern here the way there
+// would be showing someone's real photo next to a still-secret alias
+// mid-season — this is genuinely safe to be the one place in the app
+// that reaches for the cross-season profile photo instead. Falls back
+// to a plain initial-in-a-circle for anyone who hasn't set one — same
+// "never show nothing" instinct as everywhere else a photo is optional.
+function FinaleFinalistTiles({ finalists, byId, profilePhotos, players, winnerId }) {
+  if (!finalists || finalists.length === 0) return null;
+  const userIdFor = (playerId) => (players || []).find((p) => p.id === playerId)?.user_id;
+  return (
+    <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", margin: "10px 0" }}>
+      {finalists.map((f) => {
+        const name = byId[f.playerId] || f.name;
+        const photoUrl = profilePhotos?.[userIdFor(f.playerId)];
+        const isWinner = winnerId && f.playerId === winnerId;
+        return (
+          <div key={f.playerId} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, width: 76 }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: "50%", overflow: "hidden", flexShrink: 0,
+              background: "#0d0618", display: "flex", alignItems: "center", justifyContent: "center",
+              border: `3px solid ${isWinner ? "#ffd700" : "#3d1f5c"}`,
+              boxShadow: isWinner ? "0 0 14px #ffd700aa" : "none",
+            }}>
+              {photoUrl
+                ? <img src={photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                : <span style={{ fontSize: 20, fontWeight: 900, color: "#6b4f99" }}>{(name || "?").charAt(0).toUpperCase()}</span>}
+            </div>
+            <span style={{ fontSize: 11, color: isWinner ? "#ffd700" : "#f5f0ff", fontWeight: 700, textAlign: "center", lineHeight: 1.2 }}>
+              {name}{isWinner ? " 🏆" : ""}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function FinaleCard({ finale, rows, byId, showComments, qa, players, profilePhotos }) {
   const winnerName = finale.winnerId ? byId[finale.winnerId] : null;
   const statementEntries = Object.entries(qa?.statements || {});
   const questions = qa?.questions || [];
@@ -220,6 +263,13 @@ export function FinaleCard({ finale, rows, byId, showComments, qa }) {
       <p style={{ fontSize: 12, color: "#a68fd6", margin: "0 0 4px" }}>
         Finalists: {(finale.finalists || []).map((f) => byId[f.playerId] || f.name).join(", ")}
       </p>
+      <FinaleFinalistTiles
+        finalists={finale.finalists}
+        byId={byId}
+        players={players}
+        profilePhotos={profilePhotos}
+        winnerId={finale.revealed ? finale.winnerId : null}
+      />
       {finale.chaosHolderId && (
         <div style={{ margin: "0 0 4px" }}>
           <p style={{ fontSize: 11, color: "#a68fd6", fontStyle: "italic", margin: 0 }}>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card } from "./ui";
+import { Card, Btn } from "./ui";
 import Boombox from "./Boombox";
 import StereoTypesTitleScreen from "./StereoTypesTitleScreen";
 import StereoTypesScoreboard from "./StereoTypesScoreboard";
@@ -8,6 +8,78 @@ import StereoTypesRemixPlayer from "./StereoTypesRemixPlayer";
 import StereoTypesOnBlastPlayer from "./StereoTypesOnBlastPlayer";
 import { subscribeStereoTypesNowPlaying } from "../lib/stereoTypesNowPlaying";
 import { subscribeStereoTypesRound } from "../lib/stereoTypesASide";
+import { supabase } from "../lib/supabaseClient";
+
+const MAX_DISPLAY_NAME_LENGTH = 40;
+
+// ─── Set your display name ───
+// A plain rename of this player's OWN row for THIS game only (players
+// isn't a cross-game identity — see sql/schema.sql — so this doesn't
+// touch the account-level profile display name upsertProfile writes on
+// /admin; it's the same "per-season name" every other game type already
+// lets a player set at join time, just editable afterward here). Inline
+// click-to-edit rather than always-visible input+button, same
+// "collapsed until you actually want to change it" instinct
+// GameAccessPanel.jsx's own co-hosts/notifications sections already use.
+// No local optimistic name swap needed on save — pages/play.jsx's own
+// self-player realtime subscription already fires for any change to
+// this row and updates `player.name` for every consumer of it,
+// including this component's own parent, the instant the write lands.
+function DisplayNameEditor({ player }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(player?.name || "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const startEditing = () => {
+    setDraft(player?.name || "");
+    setError("");
+    setEditing(true);
+  };
+
+  const save = async () => {
+    const trimmed = draft.trim();
+    if (!trimmed) { setError("Name can't be empty."); return; }
+    if (trimmed.length > MAX_DISPLAY_NAME_LENGTH) { setError(`Keep it under ${MAX_DISPLAY_NAME_LENGTH} characters.`); return; }
+    setSaving(true);
+    setError("");
+    const { error: dbError } = await supabase.from("players").update({ display_name: trimmed }).eq("id", player.id);
+    setSaving(false);
+    if (dbError) { setError("Couldn't save: " + dbError.message); return; }
+    setEditing(false);
+  };
+
+  if (!editing) {
+    return (
+      <button
+        onClick={startEditing}
+        style={{ background: "none", border: "none", color: "#6b6558", fontSize: 11, cursor: "pointer", padding: 0, textDecoration: "underline" }}
+      >
+        Set your display name
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ display: "grid", gap: 8, maxWidth: 260, margin: "0 auto" }}>
+      <input
+        type="text" value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={MAX_DISPLAY_NAME_LENGTH}
+        disabled={saving} autoFocus
+        style={{ background: "#0a0e18", border: "1px solid #3d1f5c", borderRadius: 8, padding: "8px 10px", color: "#f5eddc", fontSize: 13, textAlign: "center" }}
+      />
+      {error && <p style={{ color: "#ff3860", fontSize: 11, margin: 0 }}>{error}</p>}
+      <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+        <Btn small onClick={save} disabled={saving}>{saving ? "Saving..." : "Save"}</Btn>
+        <button
+          onClick={() => setEditing(false)} disabled={saving}
+          style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, color: "#a68fd6", fontSize: 12, padding: "6px 14px", cursor: "pointer" }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ─── Stereo Types — player view (Phase 2-6) ───
 // By the time this mounts, StereoTypesIdentityPicker.jsx (see
@@ -85,6 +157,9 @@ export default function StereoTypesPlayerPanels({ gameId, player, players }) {
       <Card style={{ borderColor: "#f4c430", textAlign: "center" }}>
         <div style={{ marginBottom: 12 }}>
           <Boombox color={player?.color} stickerId={player?.equippedSticker} label={player?.name} size={160} />
+        </div>
+        <div style={{ marginBottom: nowPlaying?.isPlaying && nowPlaying?.trackName ? 10 : 0 }}>
+          <DisplayNameEditor player={player} />
         </div>
         {nowPlaying?.isPlaying && nowPlaying?.trackName && (
           <p style={{ color: "#f4c430", fontSize: 12, margin: 0, fontWeight: 700 }}>

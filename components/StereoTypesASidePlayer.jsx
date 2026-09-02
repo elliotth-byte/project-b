@@ -4,6 +4,7 @@ import {
   subscribeASideRound, submitASideRanking, submitASideGuesses,
   maybeAdvanceASideToReveal, maybeScoreASide, persistASideRoundScores,
 } from "../lib/stereoTypesASide";
+import { getSuperlativeAttributions } from "../lib/stereoTypesSuperlatives";
 import StereoTypesASideResults from "./StereoTypesASideResults";
 
 function nameFor(players, id) {
@@ -57,6 +58,17 @@ export default function StereoTypesASidePlayer({ gameId, player, players }) {
   const [assignments, setAssignments] = useState({});
   const [pumpedLabel, setPumpedLabel] = useState(null);
   const [busy, setBusy] = useState(false);
+  // Text -> submitter name, for approved player-submitted superlatives
+  // only (see lib/stereoTypesSuperlatives.js's getSuperlativeAttributions)
+  // — fetched once on mount rather than threaded down as a prop, since
+  // it's a display-only lookup with no bearing on any of this
+  // component's actual game logic. {} (not null) before it loads, so
+  // every lookup below just misses harmlessly until it's ready.
+  const [attributions, setAttributions] = useState({});
+
+  useEffect(() => {
+    getSuperlativeAttributions().then(setAttributions);
+  }, []);
 
   useEffect(() => {
     if (!gameId) return;
@@ -198,6 +210,11 @@ export default function StereoTypesASidePlayer({ gameId, player, players }) {
         <Card>
           <div style={{ fontSize: 11, color: "#c9b98a", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Your superlative</div>
           <p style={{ color: "#f4c430", fontWeight: 700, fontSize: 15, marginTop: 0, marginBottom: 4 }}>{mySuperlative}</p>
+          {attributions[mySuperlative] && (
+            <p style={{ color: "#6b6558", fontSize: 11, fontStyle: "italic", margin: "0 0 4px" }}>
+              Submitted by {attributions[mySuperlative]}
+            </p>
+          )}
           <p style={{ color: "#6b6558", fontSize: 12, marginBottom: 12 }}>
             Rank every player, including yourself, from MOST to LEAST this applies. Nobody sees whose list is whose until everyone's in.
           </p>
@@ -229,7 +246,12 @@ export default function StereoTypesASidePlayer({ gameId, player, players }) {
               return (
                 <div key={label} style={{ background: "#0a0e18", borderRadius: 8, padding: 10, border: isMine ? "1px solid #f4c430" : "none" }}>
                   <div style={{ color: "#c9b98a", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
-                  <div style={{ color: "#f4c430", fontWeight: 700, fontSize: 13, margin: "2px 0 6px" }}>{superlative}</div>
+                  <div style={{ color: "#f4c430", fontWeight: 700, fontSize: 13, margin: "2px 0 2px" }}>{superlative}</div>
+                  {attributions[superlative] && (
+                    <div style={{ color: "#6b6558", fontSize: 10.5, fontStyle: "italic", margin: "0 0 6px" }}>
+                      Submitted by {attributions[superlative]}
+                    </div>
+                  )}
                   <ol style={{ margin: "0 0 8px", paddingLeft: 18, color: "#f5eddc", fontSize: 12 }}>
                     {rankedOrder.map((pid) => <li key={pid}>{nameFor(players, pid)}</li>)}
                   </ol>

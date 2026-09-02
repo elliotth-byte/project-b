@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { Card } from "./ui";
+import { getSuperlativeAttributions } from "../lib/stereoTypesSuperlatives";
 
 // ─── Stereo Types — A Side results (shared by host + player) ───
 // Only ever rendered once round.status === "scored", i.e. once
@@ -20,6 +22,15 @@ function nameFor(players, id) {
 
 export default function StereoTypesASideResults({ round, players, myPlayerId }) {
   const result = round?.result;
+  // Fetched here too (rather than passed down from
+  // StereoTypesASidePlayer.jsx's own copy) since StereoTypesASideHost.jsx
+  // mounts this same component with no equivalent player-side fetch of
+  // its own — see lib/stereoTypesSuperlatives.js's
+  // getSuperlativeAttributions for what this actually is.
+  const [attributions, setAttributions] = useState({});
+  useEffect(() => {
+    getSuperlativeAttributions().then(setAttributions);
+  }, []);
   if (!result) return null;
 
   const anonMap = round.anonMap || {};
@@ -56,7 +67,12 @@ export default function StereoTypesASideResults({ round, players, myPlayerId }) 
             <div style={{ fontSize: 11, color: "#c9b98a", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
               {label} — really <span style={{ color: "#f4c430" }}>{nameFor(players, ownerId)}</span>
             </div>
-            <div style={{ color: "#f5eddc", fontWeight: 700, marginBottom: 8, fontSize: 13 }}>{superlative}</div>
+            <div style={{ color: "#f5eddc", fontWeight: 700, marginBottom: 4, fontSize: 13 }}>{superlative}</div>
+            {attributions[superlative] && (
+              <div style={{ color: "#6b6558", fontSize: 11, fontStyle: "italic", marginBottom: 8 }}>
+                Submitted by {attributions[superlative]}
+              </div>
+            )}
             <ol style={{ margin: "0 0 8px", paddingLeft: 20, color: "#f5eddc", fontSize: 13 }}>
               {order.map((pid) => (
                 <li key={pid}>{nameFor(players, pid)}{pid === ownerId ? " (self)" : ""}</li>

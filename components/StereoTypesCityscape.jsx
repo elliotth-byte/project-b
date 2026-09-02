@@ -44,6 +44,46 @@ const WIN_PAD = 8;
 const WIN_PITCH_X = 14;
 const WIN_PITCH_Y = 18;
 
+// A different fixed seed than the skyline's own SEED — deliberately, so
+// star placement doesn't accidentally correlate with window placement
+// (e.g. every building happening to line up with a gap in the stars).
+// Same mulberry32 determinism reasoning as buildSkyline above: fixed
+// seed avoids an SSR/client hydration mismatch a real Math.random()
+// would cause.
+const STAR_SEED = 40404;
+const STAR_COUNT = 140;
+const STAR_COLORS = ["#ffffff", "#dfe8ff", "#fff6d8"];
+
+// Stars only ever occupy the upper ~78% of the canvas — leaving a clear
+// band just above the tallest buildings keeps the skyline's own
+// silhouette reading as the clear foreground rather than stars peeking
+// out between windows. Scattered across a canvas exactly as wide as the
+// scrolling track's own single skyline copy (totalWidth) so the starfield
+// tiles seamlessly the same way the two skyline copies do — it's
+// rendered ONCE and reused directly as CSS background-position-repeated
+// art rather than duplicated like the skyline SVGs, since (unlike the
+// skyline) the sky is intentionally static, not scrolling: real night
+// skies don't visibly drift the way a foreground skyline does at this
+// scale, so stars stay put while the city moves past them — a small
+// parallax-like touch for free.
+function buildStars(seed, count, width, height) {
+  const rand = mulberry32(seed);
+  const stars = [];
+  for (let i = 0; i < count; i++) {
+    stars.push({
+      x: rand() * width,
+      y: rand() * height * 0.78,
+      r: 0.6 + rand() * 1.3,
+      color: STAR_COLORS[Math.floor(rand() * STAR_COLORS.length)],
+      // Twinkle timing offset, same "out of phase with its neighbors"
+      // trick the skyline's own lit windows use (see `phase` above).
+      phase: rand(),
+      duration: 2.2 + rand() * 2.6,
+    });
+  }
+  return stars;
+}
+
 // count buildings, each with a random width/height (a real varied
 // silhouette, not a flat row) and its own deterministic window grid.
 export function buildSkyline(seed = SEED, count = BUILDING_COUNT, maxHeight = 200) {
@@ -133,6 +173,11 @@ export default function StereoTypesCityscape({ height = 200, fullscreen = false,
 
   const effectiveHeight = fullscreen ? viewportHeight : height;
   const { buildings, totalWidth } = useMemo(() => buildSkyline(SEED, BUILDING_COUNT, effectiveHeight), [effectiveHeight]);
+  // One skyline-copy's worth of stars, tiled by repeating the same
+  // background image every totalWidth px (see the style block below) —
+  // matches the scrolling track's own two-copies-of-totalWidth loop
+  // exactly, so the starfield's seam lines up with the skyline's own.
+  const stars = useMemo(() => buildStars(STAR_SEED, STAR_COUNT, totalWidth, effectiveHeight), [totalWidth, effectiveHeight]);
 
   const clampedIntensity = Math.max(0, Math.min(1, intensity));
   // Ambient default is 80s either way. Reactive mode ramps that down
@@ -164,6 +209,22 @@ export default function StereoTypesCityscape({ height = 200, fullscreen = false,
   const pulseScale = Math.max(1.08, 1 + clampedIntensity * 0.4);
   const pulseSeconds = Math.max(0.6, 1.6 - clampedIntensity * 1.0);
 
+  const starsLayer = (copyKey) => (
+    <svg key={copyKey} width={totalWidth} height={effectiveHeight} viewBox={`0 0 ${totalWidth} ${effectiveHeight}`} style={{ display: "block", flexShrink: 0 }}>
+      {stars.map((s, i) => (
+        <circle
+          key={i}
+          cx={s.x}
+          cy={s.y}
+          r={s.r}
+          fill={s.color}
+          className="stereo-star"
+          style={{ animationDuration: `${s.duration.toFixed(2)}s`, animationDelay: `${(s.phase * s.duration).toFixed(2)}s` }}
+        />
+      ))}
+    </svg>
+  );
+
   const skyline = (copyKey) => (
     <svg key={copyKey} width={totalWidth} height={effectiveHeight} viewBox={`0 0 ${totalWidth} ${effectiveHeight}`} style={{ display: "block", flexShrink: 0 }}>
       {buildings.map((b, i) => {
@@ -193,6 +254,20 @@ export default function StereoTypesCityscape({ height = 200, fullscreen = false,
 
   return (
     <div style={{ position: "relative", width: "100%", height: effectiveHeight, overflow: "hidden", background: `linear-gradient(180deg, ${SKY_TOP} 0%, ${SKY_BOTTOM} 100%)` }}>
+      {/* Static starfield, sat behind the scrolling skyline and never
+          itself animated — real stars don't visibly drift alongside a
+          foreground skyline at this scale, so leaving them put (while
+          the city scrolls past) reads as a real depth cue for free
+          instead of just "more scrolling stuff." Same two-copies-of-
+          totalWidth tiling as the skyline below so its own seam lines
+          up cleanly, but position: absolute + no scroll animation, and
+          explicit z-index on the skyline track below to guarantee the
+          buildings paint on top regardless of DOM/positioning order. */}
+      <div style={{ position: "absolute", inset: 0, display: "flex", width: totalWidth * 2, height: effectiveHeight }}>
+        {starsLayer("stars-a")}
+        {starsLayer("stars-b")}
+      </div>
+
       {/* Rendered twice, side by side, in a track exactly double the
           artwork's own width — animating that track to -50% (half of
           ITS width, i.e. exactly one skyline-width) is what makes the
@@ -201,6 +276,8 @@ export default function StereoTypesCityscape({ height = 200, fullscreen = false,
       <div
         className="stereo-cityscape-track"
         style={{
+          position: "relative",
+          zIndex: 1,
           display: "flex",
           width: totalWidth * 2,
           height: effectiveHeight,
@@ -234,6 +311,15 @@ export default function StereoTypesCityscape({ height = 200, fullscreen = false,
         @keyframes stereo-window-pulse {
           0%, 100% { opacity: 1; transform: scale(1); }
           50% { opacity: var(--stereo-pulse-min-opacity, 0.4); transform: scale(var(--stereo-pulse-scale, 1.15)); }
+        }
+        .stereo-star {
+          animation-name: stereo-star-twinkle;
+          animation-timing-function: ease-in-out;
+          animation-iteration-count: infinite;
+        }
+        @keyframes stereo-star-twinkle {
+          0%, 100% { opacity: 0.35; }
+          50% { opacity: 1; }
         }
       `}</style>
     </div>
