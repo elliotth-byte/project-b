@@ -267,11 +267,22 @@ export default function LabyrinthPlayer({ gameId, round, challenge, player }) {
           const isPlayer = pos.r === r && pos.c === c;
           const isMinotaur = minotaurPos.r === r && minotaurPos.c === c;
           const isOlive = !wall && !(r === 1 && c === 1) && !collected.has(`${r},${c}`) && !isPlayer;
-          const bg = wall ? "#3d1f5c" : isPlayer ? "#ff2d95" : isMinotaur ? "#ff3860" : "#0d0618";
+          // Visited floor (any non-wall cell whose olive is already
+          // collected, or the start cell) gets a faint trail tint —
+          // "where you've walked" — instead of looking identical to
+          // unexplored floor.
+          const visited = !wall && (collected.has(`${r},${c}`) || (r === 1 && c === 1));
+          let bg = "#0d0618";
+          if (wall) bg = "linear-gradient(160deg, #4a2a72, #241340)"; // stone-block gradient instead of a flat fill
+          else if (isPlayer) bg = "radial-gradient(circle at 35% 30%, #ff8ac8, #ff2d95)";
+          else if (isMinotaur) bg = "radial-gradient(circle at 35% 30%, #ff8080, #ff3860)";
+          else if (visited) bg = "rgba(0,255,157,0.06)";
           return (
             <div key={`${r}-${c}`} style={{
               width: cell, height: cell, background: bg, boxSizing: "border-box",
-              fontSize: Math.min(cell, 16), lineHeight: `${cell}px`, border: "1px solid rgba(255,255,255,0.03)",
+              fontSize: Math.min(cell, 16), lineHeight: `${cell}px`,
+              border: wall ? "1px solid rgba(0,0,0,0.3)" : "1px solid rgba(255,255,255,0.03)",
+              boxShadow: wall ? "inset 1px 1px 0 rgba(255,255,255,0.08)" : "none",
             }}>
               {isPlayer ? "🧍" : isMinotaur ? "🐂" : isOlive ? "🫒" : ""}
             </div>
