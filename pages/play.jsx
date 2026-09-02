@@ -18,6 +18,7 @@ import ConfessionalPlayer from "../components/ConfessionalPlayer";
 import MusicPlayer from "../components/MusicPlayer";
 import TraitorsMusicPlayer from "../components/TraitorsMusicPlayer";
 import TraitorsPlayerPanels from "../components/TraitorsPlayerPanels";
+import StereoTypesPlayerPanels from "../components/StereoTypesPlayerPanels";
 import HelpPanel from "../components/HelpPanel";
 import FinalWordsPrompt from "../components/FinalWordsPrompt";
 import { hasResolvedFinalWords } from "../lib/finalWords";
@@ -110,6 +111,10 @@ export default function PlayPage() {
   // isTraitors just reads false for that one render until the fetch
   // below resolves, same effect as host.jsx's identical situation.
   const isTraitors = gameInfo?.game_type === "traitors";
+  // Stereo Types has no round-phase engine either (same reasoning as
+  // Traitors) — its own rounds (A Side/The Remix/On Blast) each get
+  // their own state shape in later phases, not lib/roundEngine.js's.
+  const isStereoTypes = gameInfo?.game_type === "stereo_types";
   const theme = themeFor(gameInfo?.game_type);
   const pageStyle = { minHeight: "100vh", background: theme.pageBg, color: theme.text, fontFamily: theme.font, padding: 24 };
   // Only used by the "no gameId at all" fallback screen further down —
@@ -118,7 +123,7 @@ export default function PlayPage() {
   // and doesn't exist yet at this point — there's no game to theme by
   // until a gameId shows up in the URL).
   const { theme: siteTheme } = useSiteTheme();
-  useRoundWatcher(gameId, { enabled: !isTraitors });
+  useRoundWatcher(gameId, { enabled: !isTraitors && !isStereoTypes });
 
   // Hooks must run unconditionally, before any early returns below — this
   // is intentionally called this early (using the raw state directly,
@@ -493,13 +498,16 @@ export default function PlayPage() {
   const needsFinalWords = exiled && !quitByChoice && !removedForInactivity && myPlayer.eliminationRound != null && !finalWordsResolved;
   const approved = joined && !!myPlayer?.approved;
   const gameEnded = round?.phase === PHASES.ENDED;
-  const needsIdentity = !isTraitors && joined && myPlayer && !identityComplete(myPlayer, settings);
+  // Stereo Types has its own identity step too (boombox color, once
+  // that lands) — same "not Project B's color+alias onboarding" carve-
+  // out Traitors already gets.
+  const needsIdentity = !isTraitors && !isStereoTypes && joined && myPlayer && !identityComplete(myPlayer, settings);
   // Shown once, right after identity is picked and before the "waiting
   // for host approval" screen — see components/OnboardingPreferences.jsx
   // for the full reasoning. Gated off once approved (an approved player
   // never needs to see this again, even if they somehow never completed
   // it — better to let them into the game than trap them here).
-  const needsOnboardingPrefs = !isTraitors && joined && myPlayer && !needsIdentity && !approved && !myPlayer.gamePrefs?.onboardingComplete;
+  const needsOnboardingPrefs = !isTraitors && !isStereoTypes && joined && myPlayer && !needsIdentity && !approved && !myPlayer.gamePrefs?.onboardingComplete;
   // Traitors' own, much lighter identity step — a free-text alias only,
   // no color, no fixed god-name list, no onboarding-prefs step (see
   // traitorsIdentityComplete's own comment for why this is separate from
@@ -653,7 +661,7 @@ export default function PlayPage() {
           </ChallengeErrorBoundary>
         )}
 
-        {!isTraitors && approved && !needsIdentity && playerName && !pendingReveal && (
+        {!isTraitors && !isStereoTypes && approved && !needsIdentity && playerName && !pendingReveal && (
           <>
             <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #3d1f5c" }}>
               {visibleTabs.map((t) => (
@@ -856,9 +864,17 @@ export default function PlayPage() {
             </ChallengeErrorBoundary>
           </>
         )}
+
+        {isStereoTypes && approved && playerName && (
+          <ChallengeErrorBoundary label="Stereo Types">
+            <StereoTypesPlayerPanels gameId={gameId} player={{ id: myPlayer.id, name: playerName }} />
+          </ChallengeErrorBoundary>
+        )}
       </div>
       {approved && isTraitors && <TraitorsMusicPlayer gameId={gameId} isHost={false} />}
-      {approved && !isTraitors && <MusicPlayer gameId={gameId} isHost={false} portalTarget={radioPortalNode} />}
+      {approved && !isTraitors && !isStereoTypes && <MusicPlayer gameId={gameId} isHost={false} portalTarget={radioPortalNode} />}
+      {/* No Stereo Types music player yet — its Spotify embed lands in
+          Phase 4. */}
       {showNavTour && (
         <NavTourOverlay
           visibleTabKeys={visibleTabs.map((t) => t.key)}

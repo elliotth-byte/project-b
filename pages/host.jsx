@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabaseClient";
 import { signInHost, signOut, isHost } from "../lib/auth";
 import HostPanels from "../components/HostPanels";
 import TraitorsHostPanels from "../components/TraitorsHostPanels";
+import StereoTypesHostPanels from "../components/StereoTypesHostPanels";
 import GameAccessPanel from "../components/GameAccessPanel";
 import UpdateBanner from "../components/UpdateBanner";
 import MusicPlayer from "../components/MusicPlayer";
@@ -47,7 +48,7 @@ export default function HostPage() {
   // below, can gate on game_type — see that hook's own comment on why
   // a traitors season needs enabled: false.
   const game = useMemo(() => games?.find((g) => g.id === activeGameId) || null, [games, activeGameId]);
-  useRoundWatcher(activeGameId, { enabled: game?.game_type !== "traitors" });
+  useRoundWatcher(activeGameId, { enabled: game?.game_type === "project_b" });
   // Drives every color/font reference below — see lib/uiTheme.js. No
   // active season yet (login, "no active season") just gets Project
   // B's own palette, same as always.
@@ -314,7 +315,7 @@ export default function HostPage() {
     const { data: code } = await supabase.rpc("generate_join_code");
     const { data: created, error } = await supabase
       .from("games")
-      .insert({ name: name || (type === "traitors" ? "The Traitors" : "Panopticon"), subtitle: subtitle || null, host_id: user.id, join_code: code, game_type: type })
+      .insert({ name: name || (type === "traitors" ? "The Traitors" : type === "stereo_types" ? "Stereo Types" : "Panopticon"), subtitle: subtitle || null, host_id: user.id, join_code: code, game_type: type })
       .select()
       .single();
     if (error) { setError(error.message); return null; }
@@ -432,7 +433,7 @@ export default function HostPage() {
                   }}
                   title={g.subtitle || undefined}
                 >
-                  {g.game_type === "traitors" ? "🏰" : "🃏"} {g.name}
+                  {g.game_type === "traitors" ? "🏰" : g.game_type === "stereo_types" ? "📻" : "🃏"} {g.name}
                   {g.subtitle && (
                     <span style={{ fontWeight: 400, opacity: 0.8 }}> — {g.subtitle}</span>
                   )}
@@ -501,6 +502,7 @@ export default function HostPage() {
               {[
                 { value: "project_b", label: "🃏 Panopticon", desc: "Challenge → Fates → Exile" },
                 { value: "traitors", label: "🏰 Traitors", desc: "Roundtable & Murder Vote" },
+                { value: "stereo_types", label: "📻 Stereo Types", desc: "A Side → The Remix → On Blast" },
               ].map((opt) => {
                 const optTheme = themeFor(opt.value);
                 const selected = newGameType === opt.value;
@@ -598,7 +600,7 @@ export default function HostPage() {
             }
           />
         )}
-        {game && game.game_type !== "traitors" && (
+        {game && game.game_type === "project_b" && (
           <HostPanels
             key={game.id}
             gameId={game.id}
@@ -630,9 +632,35 @@ export default function HostPage() {
             }
           />
         )}
+        {game && game.game_type === "stereo_types" && (
+          <StereoTypesHostPanels
+            key={game.id}
+            gameId={game.id}
+            players={players}
+            adminExtra={
+              <GameAccessPanel
+                game={game}
+                players={players}
+                isPrimaryHost={isPrimaryHost}
+                origin={origin}
+                userId={user?.id}
+                coHosts={coHosts}
+                inviteEmail={inviteEmail}
+                setInviteEmail={setInviteEmail}
+                inviteStatus={inviteStatus}
+                inviteCoHost={inviteCoHost}
+                removeCoHost={removeCoHost}
+              />
+            }
+          />
+        )}
       </div>
       {game && game.game_type === "traitors" && <TraitorsMusicPlayer key={`music-${game.id}`} gameId={game.id} isHost={true} />}
-      {game && game.game_type !== "traitors" && <MusicPlayer key={`music-${game.id}`} gameId={game.id} isHost={true} portalTarget={radioPortalNode} />}
+      {game && game.game_type === "project_b" && <MusicPlayer key={`music-${game.id}`} gameId={game.id} isHost={true} portalTarget={radioPortalNode} />}
+      {/* No Stereo Types music player yet — its Spotify embed lands in
+          Phase 4 (see this repo's own session notes on the build order);
+          the built-in Tone.js engine above is specifically Project B's
+          own radio, not something Stereo Types reuses. */}
       <p style={{ fontSize: 10, color: theme.border, textAlign: "center", margin: "16px 0 0" }}>
         Version {process.env.NEXT_PUBLIC_APP_VERSION || "dev"}
       </p>
