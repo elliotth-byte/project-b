@@ -132,16 +132,31 @@ export default function RedLightGreenLightPlayer({ gameId, challenge, round, pla
         <Badge color={lives <= 1 ? "#ff3860" : "#ff2d95"}>{"❤️".repeat(lives)} · {score}/{TARGET_SCORE}</Badge>
       </div>
 
+      {/* A real traffic-light housing (three stacked lamps) instead of
+          one circle that swaps color — only the lamp matching the
+          current state is lit; the other two stay dim, same as an
+          actual signal. */}
       <div style={{
-        margin: "0 auto 16px", width: 90, height: 90, borderRadius: "50%",
-        background: isWarning ? "#ffd700" : isGreen ? "#00ff9d" : "#ff3860",
-        boxShadow: `0 0 30px ${isWarning ? "#ffd700" : isGreen ? "#00ff9d" : "#ff3860"}`,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 13, fontWeight: 900, color: "#05010f", fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
-        transition: "background 0.15s",
+        margin: "0 auto 16px", width: 60, padding: "10px 0", borderRadius: 14,
+        background: "linear-gradient(160deg, #1c1230, #0a0614)", border: "2px solid #3d1f5c",
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
       }}>
-        {isWarning ? "GET READY" : isGreen ? "GO" : "STOP"}
+        {[
+          { color: "#ff3860", on: !isGreen && !isWarning },
+          { color: "#ffd700", on: isWarning },
+          { color: "#00ff9d", on: isGreen && !isWarning },
+        ].map((lamp, i) => (
+          <div key={i} style={{
+            width: 34, height: 34, borderRadius: "50%",
+            background: lamp.on ? lamp.color : `${lamp.color}22`,
+            boxShadow: lamp.on ? `0 0 18px ${lamp.color}` : "inset 0 2px 3px rgba(0,0,0,0.5)",
+            transition: "background 0.15s, box-shadow 0.15s",
+          }} />
+        ))}
       </div>
+      <p style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 900, color: isWarning ? "#ffd700" : isGreen ? "#00ff9d" : "#ff3860", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
+        {isWarning ? "GET READY" : isGreen ? "GO" : "STOP"}
+      </p>
 
       <button
         onClick={tap}
