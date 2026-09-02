@@ -20,7 +20,7 @@ import StereoTypesLogo from "./StereoTypesLogo";
 // without touching the column itself (which every other Stereo Types
 // panel still wants to keep, for the roster/admin controls that scroll
 // in below this).
-export default function StereoTypesTitleScreen({ roomCode, playerCount, fullscreen = false }) {
+export default function StereoTypesTitleScreen({ roomCode, playerCount, fullscreen = false, reactive = false, intensity = 0 }) {
   const hasFooter = !!roomCode || playerCount != null;
 
   return (
@@ -31,7 +31,7 @@ export default function StereoTypesTitleScreen({ roomCode, playerCount, fullscre
           : { position: "relative", borderRadius: 12, overflow: "hidden", marginBottom: 4 }
       }
     >
-      <StereoTypesCityscape height={200} fullscreen={fullscreen} />
+      <StereoTypesCityscape height={200} fullscreen={fullscreen} reactive={reactive} intensity={intensity} />
       <div
         style={{
           position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",

@@ -62,6 +62,12 @@ export function buildSkyline(seed = SEED, count = BUILDING_COUNT, maxHeight = 20
           y: WIN_PAD + r * WIN_PITCH_Y,
           lit,
           color: lit ? YELLOWS[Math.floor(rand() * YELLOWS.length)] : null,
+          // Only meaningful for lit windows — a deterministic 0-1 draw
+          // used as this window's own animation-delay offset when
+          // reactive mode pulses the skyline, so every lit window
+          // twinkles slightly out of phase with its neighbors instead
+          // of the whole city flashing in lockstep.
+          phase: lit ? rand() : 0,
         });
       }
     }
@@ -71,12 +77,19 @@ export function buildSkyline(seed = SEED, count = BUILDING_COUNT, maxHeight = 20
   return { buildings, totalWidth: x };
 }
 
-// reactive/intensity: accepted but not implemented yet — Phase 4 will
-// use intensity (0-1) to brighten/pulse lit windows in sync with music,
-// and reactive to swap the slow ambient auto-scroll below for that
-// beat-driven behavior instead. Keeping both in the signature now means
-// Phase 4 only has to change what's INSIDE this component, not any of
-// its call sites.
+// reactive/intensity: driven by whatever's actually playing on the
+// host's Spotify (StereoTypesSpotifyWidget.jsx broadcasts it, either
+// straight to the host's own title screen or via the
+// stereo_types:now-playing game_state key for every other player).
+// reactive=true speeds the ambient auto-scroll up and starts the lit
+// windows pulsing; intensity (0-1) controls how far both of those go.
+//
+// This is deliberately isPlaying-only, not tempo/energy-driven: Spotify
+// gates real per-track audio data (the /v1/audio-features endpoint)
+// behind extended API access that a newly created app can't be assumed
+// to have (see StereoTypesSpotifyWidget.jsx's own comment on this), so
+// intensity here is just "is music playing right now," not "how
+// energetic is this specific song." Honest baseline over a guess.
 //
 // fullscreen: ignores `height` and measures the real viewport instead
 // (window.innerHeight, kept live via a resize listener) — "make the
@@ -99,6 +112,19 @@ export default function StereoTypesCityscape({ height = 200, fullscreen = false,
   const effectiveHeight = fullscreen ? viewportHeight : height;
   const { buildings, totalWidth } = useMemo(() => buildSkyline(SEED, BUILDING_COUNT, effectiveHeight), [effectiveHeight]);
 
+  const clampedIntensity = Math.max(0, Math.min(1, intensity));
+  // Ambient default is 80s either way. Reactive mode ramps that down
+  // as intensity climbs — 50s at intensity 0 (still visibly livelier
+  // than pure ambient, since reactive=true already implies "something
+  // is playing") down to 18s at full intensity, floored so it never
+  // scrolls fast enough to look broken rather than lively.
+  const scrollSeconds = reactive ? Math.max(18, 50 - clampedIntensity * 32) : 80;
+  // How far lit windows dim on each pulse, and how fast — both scale
+  // with intensity. Only ever applied when reactive; non-reactive
+  // windows stay exactly as before (opacity 1, no animation at all).
+  const pulseMinOpacity = Math.max(0.15, 0.55 - clampedIntensity * 0.4);
+  const pulseSeconds = Math.max(0.6, 1.6 - clampedIntensity * 1.0);
+
   const skyline = (copyKey) => (
     <svg key={copyKey} width={totalWidth} height={effectiveHeight} viewBox={`0 0 ${totalWidth} ${effectiveHeight}`} style={{ display: "block", flexShrink: 0 }}>
       {buildings.map((b, i) => {
@@ -106,7 +132,20 @@ export default function StereoTypesCityscape({ height = 200, fullscreen = false,
         return (
           <g key={i} transform={`translate(${b.x}, ${by})`}>
             <rect width={b.width} height={b.height} fill={BUILDING_FILL} />
-            {b.windows.map((w, wi) => (w.lit ? <rect key={wi} x={w.x} y={w.y} width={WIN_W} height={WIN_H} fill={w.color} /> : null))}
+            {b.windows.map((w, wi) =>
+              w.lit ? (
+                <rect
+                  key={wi}
+                  x={w.x}
+                  y={w.y}
+                  width={WIN_W}
+                  height={WIN_H}
+                  fill={w.color}
+                  className={reactive ? "stereo-window" : undefined}
+                  style={reactive ? { animationDelay: `${(w.phase * pulseSeconds).toFixed(2)}s` } : undefined}
+                />
+              ) : null
+            )}
           </g>
         );
       })}
@@ -120,17 +159,34 @@ export default function StereoTypesCityscape({ height = 200, fullscreen = false,
           ITS width, i.e. exactly one skyline-width) is what makes the
           loop seamless: by the time copy A has scrolled fully off,
           copy B is sitting in exactly the position A started in. */}
-      <div className="stereo-cityscape-track" style={{ display: "flex", width: totalWidth * 2, height: effectiveHeight }}>
+      <div
+        className="stereo-cityscape-track"
+        style={{
+          display: "flex",
+          width: totalWidth * 2,
+          height: effectiveHeight,
+          "--stereo-scroll-seconds": `${scrollSeconds}s`,
+          "--stereo-pulse-seconds": `${pulseSeconds}s`,
+          "--stereo-pulse-min-opacity": pulseMinOpacity,
+        }}
+      >
         {skyline("a")}
         {skyline("b")}
       </div>
       <style jsx>{`
         .stereo-cityscape-track {
-          animation: stereo-cityscape-scroll 80s linear infinite;
+          animation: stereo-cityscape-scroll var(--stereo-scroll-seconds, 80s) linear infinite;
         }
         @keyframes stereo-cityscape-scroll {
           from { transform: translateX(0); }
           to { transform: translateX(-50%); }
+        }
+        .stereo-window {
+          animation: stereo-window-pulse var(--stereo-pulse-seconds, 1.2s) ease-in-out infinite;
+        }
+        @keyframes stereo-window-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: var(--stereo-pulse-min-opacity, 0.4); }
         }
       `}</style>
     </div>
