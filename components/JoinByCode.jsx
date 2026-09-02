@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 import LogoutButton from "./LogoutButton";
-import { SITE_THEME } from "../lib/siteTheme";
+import { useSiteTheme } from "../lib/siteTheme";
 
 // Looks up a game's short code (4 letters, e.g. "FXQR" — see
 // sql/generate_join_code's own comment) and redirects to the real
@@ -19,6 +19,12 @@ export default function JoinByCode() {
   const { code } = router.query;
   const [error, setError] = useState("");
   const [preview, setPreview] = useState(null);
+  const { theme } = useSiteTheme();
+  const pageStyle = {
+    minHeight: "100vh", background: theme.pageBg, color: theme.text,
+    fontFamily: theme.font, display: "flex",
+    alignItems: "center", justifyContent: "center", padding: 24,
+  };
 
   useEffect(() => {
     if (!code) return;
@@ -40,24 +46,18 @@ export default function JoinByCode() {
 
   return (
     <div style={pageStyle}>
-      <div style={{ position: "absolute", top: 20, right: 24 }}><LogoutButton theme={SITE_THEME} /></div>
+      <div style={{ position: "absolute", top: 20, right: 24 }}><LogoutButton theme={theme} /></div>
       <div style={{ textAlign: "center", maxWidth: 320 }}>
         {preview && !error && (
           <>
-            <div style={{ fontFamily: SITE_THEME.font, fontSize: 18, fontWeight: 700, marginBottom: 2 }}>{preview.name}</div>
-            {preview.subtitle && <div style={{ color: SITE_THEME.textMuted, fontSize: 12.5, fontStyle: "italic", marginBottom: 10 }}>{preview.subtitle}</div>}
+            <div style={{ fontFamily: theme.font, fontSize: 18, fontWeight: 700, marginBottom: 2 }}>{preview.name}</div>
+            {preview.subtitle && <div style={{ color: theme.textMuted, fontSize: 12.5, fontStyle: "italic", marginBottom: 10 }}>{preview.subtitle}</div>}
           </>
         )}
-        <p style={{ color: error ? SITE_THEME.danger : SITE_THEME.textMuted, fontSize: 14 }}>
+        <p style={{ color: error ? theme.danger : theme.textMuted, fontSize: 14 }}>
           {error || "Finding your game..."}
         </p>
       </div>
     </div>
   );
 }
-
-const pageStyle = {
-  minHeight: "100vh", background: SITE_THEME.pageBg, color: SITE_THEME.text,
-  fontFamily: SITE_THEME.font, display: "flex",
-  alignItems: "center", justifyContent: "center", padding: 24,
-};

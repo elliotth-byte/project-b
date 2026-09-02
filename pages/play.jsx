@@ -58,7 +58,7 @@ import { useHasUnreadChat } from "../lib/useChatUnread";
 import { useNeedsAction } from "../lib/useNeedsAction";
 import { useRoundWatcher } from "../lib/useRoundWatcher";
 import { themeFor } from "../lib/uiTheme";
-import { SITE_THEME } from "../lib/siteTheme";
+import { useSiteTheme } from "../lib/siteTheme";
 
 // Flavor text for a traitors-type season's elimination banner — mirrors
 // the standalone Traitors app's own copy (see its pages/play.jsx); a
@@ -112,6 +112,12 @@ export default function PlayPage() {
   const isTraitors = gameInfo?.game_type === "traitors";
   const theme = themeFor(gameInfo?.game_type);
   const pageStyle = { minHeight: "100vh", background: theme.pageBg, color: theme.text, fontFamily: theme.font, padding: 24 };
+  // Only used by the "no gameId at all" fallback screen further down —
+  // this is the platform brand's own day/night theme (see
+  // lib/siteTheme.js), unrelated to `theme` above (which is per-GAME,
+  // and doesn't exist yet at this point — there's no game to theme by
+  // until a gameId shows up in the URL).
+  const { theme: siteTheme } = useSiteTheme();
   useRoundWatcher(gameId, { enabled: !isTraitors });
 
   // Hooks must run unconditionally, before any early returns below — this
@@ -403,11 +409,11 @@ export default function PlayPage() {
       router.push(`/play/${trimmed}`);
     };
     return (
-      <div style={{ ...pageStyle, background: SITE_THEME.pageBg, fontFamily: SITE_THEME.font }}>
-        <div style={{ position: "absolute", top: 20, right: 24 }}><LogoutButton theme={SITE_THEME} /></div>
+      <div style={{ ...pageStyle, background: siteTheme.pageBg, fontFamily: siteTheme.font }}>
+        <div style={{ position: "absolute", top: 20, right: 24 }}><LogoutButton theme={siteTheme} /></div>
         <div style={{ textAlign: "center", maxWidth: 280 }}>
-          <p style={{ color: SITE_THEME.textMuted }}>Ask the host for your join link — it looks like <code>/play?game=...</code>.</p>
-          <p style={{ color: SITE_THEME.textMuted, margin: "12px 0" }}>...or enter your four-letter code:</p>
+          <p style={{ color: siteTheme.textMuted }}>Ask the host for your join link — it looks like <code>/play?game=...</code>.</p>
+          <p style={{ color: siteTheme.textMuted, margin: "12px 0" }}>...or enter your four-letter code:</p>
           <form onSubmit={submitCode} style={{ display: "flex", gap: 8, justifyContent: "center" }}>
             <input
               value={codeInput}
@@ -416,12 +422,12 @@ export default function PlayPage() {
               autoCapitalize="characters"
               style={{
                 width: 100, textAlign: "center", letterSpacing: 4, fontSize: 18, fontWeight: 700,
-                background: SITE_THEME.inputBg, border: `1px solid ${SITE_THEME.border}`, borderRadius: 8,
-                padding: "10px 8px", color: SITE_THEME.text, outline: "none",
+                background: siteTheme.inputBg, border: `1px solid ${siteTheme.border}`, borderRadius: 8,
+                padding: "10px 8px", color: siteTheme.text, outline: "none",
               }}
             />
             <button type="submit" disabled={codeInput.length !== 4} style={{
-              background: SITE_THEME.accentGradient, color: SITE_THEME.accentText, border: "none",
+              background: siteTheme.accentGradient, color: siteTheme.accentText, border: "none",
               borderRadius: 8, padding: "10px 18px", fontSize: 14, fontWeight: 700,
               cursor: codeInput.length === 4 ? "pointer" : "not-allowed", opacity: codeInput.length === 4 ? 1 : 0.5,
             }}>

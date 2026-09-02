@@ -5,7 +5,7 @@ import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 import { signOut, isHost, displayNameFromUser } from "../lib/auth";
 import { checkIsPlatformAdmin } from "../lib/adminModeration";
-import { SITE_THEME, LOGO_SRC } from "../lib/siteTheme";
+import { useSiteTheme } from "../lib/siteTheme";
 
 // ─── Cruel Summer House — the front door ───
 // This used to always show every entry point at once (signup, login,
@@ -18,6 +18,11 @@ import { SITE_THEME, LOGO_SRC } from "../lib/siteTheme";
 // your game-agnostic profile/messages, plus a host console link if
 // you're a host. Which specific SEASON's colors take over from here is
 // still entirely lib/uiTheme.js's job, once you're actually in one.
+//
+// The splash itself now swaps between a "day" and "night" brand look
+// (see lib/siteTheme.js's useSiteTheme) based on the viewer's own local
+// clock — everything past login stays exactly as themed as it always
+// was, this only touches the pre-login/no-game-yet screens.
 export default function Home() {
   const router = useRouter();
   const game = router.query.game;
@@ -31,6 +36,7 @@ export default function Home() {
   // navigation ever links to /admin — a real host who's also a
   // platform admin had no way to find it short of typing the URL.
   const [isAdmin, setIsAdmin] = useState(false);
+  const { theme, logoSrc, logoDimensions } = useSiteTheme();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user || null));
@@ -43,38 +49,61 @@ export default function Home() {
     checkIsPlatformAdmin().then(({ isAdmin: ok }) => setIsAdmin(!!ok));
   }, [user]);
 
+  const pageStyle = {
+    minHeight: "100vh",
+    background: theme.pageBg,
+    color: theme.text,
+    fontFamily: theme.font,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  };
+  const linkBtn = {
+    display: "block",
+    padding: "12px 18px",
+    borderRadius: 10,
+    border: `1px solid ${theme.border}`,
+    background: theme.cardBg,
+    color: theme.text,
+    textDecoration: "none",
+    fontSize: 14,
+    fontWeight: 700,
+    width: "100%",
+  };
+
   return (
     <div style={pageStyle}>
       <div style={{ textAlign: "center", maxWidth: 420, width: "100%" }}>
-        <div style={{ position: "relative", width: 220, height: 275, margin: "0 auto 8px" }}>
-          <Image src={LOGO_SRC} alt="Cruel Summer House" fill style={{ objectFit: "contain" }} priority />
+        <div style={{ position: "relative", width: logoDimensions.width, height: logoDimensions.height, margin: "0 auto 8px" }}>
+          <Image src={logoSrc} alt="Cruel Summer House" fill style={{ objectFit: "contain" }} priority />
         </div>
 
         {user === undefined ? (
-          <p style={{ color: SITE_THEME.textMuted, fontSize: 14, fontStyle: "italic" }}>Loading...</p>
+          <p style={{ color: theme.textMuted, fontSize: 14, fontStyle: "italic" }}>Loading...</p>
         ) : user === null ? (
           <>
-            <p style={{ color: SITE_THEME.textMuted, fontSize: 14, marginBottom: 28, fontStyle: "italic" }}>
+            <p style={{ color: theme.textMuted, fontSize: 14, marginBottom: 28, fontStyle: "italic" }}>
               Be someone. More.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <Link href={withGame("/signup")} style={linkBtn}>👤 New player — Create account</Link>
               <Link href={withGame("/login")} style={linkBtn}>🔑 Returning player — Log in</Link>
-              <Link href="/host" style={{ ...linkBtn, borderColor: SITE_THEME.accent, color: SITE_THEME.accent }}>👑 I'm the Host</Link>
+              <Link href="/host" style={{ ...linkBtn, borderColor: theme.accent, color: theme.accent }}>👑 I'm the Host</Link>
             </div>
           </>
         ) : (
           <>
-            <p style={{ color: SITE_THEME.textMuted, fontSize: 14, marginBottom: 28, fontStyle: "italic" }}>
+            <p style={{ color: theme.textMuted, fontSize: 14, marginBottom: 28, fontStyle: "italic" }}>
               Welcome back, {displayNameFromUser(user)}.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {game && <Link href={`/play?game=${game}`} style={{ ...linkBtn, borderColor: SITE_THEME.accent, color: SITE_THEME.accent }}>▶️ Continue to Game</Link>}
+              {game && <Link href={`/play?game=${game}`} style={{ ...linkBtn, borderColor: theme.accent, color: theme.accent }}>▶️ Continue to Game</Link>}
               <Link href="/profile" style={linkBtn}>🪪 My Profile</Link>
               <Link href="/messages" style={linkBtn}>💬 Messages</Link>
-              {isHost(user) && <Link href="/host" style={{ ...linkBtn, borderColor: SITE_THEME.accent, color: SITE_THEME.accent }}>👑 Host Console</Link>}
+              {isHost(user) && <Link href="/host" style={{ ...linkBtn, borderColor: theme.accent, color: theme.accent }}>👑 Host Console</Link>}
               {isAdmin && <Link href="/admin" style={linkBtn}>🛠 Platform Admin</Link>}
-              <button onClick={signOut} style={{ ...linkBtn, background: "none", cursor: "pointer", color: SITE_THEME.textDim }}>Log out</button>
+              <button onClick={signOut} style={{ ...linkBtn, background: "none", cursor: "pointer", color: theme.textDim }}>Log out</button>
             </div>
           </>
         )}
@@ -82,27 +111,3 @@ export default function Home() {
     </div>
   );
 }
-
-const pageStyle = {
-  minHeight: "100vh",
-  background: SITE_THEME.pageBg,
-  color: SITE_THEME.text,
-  fontFamily: SITE_THEME.font,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: 24,
-};
-
-const linkBtn = {
-  display: "block",
-  padding: "12px 18px",
-  borderRadius: 10,
-  border: `1px solid ${SITE_THEME.border}`,
-  background: SITE_THEME.cardBg,
-  color: SITE_THEME.text,
-  textDecoration: "none",
-  fontSize: 14,
-  fontWeight: 700,
-  width: "100%",
-};
