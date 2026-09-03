@@ -1,6 +1,6 @@
-import { useState } from "react";
 import { Card } from "./ui";
 import { RULES_SECTIONS, battleList } from "../lib/rulesContent";
+import RulesAccordion from "./RulesAccordion";
 
 // ─── Player help ───
 // The full rules, in-app (see lib/rulesContent.js — kept as data
@@ -14,13 +14,27 @@ import { RULES_SECTIONS, battleList } from "../lib/rulesContent";
 // Options tab now (see OptionsPanel.jsx); this tab is purely
 // informational.
 export default function HelpPanel({ player, onReplayTour, readOnly = false }) {
-  const [openSections, setOpenSections] = useState(new Set());
-
-  const toggleSection = (i) => setOpenSections((prev) => {
-    const next = new Set(prev);
-    if (next.has(i)) next.delete(i); else next.add(i);
-    return next;
-  });
+  // The one section (see lib/rulesContent.js's own comment on it) that
+  // needs real markup instead of a plain paragraph — attached here via
+  // renderBody rather than in the data file itself, so rulesContent.js
+  // can stay presentation-agnostic and RulesAccordion.jsx doesn't need
+  // to import battleList/GAME_REGISTRY just to special-case this one
+  // section.
+  const sections = RULES_SECTIONS.map((section) =>
+    section.body !== null ? section : {
+      ...section,
+      renderBody: () => (
+        <div style={{ display: "grid", gap: 10 }}>
+          {battleList().map((g) => (
+            <div key={g.label}>
+              <div style={{ fontSize: 13, color: "#f5f0ff", fontWeight: 700, marginBottom: 2 }}>{g.icon} {g.label}</div>
+              <div style={{ fontSize: 12, color: "#a68fd6", lineHeight: 1.5 }}>{g.blurb}</div>
+            </div>
+          ))}
+        </div>
+      ),
+    }
+  );
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
@@ -28,42 +42,7 @@ export default function HelpPanel({ player, onReplayTour, readOnly = false }) {
         <div style={{ fontSize: 12, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
           📖 Rules
         </div>
-        <div style={{ display: "grid", gap: 6 }}>
-          {RULES_SECTIONS.map((section, i) => {
-            const isOpen = openSections.has(i);
-            const isBattleList = section.body === null;
-            return (
-              <div key={section.title}>
-                <button
-                  onClick={() => toggleSection(i)}
-                  style={{
-                    width: "100%", textAlign: "left", background: isOpen ? "rgba(255,45,149,0.08)" : "#0d0618",
-                    border: `1px solid ${isOpen ? "rgba(255,45,149,0.3)" : "#3d1f5c"}`, borderRadius: 8,
-                    padding: "10px 12px", color: isOpen ? "#ff2d95" : "#f5f0ff", fontSize: 13, fontWeight: 600, cursor: "pointer",
-                  }}
-                >
-                  {isOpen ? "▾" : "▸"} {section.title}
-                </button>
-                {isOpen && (
-                  <div style={{ padding: "10px 4px 4px 12px" }}>
-                    {isBattleList ? (
-                      <div style={{ display: "grid", gap: 10 }}>
-                        {battleList().map((g) => (
-                          <div key={g.label}>
-                            <div style={{ fontSize: 13, color: "#f5f0ff", fontWeight: 700, marginBottom: 2 }}>{g.icon} {g.label}</div>
-                            <div style={{ fontSize: 12, color: "#a68fd6", lineHeight: 1.5 }}>{g.blurb}</div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p style={{ fontSize: 12, color: "#a68fd6", lineHeight: 1.6, margin: 0, whiteSpace: "pre-line" }}>{section.body}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <RulesAccordion sections={sections} />
       </Card>
 
       {player && (

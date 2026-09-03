@@ -1,4 +1,7 @@
+import { useEffect, useState } from "react";
 import { Card } from "./ui";
+import { subscribeStereoTypesReactions, toggleStereoTypesReaction } from "../lib/stereoTypesReactions";
+import StereoTypesReactionBar from "./StereoTypesReactionBar";
 
 // ─── Stereo Types — Round 2 ("The Remix") results (shared by host + player) ───
 // Mirrors StereoTypesASideResults.jsx's own shape almost exactly — see
@@ -18,8 +21,15 @@ function nameFor(players, id) {
   return p?.display_name || "Unknown player";
 }
 
-export default function StereoTypesRemixResults({ round, players, myPlayerId }) {
+export default function StereoTypesRemixResults({ round, players, myPlayerId, gameId }) {
   const result = round?.result;
+  // Same reasoning as StereoTypesASideResults.jsx's own reactions
+  // subscription — one scope for the whole round, sliced per entry.
+  const [reactions, setReactions] = useState({});
+  useEffect(() => {
+    if (!gameId || !round?.round) return;
+    return subscribeStereoTypesReactions(gameId, `remix:${round.round}`, setReactions);
+  }, [gameId, round?.round]);
   if (!result) return null;
 
   const anonMap = round.anonMap || {};
@@ -65,6 +75,13 @@ export default function StereoTypesRemixResults({ round, players, myPlayerId }) 
             <div style={{ fontSize: 11, color: "#6b6558" }}>
               {guessers.length === 0 ? "Nobody guessed this one." : `Correctly guessed by: ${guessers.map((id) => nameFor(players, id)).join(", ")}`}
             </div>
+            {gameId && myPlayerId && (
+              <StereoTypesReactionBar
+                reactions={reactions[label]}
+                myPlayerId={myPlayerId}
+                onToggle={(emoji) => toggleStereoTypesReaction(gameId, `remix:${round.round}`, label, myPlayerId, emoji)}
+              />
+            )}
           </Card>
         );
       })}

@@ -4,7 +4,9 @@ import {
   subscribeRemixRound, submitRemixPick, submitRemixGuesses,
   maybeAdvanceRemixToReveal, maybeScoreRemix, persistRemixRoundScores,
 } from "../lib/stereoTypesRemix";
+import { startOnBlast } from "../lib/stereoTypesOnBlast";
 import StereoTypesRemixResults from "./StereoTypesRemixResults";
+import StereoTypesWaitingList from "./StereoTypesWaitingList";
 
 function nameFor(players, id) {
   const p = (players || []).find((pl) => pl.id === id);
@@ -37,7 +39,7 @@ function nameFor(players, id) {
 // round. Per the spec's own guidance, duplicating here is the lower-risk
 // call. If a Round 3 (or later) reuse makes this a third copy, THAT'S
 // the point a real shared component earns its cost.
-export default function StereoTypesRemixPlayer({ gameId, player, players }) {
+export default function StereoTypesRemixPlayer({ gameId, player, players, globalRound, onContinue }) {
   const [round, setRound] = useState(null);
   const [pick, setPick] = useState(null);
   const [assignments, setAssignments] = useState({});
@@ -80,6 +82,9 @@ export default function StereoTypesRemixPlayer({ gameId, player, players }) {
     if (round.status === "picking") maybeAdvanceRemixToReveal(gameId, 2);
     if (round.status === "reveal") maybeScoreRemix(gameId, 2);
     if (round.status === "scored" && round.result) persistRemixRoundScores(gameId, 2, round.result.perPlayer);
+    // Round 3 now starts automatically the moment Round 2 finishes
+    // scoring — see StereoTypesRemixHost.jsx's identical line/comment.
+    if (round.status === "scored") startOnBlast(gameId, (players || []).filter((p) => p.approved));
   }, [gameId, round]);
 
   if (!round) {
@@ -142,11 +147,19 @@ export default function StereoTypesRemixPlayer({ gameId, player, players }) {
       {round.status !== "scored" && (
         <Card style={{ borderColor: "#f4c430" }}>
           <div style={{ fontSize: 11, color: "#c9b98a", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Round 2 — The Remix</div>
-          <p style={{ color: "#f5eddc", fontSize: 13, margin: 0 }}>
+          <p style={{ color: "#f5eddc", fontSize: 13, margin: "0 0 10px" }}>
             {round.status === "picking"
               ? `${pickedCount} of ${totalPlayers} players have picked a superlative.`
               : `${guessedCount} of ${totalPlayers} players have submitted their guesses.`}
           </p>
+          <StereoTypesWaitingList
+            playerIds={round.playerIds}
+            players={players}
+            statusFor={(pid) => {
+              const done = round.status === "picking" ? !!round.picks?.[pid] : !!round.guesses?.[pid];
+              return done ? { label: "✓ Submitted", done: true } : { label: "Waiting...", done: false };
+            }}
+          />
         </Card>
       )}
 
@@ -242,7 +255,18 @@ export default function StereoTypesRemixPlayer({ gameId, player, players }) {
       )}
 
       {round.status === "scored" && (
-        <StereoTypesRemixResults round={round} players={players} myPlayerId={player.id} />
+        <>
+          <StereoTypesRemixResults round={round} players={players} myPlayerId={player.id} gameId={gameId} />
+          <Card style={{ textAlign: "center" }}>
+            {globalRound >= 3 ? (
+              <Btn onClick={onContinue}>Continue to Round 3 — On Blast →</Btn>
+            ) : (
+              <p style={{ color: "#6b6558", fontSize: 12, margin: 0, fontStyle: "italic" }}>
+                ⏳ Waiting for everyone to finish Round 2 before Round 3 starts...
+              </p>
+            )}
+          </Card>
+        </>
       )}
     </div>
   );

@@ -314,19 +314,23 @@ export default function HostPage() {
   };
 
   const submitBecomeHost = async () => {
-    if (!confirm("This adds hosting to your current account — you'll be able to create and run Stereo Types seasons with the same login you already use to play. Continue?")) return;
+    if (!confirm("This adds hosting to your current account — you'll be able to create and run Stereo Types seasons with the same login you already use to play. You'll need to log back in once afterward for it to take effect. Continue?")) return;
     setBecomingHost(true);
     setBecomeHostError("");
     const res = await becomeHost("stereo_types");
-    setBecomingHost(false);
-    if (!res.ok) { setBecomeHostError(res.error); return; }
-    // becomeHost's own updateUser call already refreshed the session's
-    // JWT with the new role/hostScope baked in (see that function's own
-    // comment on why that matters for the games-insert RLS policy) — no
-    // reload needed; the onAuthStateChange subscription above already
-    // picked up the USER_UPDATED event and updated `user`, so this
-    // component just re-renders straight into the real host console
-    // below on its own.
+    if (!res.ok) { setBecomingHost(false); setBecomeHostError(res.error); return; }
+    // The role/hostScope change is saved to the database at this point,
+    // but NOT necessarily usable by this same session yet — see
+    // lib/auth.js's becomeHost for why a same-session refresh isn't
+    // reliable here (confirmed by a real RLS failure on the very next
+    // "Create Season" click when this used to just carry on in place).
+    // A real sign-out + fresh login is the only guaranteed-correct way
+    // to get a token that actually reflects the new role, so that's
+    // what this does — signOut() first (so the stale session is fully
+    // gone, not just visually replaced), then straight to /login rather
+    // than leaving them on this page looking done when it isn't yet.
+    await signOut();
+    router.push("/login?hostReady=1");
   };
 
   async function createSeason(name, subtitle, gameType) {

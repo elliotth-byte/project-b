@@ -4,8 +4,10 @@ import {
   subscribeASideRound, submitASideRanking, submitASideGuesses,
   maybeAdvanceASideToReveal, maybeScoreASide, persistASideRoundScores,
 } from "../lib/stereoTypesASide";
+import { startRemix } from "../lib/stereoTypesRemix";
 import { getSuperlativeAttributions } from "../lib/stereoTypesSuperlatives";
 import StereoTypesASideResults from "./StereoTypesASideResults";
+import StereoTypesWaitingList from "./StereoTypesWaitingList";
 
 function nameFor(players, id) {
   const p = (players || []).find((pl) => pl.id === id);
@@ -52,7 +54,7 @@ function moveBtnStyle(disabled) {
 // decision (who's in this round, whose ranking is whose) goes through
 // `round.playerIds`/`round.anonMap` instead, which are frozen at the
 // moment the round started and don't drift if someone joins mid-round.
-export default function StereoTypesASidePlayer({ gameId, player, players }) {
+export default function StereoTypesASidePlayer({ gameId, player, players, globalRound, onContinue }) {
   const [round, setRound] = useState(null);
   const [order, setOrder] = useState(null);
   const [assignments, setAssignments] = useState({});
@@ -116,6 +118,15 @@ export default function StereoTypesASidePlayer({ gameId, player, players }) {
     // scoring race never got a chance to write it itself (e.g. it lost
     // its connection right after winning).
     if (round.status === "scored" && round.result) persistASideRoundScores(gameId, 1, round.result.perPlayer);
+    // Round 2 now starts the moment Round 1 finishes scoring, with no
+    // host click required — see StereoTypesASideHost.jsx's identical
+    // line for the full reasoning (startRemix's own storageUpdate is
+    // already a safe first-write-wins CAS, so running it opportunistically
+    // from every player's tab too costs nothing). This only controls
+    // when Round 2 EXISTS — StereoTypesPlayerPanels.jsx's own
+    // displayRound (built from this player's onContinue clicks) is what
+    // actually decides when THIS player leaves this results screen.
+    if (round.status === "scored") startRemix(gameId, (players || []).filter((p) => p.approved));
   }, [gameId, round]);
 
   if (!round) {
@@ -198,11 +209,19 @@ export default function StereoTypesASidePlayer({ gameId, player, players }) {
       {round.status !== "scored" && (
         <Card style={{ borderColor: "#f4c430" }}>
           <div style={{ fontSize: 11, color: "#c9b98a", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Round 1 — A Side</div>
-          <p style={{ color: "#f5eddc", fontSize: 13, margin: 0 }}>
+          <p style={{ color: "#f5eddc", fontSize: 13, margin: "0 0 10px" }}>
             {round.status === "ranking"
               ? `${submittedCount} of ${totalPlayers} players have submitted their ranking.`
               : `${guessedCount} of ${totalPlayers} players have submitted their guesses.`}
           </p>
+          <StereoTypesWaitingList
+            playerIds={round.playerIds}
+            players={players}
+            statusFor={(pid) => {
+              const done = round.status === "ranking" ? !!round.rankings?.[pid] : !!round.guesses?.[pid];
+              return done ? { label: "✓ Submitted", done: true } : { label: "Waiting...", done: false };
+            }}
+          />
         </Card>
       )}
 
@@ -299,7 +318,18 @@ export default function StereoTypesASidePlayer({ gameId, player, players }) {
       )}
 
       {round.status === "scored" && (
-        <StereoTypesASideResults round={round} players={players} myPlayerId={player.id} />
+        <>
+          <StereoTypesASideResults round={round} players={players} myPlayerId={player.id} gameId={gameId} />
+          <Card style={{ textAlign: "center" }}>
+            {globalRound >= 2 ? (
+              <Btn onClick={onContinue}>Continue to Round 2 — The Remix →</Btn>
+            ) : (
+              <p style={{ color: "#6b6558", fontSize: 12, margin: 0, fontStyle: "italic" }}>
+                ⏳ Waiting for everyone to finish Round 1 before Round 2 starts...
+              </p>
+            )}
+          </Card>
+        </>
       )}
     </div>
   );

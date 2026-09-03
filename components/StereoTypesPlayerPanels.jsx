@@ -9,6 +9,7 @@ import StereoTypesOnBlastPlayer from "./StereoTypesOnBlastPlayer";
 import { subscribeStereoTypesNowPlaying } from "../lib/stereoTypesNowPlaying";
 import { subscribeStereoTypesRound } from "../lib/stereoTypesASide";
 import { supabase } from "../lib/supabaseClient";
+import StereoTypesRulesPanel from "./StereoTypesRulesPanel";
 
 const MAX_DISPLAY_NAME_LENGTH = 40;
 
@@ -120,16 +121,52 @@ export default function StereoTypesPlayerPanels({ gameId, player, players }) {
   // uses — pending (not-yet-approved) players don't have a real boombox
   // worth showing here either.
   const approvedPlayers = (players || []).filter((p) => p.approved);
-  // Phase 6 adds Round 2 ("The Remix") — same currentRound switch as
-  // StereoTypesHostPanels.jsx's own, see that file's comment for the
-  // full reasoning (identical here: KEY_STEREO_TYPES_ROUND is the one
-  // signal that's meaningful both before either round has started and
-  // once either has, so it's read once here rather than each round
-  // component inferring "am I current" from its own round.status).
-  //
-  // Phase 7 adds Round 3 ("On Blast", StereoTypesOnBlastPlayer below) and
-  // the game's actual end — same currentRound switch, third branch.
+  // currentRound is the GLOBAL, real state of the game — which round
+  // actually exists right now (StereoTypesASideHost.jsx/
+  // StereoTypesRemixHost.jsx's own auto-advance effects flip this the
+  // instant a round finishes scoring, with no host click involved).
+  // It does NOT by itself decide what THIS player sees, though — see
+  // displayRound below.
   const [currentRound, setCurrentRound] = useState(0);
+  // This player's OWN "how far have I actually clicked through" —
+  // persisted per-player (players.game_prefs, same jsonb column
+  // lib/gamePrefs.js's colorBlindMode/swipeControls already live in;
+  // sql/add-game-prefs.sql's own comment confirms a player can already
+  // freely self-update this column, so no new RLS policy was needed
+  // here) rather than kept purely in local component state, so a
+  // player who's clicked through to Round 2 and then reloads the page
+  // stays on Round 2 instead of getting dropped back to Round 1's
+  // now-stale results. Read straight off the raw `players` row rather
+  // than threaded through the `player` prop (which pages/play.jsx
+  // builds without game_prefs on it for Stereo Types) since `players`
+  // already carries every column, this player's own row included.
+  const myFullPlayer = (players || []).find((p) => p.id === player?.id);
+  const persistedRoundSeen = myFullPlayer?.game_prefs?.stereoTypesRoundSeen || 0;
+  // Optimistic local ceiling on top of the persisted value — bumped
+  // immediately on a "Continue" click (see handleContinue below) so the
+  // transition feels instant rather than waiting on `players` itself to
+  // refresh from pages/play.jsx's own poll/subscription cycle. Never
+  // needs to go DOWN, so a plain max against whatever's persisted is
+  // always correct regardless of which one updates first.
+  const [localRoundSeen, setLocalRoundSeen] = useState(0);
+  const roundSeen = Math.max(persistedRoundSeen, localRoundSeen);
+  // Clamped by currentRound: a player can never be shown a round that
+  // hasn't actually started yet, no matter how far ahead their own
+  // roundSeen might claim to be (that combination shouldn't be
+  // reachable in practice, but the clamp costs nothing and removes any
+  // doubt). A brand new player (roundSeen 0) lands on
+  // min(currentRound, 1) — Round 1, even if the season's actually
+  // further along already; that round's own game_state row still
+  // exists and simply renders its final "scored" state read-only for
+  // a latecomer, same as it would for anyone who's fallen behind.
+  const displayRound = Math.max(1, Math.min(currentRound || 1, roundSeen + 1));
+
+  const handleContinue = async (fromRound) => {
+    setLocalRoundSeen((r) => Math.max(r, fromRound));
+    if (!player?.id) return;
+    const nextPrefs = { ...(myFullPlayer?.game_prefs || {}), stereoTypesRoundSeen: fromRound };
+    await supabase.from("players").update({ game_prefs: nextPrefs }).eq("id", player.id);
+  };
 
   useEffect(() => {
     if (!gameId) return;
@@ -153,6 +190,8 @@ export default function StereoTypesPlayerPanels({ gameId, player, players }) {
     // grid track sizing, only for flex rows).
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16 }}>
       <StereoTypesTitleScreen fullscreen reactive={!!nowPlaying?.isPlaying} intensity={nowPlaying?.intensity || 0} bpm={nowPlaying?.bpm || null} />
+
+      <StereoTypesRulesPanel />
 
       <Card style={{ borderColor: "#f4c430", textAlign: "center" }}>
         <div style={{ marginBottom: 12 }}>
@@ -192,9 +231,13 @@ export default function StereoTypesPlayerPanels({ gameId, player, players }) {
 
       <StereoTypesScoreboard gameId={gameId} players={players} myPlayerId={player?.id} />
 
-      {(!currentRound || currentRound === 1) && <StereoTypesASidePlayer gameId={gameId} player={player} players={players} />}
-      {currentRound === 2 && <StereoTypesRemixPlayer gameId={gameId} player={player} players={players} />}
-      {currentRound === 3 && <StereoTypesOnBlastPlayer gameId={gameId} player={player} players={players} />}
+      {(!displayRound || displayRound === 1) && (
+        <StereoTypesASidePlayer gameId={gameId} player={player} players={players} globalRound={currentRound} onContinue={() => handleContinue(1)} />
+      )}
+      {displayRound === 2 && (
+        <StereoTypesRemixPlayer gameId={gameId} player={player} players={players} globalRound={currentRound} onContinue={() => handleContinue(2)} />
+      )}
+      {displayRound === 3 && <StereoTypesOnBlastPlayer gameId={gameId} player={player} players={players} />}
     </div>
   );
 }

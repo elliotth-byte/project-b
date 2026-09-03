@@ -6,6 +6,7 @@ import {
 } from "../lib/stereoTypesOnBlast";
 import StereoTypesOnBlastResults from "./StereoTypesOnBlastResults";
 import StereoTypesFinalStandings from "./StereoTypesFinalStandings";
+import StereoTypesWaitingList from "./StereoTypesWaitingList";
 
 function nameFor(players, id) {
   const p = (players || []).find((pl) => pl.id === id);
@@ -188,11 +189,29 @@ export default function StereoTypesOnBlastPlayer({ gameId, player, players }) {
       {round.status !== "scored" && (
         <Card style={{ borderColor: "#f4c430" }}>
           <div style={{ fontSize: 11, color: "#c9b98a", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Round 3 — On Blast</div>
-          <p style={{ color: "#f5eddc", fontSize: 13, margin: 0 }}>
+          <p style={{ color: "#f5eddc", fontSize: 13, margin: "0 0 10px" }}>
             {round.status === "ranking"
               ? `${submittedCount} of ${totalPlayers} players have submitted their ranking.`
               : `${bidCount} of ${bidderIds.length} have placed a bid · ${guessCount} of ${bidderIds.length} have submitted a guess.`}
           </p>
+          {round.status === "ranking" ? (
+            <StereoTypesWaitingList
+              playerIds={round.playerIds}
+              players={players}
+              statusFor={(pid) => (round.submissions?.[pid] ? { label: "✓ Submitted", done: true } : { label: "Waiting...", done: false })}
+            />
+          ) : (
+            <StereoTypesWaitingList
+              playerIds={bidderIds}
+              players={players}
+              statusFor={(pid) => {
+                const bid = round.bids?.[pid];
+                if (bid?.guess != null) return { label: "✓ Guessed", done: true };
+                if (bid) return { label: "Bid placed...", done: false };
+                return { label: "Waiting...", done: false };
+              }}
+            />
+          )}
         </Card>
       )}
 
@@ -306,7 +325,7 @@ export default function StereoTypesOnBlastPlayer({ gameId, player, players }) {
 
       {round.status === "scored" && (
         <>
-          <StereoTypesOnBlastResults round={round} players={players} myPlayerId={player.id} />
+          <StereoTypesOnBlastResults round={round} players={players} myPlayerId={player.id} gameId={gameId} />
           <StereoTypesFinalStandings gameId={gameId} players={players} myPlayerId={player.id} />
         </>
       )}

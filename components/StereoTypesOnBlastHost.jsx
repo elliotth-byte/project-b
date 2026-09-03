@@ -5,6 +5,7 @@ import {
 } from "../lib/stereoTypesOnBlast";
 import StereoTypesOnBlastResults from "./StereoTypesOnBlastResults";
 import StereoTypesFinalStandings from "./StereoTypesFinalStandings";
+import StereoTypesWaitingList from "./StereoTypesWaitingList";
 
 // ─── Stereo Types — Round 3 ("On Blast"), host console ───
 // Mirrors StereoTypesASideHost.jsx/StereoTypesRemixHost.jsx's own shape
@@ -75,18 +76,11 @@ export default function StereoTypesOnBlastHost({ gameId, players }) {
             Round 3 — On Blast · Ranking in progress
           </div>
           <p style={{ color: "#f5eddc", fontSize: 13, marginTop: 0 }}>{submittedCount} of {totalPlayers} players have submitted their ranking.</p>
-          <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
-            {(round.playerIds || []).map((pid) => {
-              const p = (players || []).find((pl) => pl.id === pid);
-              const submitted = !!round.submissions?.[pid];
-              return (
-                <div key={pid} style={{ display: "flex", justifyContent: "space-between", background: "#0a0e18", borderRadius: 6, padding: "6px 10px" }}>
-                  <span style={{ color: "#f5eddc", fontSize: 13 }}>{p?.display_name || "Unknown player"}</span>
-                  <span style={{ color: submitted ? "#f4c430" : "#6b6558", fontSize: 11, fontWeight: 700 }}>{submitted ? "✓ Submitted" : "Waiting..."}</span>
-                </div>
-              );
-            })}
-          </div>
+          <StereoTypesWaitingList
+            playerIds={round.playerIds}
+            players={players}
+            statusFor={(pid) => (round.submissions?.[pid] ? { label: "✓ Submitted", done: true } : { label: "Waiting...", done: false })}
+          />
           <Btn variant="ghost" small onClick={handleForceBidding} disabled={busy}>Force bidding phase now (skip anyone AFK)</Btn>
         </Card>
       )}
@@ -99,26 +93,23 @@ export default function StereoTypesOnBlastHost({ gameId, players }) {
           <p style={{ color: "#f5eddc", fontSize: 13, marginTop: 0 }}>
             {bidCount} of {bidderIds.length} have placed a bid · {guessCount} of {bidderIds.length} have submitted a guess.
           </p>
-          <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
-            {bidderIds.map((pid) => {
-              const p = (players || []).find((pl) => pl.id === pid);
+          <StereoTypesWaitingList
+            playerIds={bidderIds}
+            players={players}
+            statusFor={(pid) => {
               const bid = round.bids?.[pid];
-              const status = bid?.guess != null ? "✓ Guessed" : bid ? "Bid placed..." : "Waiting...";
-              return (
-                <div key={pid} style={{ display: "flex", justifyContent: "space-between", background: "#0a0e18", borderRadius: 6, padding: "6px 10px" }}>
-                  <span style={{ color: "#f5eddc", fontSize: 13 }}>{p?.display_name || "Unknown player"}</span>
-                  <span style={{ color: bid?.guess != null ? "#f4c430" : "#6b6558", fontSize: 11, fontWeight: 700 }}>{status}</span>
-                </div>
-              );
-            })}
-          </div>
+              if (bid?.guess != null) return { label: "✓ Guessed", done: true };
+              if (bid) return { label: "Bid placed...", done: false };
+              return { label: "Waiting...", done: false };
+            }}
+          />
           <Btn variant="ghost" small onClick={handleForceScore} disabled={busy}>Force scoring now (skip anyone AFK)</Btn>
         </Card>
       )}
 
       {round.status === "scored" && (
         <>
-          <StereoTypesOnBlastResults round={round} players={players} />
+          <StereoTypesOnBlastResults round={round} players={players} gameId={gameId} />
           <StereoTypesFinalStandings gameId={gameId} players={players} />
         </>
       )}

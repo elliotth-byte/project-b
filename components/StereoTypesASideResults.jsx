@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Card } from "./ui";
 import { getSuperlativeAttributions } from "../lib/stereoTypesSuperlatives";
+import { subscribeStereoTypesReactions, toggleStereoTypesReaction } from "../lib/stereoTypesReactions";
+import StereoTypesReactionBar from "./StereoTypesReactionBar";
 
 // ─── Stereo Types — A Side results (shared by host + player) ───
 // Only ever rendered once round.status === "scored", i.e. once
@@ -20,7 +22,7 @@ function nameFor(players, id) {
   return p?.display_name || "Unknown player";
 }
 
-export default function StereoTypesASideResults({ round, players, myPlayerId }) {
+export default function StereoTypesASideResults({ round, players, myPlayerId, gameId }) {
   const result = round?.result;
   // Fetched here too (rather than passed down from
   // StereoTypesASidePlayer.jsx's own copy) since StereoTypesASideHost.jsx
@@ -31,6 +33,20 @@ export default function StereoTypesASideResults({ round, players, myPlayerId }) 
   useEffect(() => {
     getSuperlativeAttributions().then(setAttributions);
   }, []);
+  // Reactions on each revealed entry below — see
+  // lib/stereoTypesReactions.js. Subscribed for the whole round at once
+  // (one scope, every entry's reactions inside it) rather than one
+  // subscription per card, same "one subscription, slice it per-row"
+  // shape as everything else in this file already reads off `round`
+  // and `result` as a whole. gameId is optional (the host's own mount
+  // of this component doesn't pass myPlayerId either, since a host
+  // isn't a player and has nothing to react AS) — reactions are simply
+  // not shown at all without both.
+  const [reactions, setReactions] = useState({});
+  useEffect(() => {
+    if (!gameId || !round?.round) return;
+    return subscribeStereoTypesReactions(gameId, `a-side:${round.round}`, setReactions);
+  }, [gameId, round?.round]);
   if (!result) return null;
 
   const anonMap = round.anonMap || {};
@@ -81,6 +97,13 @@ export default function StereoTypesASideResults({ round, players, myPlayerId }) 
             <div style={{ fontSize: 11, color: "#6b6558" }}>
               {guessers.length === 0 ? "Nobody guessed this one." : `Correctly guessed by: ${guessers.map((id) => nameFor(players, id)).join(", ")}`}
             </div>
+            {gameId && myPlayerId && (
+              <StereoTypesReactionBar
+                reactions={reactions[label]}
+                myPlayerId={myPlayerId}
+                onToggle={(emoji) => toggleStereoTypesReaction(gameId, `a-side:${round.round}`, label, myPlayerId, emoji)}
+              />
+            )}
           </Card>
         );
       })}

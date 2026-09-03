@@ -10,6 +10,14 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Set by pages/host.jsx's own "Become a host" flow right before it
+  // signs the account out — see lib/auth.js's becomeHost for why a
+  // real re-login (not just an in-place session refresh) is the only
+  // reliable way to get a token that actually reflects the new role.
+  // Read straight off window.location rather than router.query, since
+  // this only needs to be checked once at mount and router.query isn't
+  // populated on Next's very first render anyway.
+  const arrivedFromBecomeHost = typeof window !== "undefined" && window.location.search.includes("hostReady=1");
   // Toggles this page from the default player sign-in into a self-serve
   // "become a host" form. Hosting used to require someone to hand-create
   // an account from the Supabase dashboard (see the comment on
@@ -45,6 +53,11 @@ export default function Login() {
     const res = await signInPlayer(username, password);
     setLoading(false);
     if (!res.ok) { setError(res.error); return; }
+    // Straight back to /host, not /play, when this login is the second
+    // half of pages/host.jsx's own "Become a host" flow — otherwise
+    // they'd land on /play having just done all that specifically to
+    // go host something, and have to navigate back to /host themselves.
+    if (arrivedFromBecomeHost) { router.push("/host"); return; }
     const game = router.query.game;
     router.push(game ? `/play?game=${game}` : "/play");
   };
@@ -121,6 +134,11 @@ export default function Login() {
         <h2 style={{ fontFamily: theme.font, fontSize: 22, marginBottom: 16 }}>
           Log in
         </h2>
+        {arrivedFromBecomeHost && (
+          <p style={{ color: theme.accent, fontSize: 12, margin: "-8px 0 16px", fontStyle: "italic" }}>
+            ✅ Hosting is enabled on your account — log back in with your usual username and password to continue.
+          </p>
+        )}
         <input
           value={username}
           onChange={(e) => setUsername(e.target.value)}

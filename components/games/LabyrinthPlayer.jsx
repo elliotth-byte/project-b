@@ -16,12 +16,12 @@ import SwipeControlsCallout from "./SwipeControlsCallout";
 // this game is named for), hunts the player through the maze while they
 // collect scattered olives.
 //
-// Same recursive-backtracker maze generator Maze2DPlayer.jsx and
-// mazeGemsData.js already use, kept local here the same way
-// Maze2DPlayer.jsx keeps its own copy rather than sharing an
-// abstraction across all three maze variants for what's a handful of
-// lines. Every open cell except the player's start gets an olive;
-// stepping onto one collects it.
+// The maze itself is now ONE fixed, hand-laid-out layout (see MAZE
+// below) rather than randomly generated per session — deliberately
+// symmetric, with a walled-off center box and wraparound side tunnels,
+// evoking the classic arcade maze-chase LOOK without reproducing any
+// specific game's actual layout. Every open cell except the player's
+// start gets an olive; stepping onto one collects it.
 //
 // The Minotaur starts at the maze's far corner and takes one step every
 // MINOTAUR_TICK_MS, via a fresh breadth-first shortest path toward the
@@ -35,59 +35,73 @@ import SwipeControlsCallout from "./SwipeControlsCallout";
 // (or before the challenge's own timer runs out) is strictly better —
 // see placementFor below.
 
-const DEFAULT_SIZE = 13; // odd, walls need to line up — a bit larger than Maze2D's default since a chase needs some room to run
 const MINOTAUR_TICK_MS = 650;
 
-function generateMaze(seed, size) {
-  let s = seed;
-  const rand = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
-  const grid = Array.from({ length: size }, () => Array(size).fill(1));
-  const cellAt = (r, c) => r > 0 && r < size - 1 && c > 0 && c < size - 1;
-  function carve(r, c) {
-    grid[r][c] = 0;
-    const dirs = [[-2, 0], [2, 0], [0, -2], [0, 2]].sort(() => rand() - 0.5);
-    for (const [dr, dc] of dirs) {
-      const nr = r + dr, nc = c + dc;
-      if (cellAt(nr, nc) && grid[nr][nc] === 1) {
-        grid[r + dr / 2][c + dc / 2] = 0;
-        carve(nr, nc);
-      }
-    }
-  }
-  carve(1, 1);
-
-  // Recursive backtracking alone produces a "perfect maze" — by
-  // definition, exactly ONE path between any two cells, with zero
-  // loops. That's exactly what made the Minotaur uncatchable-by-you:
-  // wherever it's chasing from, there was never an alternate route to
-  // dodge around it, only forward into it or back the way you came.
-  // This knocks down a fraction of the remaining interior walls — only
-  // ones where BOTH neighboring cells are already open, so this only
-  // adds shortcuts and loops, never creates a new isolated pocket —
-  // giving the maze genuine branch points a player can actually use to
-  // evade. Verified this keeps the whole maze fully connected (every
-  // open cell still reachable from the start) across many seeds before
-  // this went in, not just assumed.
-  const LOOP_CHANCE = 0.22;
-  for (let r = 1; r < size - 1; r++) {
-    for (let c = 1; c < size - 1; c++) {
-      if (grid[r][c] !== 1) continue;
-      if (r % 2 === 0 && c % 2 === 1) {
-        if (grid[r - 1][c] === 0 && grid[r + 1][c] === 0 && rand() < LOOP_CHANCE) grid[r][c] = 0;
-      } else if (r % 2 === 1 && c % 2 === 0) {
-        if (grid[r][c - 1] === 0 && grid[r][c + 1] === 0 && rand() < LOOP_CHANCE) grid[r][c] = 0;
-      }
-    }
-  }
-
-  return grid;
-}
+// ─── A fixed, hand-laid-out maze ───
+// Replacing the earlier per-session recursive-backtracker generator
+// with ONE deliberately-designed, always-the-same layout: wide
+// symmetric corridors, a walled-off center box, and wraparound side
+// tunnels — the general SHAPE conventions of a classic arcade
+// maze-chase game, built as an original layout rather than a
+// reproduction of any specific title's actual maze (still true to this
+// file's own header comment above on why that distinction matters).
+// Built by generating a recursive-backtracker maze on just the LEFT
+// half and mirroring it onto the right (so it comes out symmetric
+// left-to-right the way a hand-designed arcade maze would, rather than
+// looking like the lopsided procedural mazes this game used to
+// produce), then explicitly carving the center box and the two tunnel
+// openings on top. Verified fully connected (every open cell reachable
+// from every other one) before this ever went in — see this file's own
+// git history for the generation script, not reproduced here since the
+// point of fixing it in code is that it never needs to run again.
+//
+// Because this is now one committed layout instead of a per-challenge
+// random generation, challenge?.gameConfig?.size no longer does
+// anything — there's only the one size. Left as dead config rather
+// than removed from wherever it's set, in case a genuinely resizable
+// version of this comes back later.
+const MAZE = [
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  [1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1],
+  [1,0,1,0,1,1,1,1,1,0,1,0,1,1,1,1,1,0,1,0,1],
+  [1,0,1,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,1,0,1],
+  [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1],
+  [1,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,1,0,1],
+  [1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1],
+  [0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0],
+  [1,0,1,1,1,0,1,0,1,1,1,1,1,0,1,0,1,1,1,0,1],
+  [1,0,0,0,1,0,1,0,0,0,0,0,0,0,1,0,1,0,0,0,1],
+  [1,0,1,0,1,0,1,1,1,0,1,0,1,1,1,0,1,0,1,0,1],
+  [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1],
+  [1,0,1,1,1,1,1,0,1,0,1,0,1,0,1,1,1,1,1,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+];
+// Row 7 (the one full-width open row, "........#####........" above)
+// is the tunnel row — its own leftmost/rightmost cells are open all
+// the way to the border, which is what move()/bfsNextStep below use as
+// the signal that stepping off that edge should wrap to the other
+// side, rather than needing a separate list of "which rows tunnel."
+const TUNNEL_ROW = 7;
 
 // One BFS step toward the target — returns the NEXT cell to move into
 // (adjacent to `from`), or `from` unchanged if no path exists (shouldn't
 // happen in a fully-carved maze, but handled honestly rather than
-// crashing).
-function bfsNextStep(grid, size, from, target) {
+// crashing). Wraps horizontally at TUNNEL_ROW, same rule move() below
+// uses, so the Minotaur can use the side tunnels exactly as freely as
+// the player can — it isn't a player-only escape hatch.
+function neighborsOf(r, c, rows, cols) {
+  const raw = [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]];
+  return raw.map(([nr, nc]) => {
+    if (r === TUNNEL_ROW) {
+      if (nc < 0) nc = cols - 1;
+      else if (nc >= cols) nc = 0;
+    }
+    return [nr, nc];
+  }).filter(([nr, nc]) => nr >= 0 && nr < rows && nc >= 0 && nc < cols);
+}
+
+function bfsNextStep(grid, rows, cols, from, target) {
   if (from.r === target.r && from.c === target.c) return from;
   const key = (r, c) => `${r},${c}`;
   const visited = new Set([key(from.r, from.c)]);
@@ -97,9 +111,8 @@ function bfsNextStep(grid, size, from, target) {
   while (head < queue.length) {
     const cur = queue[head++];
     if (cur.r === target.r && cur.c === target.c) break;
-    for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-      const nr = cur.r + dr, nc = cur.c + dc;
-      if (nr < 0 || nc < 0 || nr >= size || nc >= size || grid[nr][nc] === 1) continue;
+    for (const [nr, nc] of neighborsOf(cur.r, cur.c, rows, cols)) {
+      if (grid[nr][nc] === 1) continue;
       const k = key(nr, nc);
       if (visited.has(k)) continue;
       visited.add(k);
@@ -129,28 +142,23 @@ function placementFor(didClear, olivesCollected) {
 }
 
 export default function LabyrinthPlayer({ gameId, round, challenge, player }) {
-  const SIZE = useMemo(() => {
-    const raw = challenge?.gameConfig?.size || DEFAULT_SIZE;
-    const clamped = Math.max(9, Math.min(25, raw));
-    return clamped % 2 === 0 ? clamped + 1 : clamped;
-  }, [challenge?.gameConfig?.size]);
-  const seed = (challenge?.startedAt || 1) + (player?.id ? player.id.split("-")[0].length : 0);
-  const [maze] = useState(() => generateMaze(seed || 1, SIZE));
-  const GRID_SIZE = maze.length;
+  const maze = MAZE;
+  const ROWS = maze.length;
+  const COLS = maze[0].length;
 
   const [pos, setPos] = useState({ r: 1, c: 1 });
-  const [minotaurPos, setMinotaurPos] = useState({ r: GRID_SIZE - 2, c: GRID_SIZE - 2 });
+  const [minotaurPos, setMinotaurPos] = useState({ r: ROWS - 2, c: COLS - 2 });
   const posRef = useRef(pos); // the chase timer reads this fresh each tick without needing to be a dependency
   useEffect(() => { posRef.current = pos; }, [pos]);
 
   const [collected, setCollected] = useState(() => new Set());
   const totalOlives = useMemo(() => {
     let count = 0;
-    for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++) {
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
       if (maze[r][c] === 0 && !(r === 1 && c === 1)) count++;
     }
     return count;
-  }, [maze, GRID_SIZE]);
+  }, [maze, ROWS, COLS]);
 
   const startTime = usePersistedStart(gameId, round.round, challenge?.startedAt, player.id);
   const [caught, setCaught] = useState(false);
@@ -158,11 +166,21 @@ export default function LabyrinthPlayer({ gameId, round, challenge, player }) {
   const reported = useRef(false);
   const gameOver = caught || cleared;
 
+  // Horizontal wraparound only ever applies at TUNNEL_ROW — everywhere
+  // else the outer border is a solid wall, so a would-be wrap target is
+  // always a wall cell and gets blocked exactly like before this
+  // existed; this is genuinely a no-op change in behavior for every
+  // row except the one row it's meant for.
   const move = useCallback((dr, dc) => {
     setPos((prev) => {
       if (gameOver) return prev;
-      const nr = prev.r + dr, nc = prev.c + dc;
-      if (nr < 0 || nc < 0 || nr >= GRID_SIZE || nc >= GRID_SIZE || maze[nr][nc] === 1) return prev;
+      const nr = prev.r + dr;
+      let nc = prev.c + dc;
+      if (prev.r === TUNNEL_ROW) {
+        if (nc < 0) nc = COLS - 1;
+        else if (nc >= COLS) nc = 0;
+      }
+      if (nr < 0 || nc < 0 || nr >= ROWS || nc >= COLS || maze[nr][nc] === 1) return prev;
       setCollected((c) => {
         const k = `${nr},${nc}`;
         if (c.has(k) || (nr === 1 && nc === 1)) return c;
@@ -172,7 +190,7 @@ export default function LabyrinthPlayer({ gameId, round, challenge, player }) {
       });
       return { r: nr, c: nc };
     });
-  }, [maze, gameOver, GRID_SIZE]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [maze, gameOver, ROWS, COLS]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const onKey = (e) => {
@@ -201,13 +219,13 @@ export default function LabyrinthPlayer({ gameId, round, challenge, player }) {
     if (gameOver) return;
     const interval = window.setInterval(() => {
       setMinotaurPos((prev) => {
-        const next = bfsNextStep(maze, GRID_SIZE, prev, posRef.current);
+        const next = bfsNextStep(maze, ROWS, COLS, prev, posRef.current);
         if (next.r === posRef.current.r && next.c === posRef.current.c) setCaught(true);
         return next;
       });
     }, MINOTAUR_TICK_MS);
     return () => window.clearInterval(interval);
-  }, [maze, GRID_SIZE, gameOver]);
+  }, [maze, ROWS, COLS, gameOver]);
 
   // Also catch the case where the PLAYER moves directly onto the
   // Minotaur's current cell, rather than only the reverse.
@@ -245,7 +263,7 @@ export default function LabyrinthPlayer({ gameId, round, challenge, player }) {
     return <Card style={{ marginBottom: 20, textAlign: "center" }}><p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic" }}>Loading...</p></Card>;
   }
 
-  const cell = GRID_SIZE <= 13 ? 22 : GRID_SIZE <= 19 ? 16 : 12;
+  const cell = COLS <= 15 ? 22 : COLS <= 21 ? 17 : 12;
 
   return (
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
@@ -253,12 +271,12 @@ export default function LabyrinthPlayer({ gameId, round, challenge, player }) {
         <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🐂 The Labyrinth</h3>
         <Badge>🫒 {collected.size}/{totalOlives}</Badge>
       </div>
-      <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 8px", fontStyle: "italic" }}>The Minotaur is always coming for you — keep moving.</p>
+      <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 8px", fontStyle: "italic" }}>The Minotaur is always coming for you — keep moving. The side passages wrap around.</p>
       {!swipeEnabled && <SwipeControlsCallout player={player} onEnabled={() => setSwipeOverride(true)} />}
       <div
         onTouchStart={swipeHandlers.onTouchStart} onTouchEnd={swipeHandlers.onTouchEnd}
         style={{
-          display: "grid", gridTemplateColumns: `repeat(${GRID_SIZE}, ${cell}px)`, gridTemplateRows: `repeat(${GRID_SIZE}, ${cell}px)`,
+          display: "grid", gridTemplateColumns: `repeat(${COLS}, ${cell}px)`, gridTemplateRows: `repeat(${ROWS}, ${cell}px)`,
           margin: "0 auto 12px", border: "2px solid #3d1f5c", width: "fit-content", background: "#05010f",
           touchAction: swipeEnabled ? "none" : "auto",
         }}

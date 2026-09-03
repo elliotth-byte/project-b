@@ -23,6 +23,22 @@ export default function SandsOfTimePlayer({ gameId, challenge, round, player }) 
   const [done, setDone] = useState(false);
   const [finalScoreMs, setFinalScoreMs] = useState(null);
   const [flipBusy, setFlipBusy] = useState(null); // hourglass index currently mid-flip-request, or null
+  // Per-hourglass click lockout — index -> timestamp it unlocks again.
+  // Separate from flipBusy above: flipBusy only covers the brief
+  // network round-trip of one specific request, which isn't really
+  // what spam-clicking is about — a player mashing the same eligible
+  // hourglass could otherwise fire a new (harmless but wasted) flip
+  // request every single render tick the moment the busy flag clears,
+  // well before there's any real reason to click it again. This is a
+  // flat, deliberately generous 2s per-hourglass cooldown starting the
+  // moment a click is REGISTERED (not when the request resolves), so
+  // it also covers the case of clicking an ineligible hourglass
+  // repeatedly out of impatience. It's a pure client-side UX throttle,
+  // not a fairness mechanism — lib/games/sandsOfTimeData.js's own
+  // server-side canFlip check is still what actually decides whether
+  // any given flip counts, exactly as before.
+  const [lockedUntil, setLockedUntil] = useState({});
+  const CLICK_LOCKOUT_MS = 2000;
   const reportedRef = useRef(false);
   const [, forceTick] = useState(0);
 
@@ -80,6 +96,8 @@ export default function SandsOfTimePlayer({ gameId, challenge, round, player }) 
 
   const handleFlip = async (i) => {
     if (done || flipBusy != null || !durations) return;
+    if (lockedUntil[i] && Date.now() < lockedUntil[i]) return;
+    setLockedUntil((prev) => ({ ...prev, [i]: Date.now() + CLICK_LOCKOUT_MS }));
     const hg = playerState.hourglasses[i];
     if (!canFlip(hg.lastFlippedAt, durations[i], Date.now())) return;
     setFlipBusy(i);
@@ -123,22 +141,23 @@ export default function SandsOfTimePlayer({ gameId, challenge, round, player }) 
           const remainingFrac = 1 - frac;
           const opacity = opacityForFlipCount(hg.flipCount);
           const eligible = canFlip(hg.lastFlippedAt, durations[i], now);
+          const locked = lockedUntil[i] && now < lockedUntil[i];
           const color = SAND_COLORS[i % SAND_COLORS.length];
           return (
             <button
               key={i}
               onClick={() => handleFlip(i)}
-              disabled={!eligible || flipBusy != null}
+              disabled={!eligible || flipBusy != null || locked}
               style={{
-                background: "none", border: "none", padding: 0, cursor: eligible ? "pointer" : "default",
+                background: "none", border: "none", padding: 0, cursor: eligible && !locked ? "pointer" : "default",
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
               }}
             >
               <div style={{
                 width: 44, height: 72, borderRadius: 6, position: "relative", overflow: "hidden",
-                border: `2px solid ${eligible ? color.hex : "#3d1f5c"}`, background: "#0d0618",
+                border: `2px solid ${eligible && !locked ? color.hex : "#3d1f5c"}`, background: "#0d0618",
                 opacity, transition: "opacity 0.3s",
-                boxShadow: eligible ? `0 0 12px ${color.hex}88` : "none",
+                boxShadow: eligible && !locked ? `0 0 12px ${color.hex}88` : "none",
               }}>
                 <div style={{
                   position: "absolute", bottom: 0, left: 0, right: 0,

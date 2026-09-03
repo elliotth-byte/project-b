@@ -1,4 +1,7 @@
+import { useEffect, useState } from "react";
 import { Card } from "./ui";
+import { subscribeStereoTypesReactions, toggleStereoTypesReaction } from "../lib/stereoTypesReactions";
+import StereoTypesReactionBar from "./StereoTypesReactionBar";
 
 // ─── Stereo Types — Round 3 ("On Blast") results (shared by host + player) ───
 // Only ever rendered once round.status === "scored" (lib/stereoTypesOnBlast.js's
@@ -19,8 +22,19 @@ function nameFor(players, id) {
   return p?.display_name || "Unknown player";
 }
 
-export default function StereoTypesOnBlastResults({ round, players, myPlayerId }) {
+export default function StereoTypesOnBlastResults({ round, players, myPlayerId, gameId }) {
   const result = round?.result;
+  // Same reasoning as StereoTypesASideResults.jsx's own reactions
+  // subscription. Keyed by bidderId here rather than an anon label —
+  // this round has no anonymity left to preserve by the reveal phase
+  // (see this file's own header comment), so bidderId is already the
+  // stable, unique-per-entry identifier every other part of this
+  // screen keys off of.
+  const [reactions, setReactions] = useState({});
+  useEffect(() => {
+    if (!gameId || !round?.round) return;
+    return subscribeStereoTypesReactions(gameId, `on-blast:${round.round}`, setReactions);
+  }, [gameId, round?.round]);
   if (!result) return null;
 
   const perPlayer = result.perPlayer || {};
@@ -89,6 +103,13 @@ export default function StereoTypesOnBlastResults({ round, players, myPlayerId }
               </div>
             ) : (
               <div style={{ fontSize: 12, color: "#6b6558" }}>{nameFor(players, bidderId)} never placed a bid — no points changed hands.</div>
+            )}
+            {gameId && myPlayerId && (
+              <StereoTypesReactionBar
+                reactions={reactions[bidderId]}
+                myPlayerId={myPlayerId}
+                onToggle={(emoji) => toggleStereoTypesReaction(gameId, `on-blast:${round.round}`, bidderId, myPlayerId, emoji)}
+              />
             )}
           </Card>
         );

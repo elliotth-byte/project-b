@@ -5,19 +5,21 @@ import {
 } from "../lib/stereoTypesRemix";
 import { startOnBlast } from "../lib/stereoTypesOnBlast";
 import StereoTypesRemixResults from "./StereoTypesRemixResults";
+import StereoTypesWaitingList from "./StereoTypesWaitingList";
 
 // ─── Stereo Types — Round 2 ("The Remix"), host console ───
 // Mirrors StereoTypesASideHost.jsx's own shape closely. Mounted by
 // StereoTypesHostPanels.jsx ONLY once KEY_STEREO_TYPES_ROUND is already
 // 2 — unlike StereoTypesASideHost.jsx, this component is never
 // responsible for actually STARTING its own round: that trigger is
-// StereoTypesASideHost.jsx's own "Round 2 coming soon" button (now
-// wired to lib/stereoTypesRemix.js's startRemix), which fires while
-// StereoTypesASideHost is still the one mounted. By the time this
-// component appears on screen at all, startRemix has already run, so
-// `round` here is only ever null for the brief instant before the
-// initial subscribeRemixRound fetch resolves — the `!round` branch below
-// is just a loading guard, not its own "Start Round 2" affordance.
+// StereoTypesASideHost.jsx's own auto-advance effect (startRemix, fired
+// the moment Round 1 finishes scoring, no host click involved — see
+// that file's own comment), which fires while StereoTypesASideHost is
+// still the one mounted. By the time this component appears on screen
+// at all, startRemix has already run, so `round` here is only ever
+// null for the brief instant before the initial subscribeRemixRound
+// fetch resolves — the `!round` branch below is just a loading guard,
+// not its own "Start Round 2" affordance.
 //
 // Same "never render picks/guesses/rankings/superlativePool/anonMap
 // CONTENT mid-round, only progress counts" rule as Round 1's host
@@ -40,6 +42,14 @@ export default function StereoTypesRemixHost({ gameId, players }) {
     if (round.status === "picking") maybeAdvanceRemixToReveal(gameId, 2);
     if (round.status === "reveal") maybeScoreRemix(gameId, 2);
     if (round.status === "scored" && round.result) persistRemixRoundScores(gameId, 2, round.result.perPlayer);
+    // Round 3 now starts the moment Round 2 finishes scoring, with no
+    // host click required — same reasoning as StereoTypesASideHost.jsx's
+    // own auto-advance line (startOnBlast's storageUpdate is the same
+    // safe first-write-wins CAS). StereoTypesRemixPlayer.jsx runs the
+    // identical line from every player's own tab too. Individual
+    // players still each see their own Round 2 results and click
+    // through themselves — this only controls when Round 3 exists.
+    if (round.status === "scored") startOnBlast(gameId, (players || []).filter((p) => p.approved));
   }, [gameId, round]);
 
   const handleForceReveal = async () => {
@@ -51,23 +61,6 @@ export default function StereoTypesRemixHost({ gameId, players }) {
   const handleForceScore = async () => {
     setBusy(true);
     await maybeScoreRemix(gameId, 2, { force: true });
-    setBusy(false);
-  };
-
-  // Round 3's actual start trigger — see lib/stereoTypesOnBlast.js's
-  // startOnBlast. Same relationship StereoTypesASideHost.jsx's own
-  // "Start Round 2" button has to startRemix: this button's successful
-  // click is also the moment KEY_STEREO_TYPES_ROUND flips to 3, which is
-  // what tells StereoTypesHostPanels.jsx/StereoTypesPlayerPanels.jsx to
-  // swap over to StereoTypesOnBlastHost.jsx/StereoTypesOnBlastPlayer.jsx
-  // for everyone. Not gating this on player count the same way
-  // StereoTypesASideHost.jsx's own "Start A Side" button gates itself —
-  // by the time Round 2 is "scored", at least 2 approved players already
-  // exist and nothing in this app lets that count drop back below 2.
-  const handleStartOnBlast = async () => {
-    setBusy(true);
-    const res = await startOnBlast(gameId, players.filter((p) => p.approved));
-    if (!res.ok && res.error) window.alert(res.error);
     setBusy(false);
   };
 
@@ -92,18 +85,11 @@ export default function StereoTypesRemixHost({ gameId, players }) {
             Round 2 — The Remix · Picking in progress
           </div>
           <p style={{ color: "#f5eddc", fontSize: 13, marginTop: 0 }}>{pickedCount} of {totalPlayers} players have picked a superlative.</p>
-          <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
-            {(round.playerIds || []).map((pid) => {
-              const p = (players || []).find((pl) => pl.id === pid);
-              const picked = !!round.picks?.[pid];
-              return (
-                <div key={pid} style={{ display: "flex", justifyContent: "space-between", background: "#0a0e18", borderRadius: 6, padding: "6px 10px" }}>
-                  <span style={{ color: "#f5eddc", fontSize: 13 }}>{p?.display_name || "Unknown player"}</span>
-                  <span style={{ color: picked ? "#f4c430" : "#6b6558", fontSize: 11, fontWeight: 700 }}>{picked ? "✓ Submitted" : "Waiting..."}</span>
-                </div>
-              );
-            })}
-          </div>
+          <StereoTypesWaitingList
+            playerIds={round.playerIds}
+            players={players}
+            statusFor={(pid) => (round.picks?.[pid] ? { label: "✓ Submitted", done: true } : { label: "Waiting...", done: false })}
+          />
           <Btn variant="ghost" small onClick={handleForceReveal} disabled={busy}>Force reveal now (skip anyone AFK)</Btn>
         </Card>
       )}
@@ -114,28 +100,23 @@ export default function StereoTypesRemixHost({ gameId, players }) {
             Round 2 — The Remix · Guessing in progress
           </div>
           <p style={{ color: "#f5eddc", fontSize: 13, marginTop: 0 }}>{guessedCount} of {totalPlayers} players have submitted their guesses.</p>
-          <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
-            {(round.playerIds || []).map((pid) => {
-              const p = (players || []).find((pl) => pl.id === pid);
-              const guessed = !!round.guesses?.[pid];
-              return (
-                <div key={pid} style={{ display: "flex", justifyContent: "space-between", background: "#0a0e18", borderRadius: 6, padding: "6px 10px" }}>
-                  <span style={{ color: "#f5eddc", fontSize: 13 }}>{p?.display_name || "Unknown player"}</span>
-                  <span style={{ color: guessed ? "#f4c430" : "#6b6558", fontSize: 11, fontWeight: 700 }}>{guessed ? "✓ Submitted" : "Waiting..."}</span>
-                </div>
-              );
-            })}
-          </div>
+          <StereoTypesWaitingList
+            playerIds={round.playerIds}
+            players={players}
+            statusFor={(pid) => (round.guesses?.[pid] ? { label: "✓ Submitted", done: true } : { label: "Waiting...", done: false })}
+          />
           <Btn variant="ghost" small onClick={handleForceScore} disabled={busy}>Force scoring now (skip anyone AFK)</Btn>
         </Card>
       )}
 
       {round.status === "scored" && (
         <>
-          <StereoTypesRemixResults round={round} players={players} />
+          <StereoTypesRemixResults round={round} players={players} gameId={gameId} />
           <Card style={{ textAlign: "center" }}>
             <div style={{ fontSize: 11, color: "#c9b98a", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Round 3 — On Blast</div>
-            <Btn onClick={handleStartOnBlast} disabled={busy}>Start Round 3 — On Blast</Btn>
+            <p style={{ color: "#6b6558", fontSize: 12, margin: 0 }}>
+              Round 3 starts automatically for everyone as soon as they're ready — no action needed here.
+            </p>
           </Card>
         </>
       )}

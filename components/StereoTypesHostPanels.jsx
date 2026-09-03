@@ -9,6 +9,7 @@ import StereoTypesASideHost from "./StereoTypesASideHost";
 import StereoTypesRemixHost from "./StereoTypesRemixHost";
 import StereoTypesOnBlastHost from "./StereoTypesOnBlastHost";
 import { subscribeStereoTypesRound } from "../lib/stereoTypesASide";
+import StereoTypesRulesPanel from "./StereoTypesRulesPanel";
 
 // ─── Stereo Types — host console (Phase 2-6) ───
 // Phase 2 added the real boombox graphic per roster row instead of a
@@ -113,6 +114,8 @@ export default function StereoTypesHostPanels({ gameId, roomCode, players, admin
       />
 
       <StereoTypesSpotifyWidget gameId={gameId} onStateChange={setNowPlaying} />
+
+      <StereoTypesRulesPanel />
 
       <StereoTypesScoreboard gameId={gameId} players={players} />
 
