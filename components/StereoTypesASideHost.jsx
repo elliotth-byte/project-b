@@ -6,6 +6,7 @@ import {
 import { startRemix } from "../lib/stereoTypesRemix";
 import StereoTypesASideResults from "./StereoTypesASideResults";
 import StereoTypesWaitingList from "./StereoTypesWaitingList";
+import { notifyPlayersRoundChange } from "../lib/pushNotifications";
 
 // ─── Stereo Types — Round 1 ("A Side"), host console ───
 // Mounts below the roster card in StereoTypesHostPanels.jsx. Deliberately
@@ -50,13 +51,18 @@ export default function StereoTypesASideHost({ gameId, players }) {
     // (that's StereoTypesASidePlayer.jsx's own onContinue) — this only
     // ever controls when Round 2 exists to click into, not who's
     // looking at it yet.
-    if (round.status === "scored") startRemix(gameId, approvedPlayers);
+    if (round.status === "scored") {
+      startRemix(gameId, approvedPlayers).then((r) => {
+        if (r.justStarted) notifyPlayersRoundChange(gameId, "🔁 Round 2 — The Remix", "The Remix has started — head back in to play.", "round-change");
+      });
+    }
   }, [gameId, round]);
 
   const handleStart = async () => {
     setBusy(true);
     const res = await startASide(gameId, approvedPlayers);
     if (!res.ok && res.error) window.alert(res.error);
+    else if (res.ok) notifyPlayersRoundChange(gameId, "🅰️ Round 1 — A Side", "A Side has started — head in to get your superlative.", "round-change");
     setBusy(false);
   };
 

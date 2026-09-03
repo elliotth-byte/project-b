@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Card, Btn } from "./ui";
 import { submitFinalWords, skipFinalWords } from "../lib/finalWords";
+import { notifyPushForMessage } from "../lib/pushNotifications";
 
 // ─── Final Words ───
 // See lib/finalWords.js for the full reasoning. Shown once per exile —
@@ -19,6 +20,13 @@ export default function FinalWordsPrompt({ gameId, player, eliminationRound, onR
     const res = await submitFinalWords(gameId, player, eliminationRound, message);
     setBusy(false);
     if (!res.ok) { setError(res.error); return; }
+    // lib/finalWords.js's submitFinalWords writes straight to the group
+    // chat's own storage rather than going through ChatPanel.jsx's
+    // onSend, so it never triggers ChatPanel's own push notification —
+    // this is that trigger, done here instead. isFinalWords=true is
+    // what tells pages/api/push/notify-message.js to title this as
+    // Final Words rather than an ordinary chat message.
+    notifyPushForMessage(gameId, "group", player.id, player.name, message.trim(), null, true);
     onResolved();
   };
 

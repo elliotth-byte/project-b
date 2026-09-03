@@ -37,7 +37,7 @@ function groupChatLabel(gameType) {
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { gameId, kind, senderId, senderName, body, threadId } = req.body || {};
+  const { gameId, kind, senderId, senderName, body, threadId, isFinalWords } = req.body || {};
   if (!gameId || !kind || !senderId || !body) return res.status(400).json({ error: "Missing required fields." });
 
   const authHeader = req.headers.authorization || "";
@@ -63,12 +63,22 @@ export default async function handler(req, res) {
     // client — this route already needs to trust nothing the client
     // claims about the game beyond gameId itself.
     const { data: gameRow } = await userClient.from("games").select("game_type").eq("id", gameId).maybeSingle();
+    // Final Words (components/FinalWordsPrompt.jsx, via
+    // lib/finalWords.js's submitFinalWords) is still an ordinary
+    // Panopticon group-chat message underneath — same
+    // notify_public_messages preference, same "everyone but the
+    // sender" audience — just titled distinctly so it doesn't read
+    // like a normal chat ping when it's actually someone's last
+    // message before leaving. Matches the in-chat label
+    // components/ChatPanel.jsx's own MessageBubble already shows for
+    // the exact same flag.
+    const title = isFinalWords ? `🎤 ${senderName}'s Final Words` : `💬 ${senderName}`;
     await sendPushToGame(gameId, {
-      title: `💬 ${senderName}`, body: preview, url: `/play?game=${gameId}`, tag: "chat-group",
+      title, body: preview, url: `/play?game=${gameId}`, tag: "chat-group",
       filterColumn: "notify_public_messages", excludePlayerId: senderId,
     });
     await sendPushToHosts(gameId, {
-      title: `💬 ${senderName} ${groupChatLabel(gameRow?.game_type)}`, body: preview, url: `/host?game=${gameId}`, tag: "chat-group",
+      title: `${isFinalWords ? "🎤" : "💬"} ${senderName} ${isFinalWords ? "(Final Words)" : groupChatLabel(gameRow?.game_type)}`, body: preview, url: `/host?game=${gameId}`, tag: "chat-group",
       filterColumn: "notify_chat_activity",
     });
     return res.status(200).json({ ok: true });

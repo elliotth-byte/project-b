@@ -7,6 +7,7 @@ import { recordElimination } from "../lib/seasonPlacement";
 import { STORAGE_KEY_TRAITOR_ROLES, factionLabel } from "../lib/traitorData";
 import { murderVoteKey, calculateMurderVoteResult, defaultEligibleTargets } from "../lib/murderVoteData";
 import { murderScript } from "../lib/slackScripts";
+import { notifyPlayersRoundChange } from "../lib/pushNotifications";
 import PostToSlack from "./PostToSlack";
 
 // ─── Traitors' Murder Vote: Host Control ───
@@ -87,6 +88,12 @@ function FactionPanel({ gameId, players, tr, faction, factionTraitors }) {
       fresh.log = [{ text: `🗡️ ${label} Traitors' murder vote opened.`, round: fresh.round, time: new Date().toLocaleTimeString() }, ...fresh.log];
       return fresh;
     });
+    // Targeted at just this faction's own traitors — see
+    // lib/pushNotifications.js's notifyPlayersRoundChange and that API
+    // route's own comment on why a murder vote is never broadcast to
+    // the whole game (it'd hand non-Traitor players meta-information
+    // they aren't supposed to have).
+    notifyPlayersRoundChange(gameId, `🗡️ ${label} Murder Vote`, "The murder vote is open — head in to cast your vote.", "round-change", factionTraitors.map((p) => p.id));
   };
 
   const closeVote = async () => {

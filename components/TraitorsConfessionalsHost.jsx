@@ -5,6 +5,7 @@ import {
   subscribeConfessionalPrompts, addConfessionalPrompt, removeConfessionalPrompt, respondToConfessional,
 } from "../lib/confessionalsData";
 import CopyMessage from "./CopyMessage";
+import { usePostAsName } from "../lib/hostVoice";
 
 // Traitors-themed fork of ConfessionalsHost.jsx — same feature set (host
 // replies, multi-target prompts, filters, recap builder, star/archive),
@@ -27,6 +28,9 @@ export default function ConfessionalsHost({ gameId, round, players }) {
   const [sortOrder, setSortOrder] = useState("newest");
   const [groupBy, setGroupBy] = useState("none");
   const [compact, setCompact] = useState(true);
+  // Same shared "voice" as components/ChatHostPanel.jsx's own group
+  // chat — see lib/hostVoice.js for why this is remembered across both.
+  const [postAsName, setPostAsName] = usePostAsName(gameId);
   const [promptDraft, setPromptDraft] = useState("");
   const [promptTargets, setPromptTargets] = useState([]); // player ids — empty = everyone
   const [prompts, setPrompts] = useState([]);
@@ -99,7 +103,7 @@ export default function ConfessionalsHost({ gameId, round, players }) {
   const saveReply = async (c) => {
     const text = replyDrafts[c.id] ?? c.host_reply ?? "";
     setReplySaving((prev) => ({ ...prev, [c.id]: true }));
-    await respondToConfessional(c.id, text);
+    await respondToConfessional(c.id, text, postAsName);
     setReplySaving((prev) => ({ ...prev, [c.id]: false }));
     reload();
   };
@@ -186,6 +190,20 @@ export default function ConfessionalsHost({ gameId, round, players }) {
         <p style={{ color: "#706050", fontSize: 12, margin: "0 0 10px", fontStyle: "italic" }}>
           Private player confessionals. Visible only here — players can't see each other's, this is never posted automatically.
         </p>
+
+        {/* Same shared persona as ChatHostPanel.jsx's own group chat —
+            whatever's typed here is who a player sees a reply come from,
+            instead of a flat "Host" every time. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
+          <label style={{ fontSize: 10, color: "#706050", textTransform: "uppercase", letterSpacing: 0.5, whiteSpace: "nowrap" }}>Replying as</label>
+          <input
+            value={postAsName}
+            onChange={(e) => setPostAsName(e.target.value)}
+            placeholder="Host"
+            maxLength={40}
+            style={{ flex: 1, maxWidth: 220, background: "#1a1512", border: "1px solid #3a3028", borderRadius: 6, padding: "4px 8px", color: "#c9a84c", fontSize: 11 }}
+          />
+        </div>
 
         {/* Prompts */}
         <div style={{ background: "#0a1020", borderRadius: 8, padding: 10, marginBottom: 12 }}>

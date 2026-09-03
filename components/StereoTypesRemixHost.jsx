@@ -6,6 +6,7 @@ import {
 import { startOnBlast } from "../lib/stereoTypesOnBlast";
 import StereoTypesRemixResults from "./StereoTypesRemixResults";
 import StereoTypesWaitingList from "./StereoTypesWaitingList";
+import { notifyPlayersRoundChange } from "../lib/pushNotifications";
 
 // ─── Stereo Types — Round 2 ("The Remix"), host console ───
 // Mirrors StereoTypesASideHost.jsx's own shape closely. Mounted by
@@ -49,7 +50,11 @@ export default function StereoTypesRemixHost({ gameId, players }) {
     // identical line from every player's own tab too. Individual
     // players still each see their own Round 2 results and click
     // through themselves — this only controls when Round 3 exists.
-    if (round.status === "scored") startOnBlast(gameId, (players || []).filter((p) => p.approved));
+    if (round.status === "scored") {
+      startOnBlast(gameId, (players || []).filter((p) => p.approved)).then((r) => {
+        if (r.justStarted) notifyPlayersRoundChange(gameId, "🎤 Round 3 — On Blast", "On Blast has started — head back in to play.", "round-change");
+      });
+    }
   }, [gameId, round]);
 
   const handleForceReveal = async () => {

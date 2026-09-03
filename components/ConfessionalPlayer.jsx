@@ -154,7 +154,7 @@ export default function ConfessionalPlayer({ gameId, player, round, readOnly = f
                   <div style={{ fontSize: 12, color: "#a68fd6" }}>{c.text}</div>
                   {c.host_reply && (
                     <div style={{ marginTop: 6, background: "rgba(0,217,255,0.08)", border: "1px solid rgba(0,217,255,0.3)", borderRadius: 6, padding: "6px 8px" }}>
-                      <div style={{ fontSize: 9, color: "#00d9ff", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Host replied</div>
+                      <div style={{ fontSize: 9, color: "#00d9ff", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>{c.host_reply_sender_name || "Host"} replied</div>
                       <div style={{ fontSize: 12, color: "#f5f0ff" }}>{c.host_reply}</div>
                     </div>
                   )}

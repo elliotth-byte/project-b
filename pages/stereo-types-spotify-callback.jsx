@@ -59,7 +59,7 @@ export default function StereoTypesSpotifyCallback() {
         justifyContent: "center",
         background: "#05070d",
         color: "#f5eddc",
-        fontFamily: "'Anton', 'Arial Narrow', sans-serif",
+        fontFamily: "'Poppins', 'Segoe UI', sans-serif",
         textAlign: "center",
         padding: 24,
       }}

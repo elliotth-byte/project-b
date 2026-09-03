@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
-import { signInHost, signOut, isHost, canHostGameType, becomeHost } from "../lib/auth";
+import { signInHostFlexible, signOut, isHost, canHostGameType, becomeHost } from "../lib/auth";
 import HostPanels from "../components/HostPanels";
 import TraitorsHostPanels from "../components/TraitorsHostPanels";
 import StereoTypesHostPanels from "../components/StereoTypesHostPanels";
@@ -309,7 +309,7 @@ export default function HostPage() {
   const submitLogin = async (e) => {
     e.preventDefault();
     setError("");
-    const res = await signInHost(email, password);
+    const res = await signInHostFlexible(email, password);
     if (!res.ok) setError(res.error);
   };
 
@@ -394,9 +394,9 @@ export default function HostPage() {
           <div style={{ marginBottom: 16 }}><HomeLink theme={siteTheme} /></div>
           <h2 style={{ fontFamily: siteTheme.font, fontSize: 22, marginBottom: 4 }}>Host Access</h2>
           <p style={{ color: siteTheme.textMuted, fontSize: 13, marginBottom: 16, fontStyle: "italic" }}>
-            Log in with the host account created in Supabase.
+            Log in with your host email, or your regular username if you became a host from a player account.
           </p>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Host email" style={siteInputStyle} autoFocus />
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Host email or username" style={siteInputStyle} autoFocus />
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" style={siteInputStyle} />
           {error && <p style={{ color: siteTheme.danger, fontSize: 13 }}>{error}</p>}
           <button type="submit" style={siteBtnStyle}>Enter</button>

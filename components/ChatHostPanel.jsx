@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card, Btn } from "./ui";
 import { subscribeGroupChat, sendGroupMessage, fetchAllThreads, fetchThreadMessages, subscribeAnyThreadActivity, fetchLatestMessageTimestamps } from "../lib/chatData";
 import { colorFor } from "../lib/playerColors";
+import { usePostAsName } from "../lib/hostVoice";
 
 function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -65,10 +66,11 @@ export default function ChatHostPanel({ gameId, players, groupChatLabel = "💬 
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages.length, threadMessages.length]);
 
+  const [postAsName, setPostAsName] = usePostAsName(gameId);
   const sendAsHost = async (text) => {
     const t = text.trim();
     if (!t) return;
-    await sendGroupMessage(gameId, "host", "Host", t);
+    await sendGroupMessage(gameId, "host", postAsName.trim() || "Host", t);
   };
 
   const [draft, setDraft] = useState("");
@@ -108,10 +110,20 @@ export default function ChatHostPanel({ gameId, players, groupChatLabel = "💬 
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { sendAsHost(draft); setDraft(""); } }}
-              placeholder="Message everyone as Host..."
+              placeholder={`Message everyone as ${postAsName.trim() || "Host"}...`}
               style={{ flex: 1, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 20, padding: "10px 14px", color: "#f5f0ff", fontSize: 13 }}
             />
             <Btn small onClick={() => { sendAsHost(draft); setDraft(""); }} disabled={!draft.trim()}>Send</Btn>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
+            <label style={{ fontSize: 10, color: "#6b4f99", textTransform: "uppercase", letterSpacing: 0.5, whiteSpace: "nowrap" }}>Posting as</label>
+            <input
+              value={postAsName}
+              onChange={(e) => setPostAsName(e.target.value)}
+              placeholder="Host"
+              maxLength={40}
+              style={{ flex: 1, background: "#0d0618", border: "1px solid #2a3040", borderRadius: 6, padding: "4px 8px", color: "#a68fd6", fontSize: 11 }}
+            />
           </div>
         </div>
       ) : openThreadId ? (

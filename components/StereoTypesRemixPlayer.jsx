@@ -7,6 +7,7 @@ import {
 import { startOnBlast } from "../lib/stereoTypesOnBlast";
 import StereoTypesRemixResults from "./StereoTypesRemixResults";
 import StereoTypesWaitingList from "./StereoTypesWaitingList";
+import { notifyPlayersRoundChange } from "../lib/pushNotifications";
 
 function nameFor(players, id) {
   const p = (players || []).find((pl) => pl.id === id);
@@ -84,7 +85,11 @@ export default function StereoTypesRemixPlayer({ gameId, player, players, global
     if (round.status === "scored" && round.result) persistRemixRoundScores(gameId, 2, round.result.perPlayer);
     // Round 3 now starts automatically the moment Round 2 finishes
     // scoring — see StereoTypesRemixHost.jsx's identical line/comment.
-    if (round.status === "scored") startOnBlast(gameId, (players || []).filter((p) => p.approved));
+    if (round.status === "scored") {
+      startOnBlast(gameId, (players || []).filter((p) => p.approved)).then((r) => {
+        if (r.justStarted) notifyPlayersRoundChange(gameId, "🎤 Round 3 — On Blast", "On Blast has started — head back in to play.", "round-change");
+      });
+    }
   }, [gameId, round]);
 
   if (!round) {

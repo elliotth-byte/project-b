@@ -8,6 +8,7 @@ import { startRemix } from "../lib/stereoTypesRemix";
 import { getSuperlativeAttributions } from "../lib/stereoTypesSuperlatives";
 import StereoTypesASideResults from "./StereoTypesASideResults";
 import StereoTypesWaitingList from "./StereoTypesWaitingList";
+import { notifyPlayersRoundChange } from "../lib/pushNotifications";
 
 function nameFor(players, id) {
   const p = (players || []).find((pl) => pl.id === id);
@@ -126,7 +127,11 @@ export default function StereoTypesASidePlayer({ gameId, player, players, global
     // when Round 2 EXISTS — StereoTypesPlayerPanels.jsx's own
     // displayRound (built from this player's onContinue clicks) is what
     // actually decides when THIS player leaves this results screen.
-    if (round.status === "scored") startRemix(gameId, (players || []).filter((p) => p.approved));
+    if (round.status === "scored") {
+      startRemix(gameId, (players || []).filter((p) => p.approved)).then((r) => {
+        if (r.justStarted) notifyPlayersRoundChange(gameId, "🔁 Round 2 — The Remix", "The Remix has started — head back in to play.", "round-change");
+      });
+    }
   }, [gameId, round]);
 
   if (!round) {

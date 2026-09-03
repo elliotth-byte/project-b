@@ -10,6 +10,7 @@ import StereoTypesRemixHost from "./StereoTypesRemixHost";
 import StereoTypesOnBlastHost from "./StereoTypesOnBlastHost";
 import { subscribeStereoTypesRound } from "../lib/stereoTypesASide";
 import StereoTypesRulesPanel from "./StereoTypesRulesPanel";
+import StereoTypesHostJoinAsPlayer from "./StereoTypesHostJoinAsPlayer";
 
 // ─── Stereo Types — host console (Phase 2-6) ───
 // Phase 2 added the real boombox graphic per roster row instead of a
@@ -126,6 +127,9 @@ export default function StereoTypesHostPanels({ gameId, roomCode, players, admin
       <Card>
         <div style={{ fontSize: 11, color: "#c9b98a", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
           🎧 Roster ({approvedPlayers.length} approved{pendingPlayers.length > 0 ? `, ${pendingPlayers.length} pending` : ""})
+        </div>
+        <div style={{ marginBottom: 10 }}>
+          <StereoTypesHostJoinAsPlayer gameId={gameId} players={players} />
         </div>
         {players.length === 0 ? (
           <p style={{ color: "#6b6558", fontSize: 12, fontStyle: "italic", margin: 0 }}>Nobody's joined yet — share the join code.</p>

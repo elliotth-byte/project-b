@@ -11,27 +11,7 @@ import { colorFor } from "../lib/playerColors";
 import { isPoseidonDmBlockActive, heraChatBlockActive } from "../lib/characterPowers";
 import { subscribeGameState } from "../lib/gameStorage";
 import { KEY_EXILE, KEY_FINALE, PHASES } from "../lib/gameState";
-import { supabase } from "../lib/supabaseClient";
-
-// Fire-and-forget — a push notification failing to send should never
-// block or show an error for the actual message send, which already
-// succeeded by the time this is called. Needs the caller's own auth
-// token since pages/api/push/notify-message.js verifies the sender is
-// really who they claim, not just an unauthenticated broadcast trigger.
-async function notifyPushForMessage(gameId, kind, senderId, senderName, body, threadId) {
-  try {
-    const { data } = await supabase.auth.getSession();
-    const token = data?.session?.access_token;
-    if (!token) return;
-    await fetch("/api/push/notify-message", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ gameId, kind, senderId, senderName, body, threadId }),
-    });
-  } catch (e) {
-    console.error("Push notify for message failed:", e);
-  }
-}
+import { notifyPushForMessage } from "../lib/pushNotifications";
 
 function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });

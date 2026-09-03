@@ -1,0 +1,23 @@
+-- ============================================================
+-- Migration: confessional reply sender name
+-- Run this in Supabase SQL Editor (New query -> paste -> Run).
+--
+-- confessionals.host_reply has always been plain text with no sender
+-- identity attached at all — every reply just showed as a flat "Host
+-- replied" to the player who wrote the confessional (see
+-- components/ConfessionalPlayer.jsx's own hardcoded label before this).
+-- This is the confessional-reply equivalent of what chat messages
+-- already had for free (players table's own senderName column) —
+-- letting a host post replies (and, separately, group chat messages —
+-- see lib/hostVoice.js's usePostAsName, which now feeds both) under a
+-- chosen name instead of a flat, generic "Host," useful for seasons
+-- that want an in-universe persona (a narrator character, a specific
+-- producer) rather than breaking the fourth wall.
+--
+-- Nullable, not backfilled: every EXISTING reply predates this column
+-- and has no sender name recorded — components/ConfessionalPlayer.jsx's
+-- own display falls back to "Host" for a null value, so old replies
+-- keep reading exactly as they always did.
+-- ============================================================
+
+alter table confessionals add column if not exists host_reply_sender_name text;

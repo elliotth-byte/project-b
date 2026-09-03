@@ -61,7 +61,7 @@ export default function SlidingPuzzlePlayer({ gameId, challenge, round, player }
     if (!done || reportedRef.current) return;
     reportedRef.current = true;
     // Math.max floors above SIZE*SIZE-1 (the max possible correctCount,
-    // 15 tiles on a 4x4 board), not just 1 — same reasoning as
+    // 8 tiles on a 3x3 board), not just 1 — same reasoning as
     // RedLightGreenLightPlayer.jsx's identical fix: a solver's score
     // must always exceed the highest possible unsolved-progress score,
     // even in the floor case.
@@ -88,7 +88,7 @@ export default function SlidingPuzzlePlayer({ gameId, challenge, round, player }
         <Badge>{elapsedSec}s · {moves} moves</Badge>
       </div>
       <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 10px", fontStyle: "italic" }}>
-        Tap a tile next to the empty slot to slide it. Get them back in order, 1 to 15.
+        Tap a tile next to the empty slot to slide it. Get them back in order, 1 to {SIZE * SIZE - 1}.
       </p>
 
       <div style={{
