@@ -3,9 +3,11 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import HomeLink from "../components/HomeLink";
 import { supabase } from "../lib/supabaseClient";
-import { fetchProfile, fetchSeasonHistory, upsertProfile, searchSeasons } from "../lib/profiles";
+import { fetchProfile, fetchSeasonHistory, fetchMostRecentAvatars, upsertProfile, searchSeasons } from "../lib/profiles";
 import { searchPeopleToDm } from "../lib/profileDms";
 import { uploadProfilePhoto, removeProfilePhoto } from "../lib/profilePhotoUpload";
+import { fetchFriendedUserIds, addFriend, removeFriend } from "../lib/friendships";
+import RelationshipWeb from "../components/RelationshipWeb";
 
 // ─── Profile ───
 // The first page in this app that isn't scoped to any one season — no
@@ -31,6 +33,9 @@ export default function ProfilePage() {
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState(null);
+  const [friended, setFriended] = useState(null); // null = not checked yet; Set of user_ids once loaded
+  const [friendBusy, setFriendBusy] = useState(false);
+  const [fallbackAvatarUrl, setFallbackAvatarUrl] = useState(null); // this person's most recent season's own avatar, only fetched if they have no profile photo
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user || null));
@@ -47,13 +52,47 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!viewingUserId) return;
+    setFallbackAvatarUrl(null); // clear any previous person's fallback immediately, don't let it flash while switching profiles
     fetchProfile(viewingUserId).then((p) => {
       setProfile(p);
       setNameDraft(p?.display_name || "");
       setQuoteDraft(p?.quote || "");
+      if (!p?.photo_url) {
+        fetchMostRecentAvatars([viewingUserId]).then((map) => setFallbackAvatarUrl(map[viewingUserId] || null));
+      }
     });
     fetchSeasonHistory(viewingUserId).then(setHistory);
   }, [viewingUserId]);
+
+  // profile.photo_url wins if set; otherwise this person's own most
+  // recent season's avatar (see lib/profiles.js's fetchMostRecentAvatars
+  // for exactly what "most recent" means — just that one season, no
+  // deeper cascade); the 👤 placeholder only shows if both are absent.
+  const displayPhotoUrl = profile?.photo_url || fallbackAvatarUrl || null;
+
+  // Only meaningful when viewing someone else — this is what drives the
+  // Friend/Unfriend button below, so it always checks the CURRENT
+  // (logged-in) user's own outgoing list, never the profile being
+  // viewed — fetchFriendedUserIds itself works for any subject (see
+  // lib/friendships.js), this call site just always passes user.id.
+  useEffect(() => {
+    if (!user || isOwnProfile) { setFriended(null); return; }
+    fetchFriendedUserIds(user.id).then((ids) => setFriended(new Set(ids)));
+  }, [user, isOwnProfile]);
+
+  const toggleFriend = async () => {
+    if (!user || !viewingUserId) return;
+    setFriendBusy(true);
+    const isFriended = friended?.has(viewingUserId);
+    const res = isFriended ? await removeFriend(user.id, viewingUserId) : await addFriend(user.id, viewingUserId);
+    setFriendBusy(false);
+    if (!res.ok) return;
+    setFriended((prev) => {
+      const next = new Set(prev);
+      if (isFriended) next.delete(viewingUserId); else next.add(viewingUserId);
+      return next;
+    });
+  };
 
   const saveName = async () => {
     const trimmed = nameDraft.trim();
@@ -166,14 +205,29 @@ export default function ProfilePage() {
         )}
 
         <div style={cardStyle}>
+          {!isOwnProfile && friended !== null && (
+            <div style={{ textAlign: "center", marginBottom: 12 }}>
+              <button
+                onClick={toggleFriend} disabled={friendBusy}
+                style={{
+                  padding: "6px 14px", borderRadius: 8, cursor: friendBusy ? "default" : "pointer", fontSize: 12, fontWeight: 700,
+                  background: friended.has(viewingUserId) ? "rgba(46,204,113,0.15)" : "#0d0618",
+                  border: `1px solid ${friended.has(viewingUserId) ? "#2ecc71" : "#3d1f5c"}`,
+                  color: friended.has(viewingUserId) ? "#2ecc71" : "#a68fd6",
+                }}
+              >
+                {friendBusy ? "..." : friended.has(viewingUserId) ? "💔 Unfriend" : "🤝 Add Friend"}
+              </button>
+            </div>
+          )}
           <div style={{ textAlign: "center", marginBottom: 16 }}>
             <div style={{
               width: 96, height: 96, borderRadius: "50%", margin: "0 auto 12px", overflow: "hidden",
               border: "2px solid #ff2d95", background: "#0d0618",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
-              {profile?.photo_url
-                ? <img src={profile.photo_url} alt={`${profile?.display_name || "Profile"} photo`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              {displayPhotoUrl
+                ? <img src={displayPhotoUrl} alt={`${profile?.display_name || "Profile"} photo`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 : <span style={{ fontSize: 32, color: "#3d1f5c" }}>👤</span>}
             </div>
             <h2 style={{ fontSize: 18, color: "#f5f0ff", margin: "0 0 6px", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
@@ -279,6 +333,22 @@ export default function ProfilePage() {
             </div>
           )}
         </div>
+
+        {history !== null && history.length > 0 && (
+          <div style={cardStyle}>
+            <div style={{ fontSize: 12, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12, textAlign: "center" }}>
+              🕸 Relationship Web
+            </div>
+            {/* Not gated on isOwnProfile — an objective view of the
+                PROFILE SUBJECT's own network (who THEY friended, who
+                THEY had adversarial votes with), same regardless of who's
+                looking. Safe to show for anyone: friendships are public
+                (sql/add-player-friendships.sql) and adversarial votes
+                only ever reflect seasons that have actually ended (see
+                lib/relationshipWeb.js's header comment). */}
+            <RelationshipWeb userId={viewingUserId} />
+          </div>
+        )}
       </div>
     </div>
   );
