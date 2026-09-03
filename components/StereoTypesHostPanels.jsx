@@ -134,7 +134,7 @@ export default function StereoTypesHostPanels({ gameId, roomCode, players, admin
             {players.map((p) => (
               <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a0e18", borderRadius: 6, padding: "6px 10px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <Boombox color={p.color} stickerId={p.equipped_sticker} size={56} />
+                  <Boombox color={p.color} stickerId={p.equipped_sticker} size={84} />
                   <span style={{ color: "#f5eddc", fontSize: 13 }}>{p.display_name}</span>
                 </div>
                 {p.approved || optimisticallyApproved.has(p.id) ? (

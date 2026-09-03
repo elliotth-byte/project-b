@@ -195,7 +195,7 @@ export default function StereoTypesPlayerPanels({ gameId, player, players }) {
 
       <Card style={{ borderColor: "#f4c430", textAlign: "center" }}>
         <div style={{ marginBottom: 12 }}>
-          <Boombox color={player?.color} stickerId={player?.equippedSticker} label={player?.name} size={160} />
+          <Boombox color={player?.color} stickerId={player?.equippedSticker} label={player?.name} size={220} />
         </div>
         <div style={{ marginBottom: nowPlaying?.isPlaying && nowPlaying?.trackName ? 10 : 0 }}>
           <DisplayNameEditor player={player} />
@@ -220,7 +220,7 @@ export default function StereoTypesPlayerPanels({ gameId, player, players }) {
         <div style={{ display: "grid", gap: 8 }}>
           {approvedPlayers.map((p) => (
             <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#0a0e18", borderRadius: 6, padding: "6px 10px" }}>
-              <Boombox color={p.color} stickerId={p.equipped_sticker} size={56} />
+              <Boombox color={p.color} stickerId={p.equipped_sticker} size={84} />
               <span style={{ color: "#f5eddc", fontSize: 13 }}>
                 {p.display_name}{p.id === player?.id && <span style={{ color: "#6b6558" }}> (you)</span>}
               </span>

@@ -60,7 +60,7 @@ export default function StereoTypesIdentityPicker({ player, allPlayers, userId, 
       </p>
 
       <div style={{ marginBottom: 16 }}>
-        <Boombox color={color} stickerId={stickerId} label={player.name} size={140} />
+        <Boombox color={color} stickerId={stickerId} label={player.name} size={200} />
       </div>
 
       {error && <p style={{ color: theme.danger, fontSize: 12, margin: "0 0 10px" }}>{error}</p>}
