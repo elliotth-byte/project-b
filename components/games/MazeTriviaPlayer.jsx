@@ -190,19 +190,24 @@ export default function MazeTriviaPlayer({ gameId, round, challenge, player }) {
           const isShortcut = shortcut.cells.has(key);
           const isKnown = isPlayer || isTarget || isVisited || isGate || isShortcut;
 
-          let bg = !isKnown ? "#05010f" : wall && !isShortcut && !isGate ? "#3d1f5c" : "#0d0618";
+          const isWallCell = wall && !isShortcut && !isGate && isKnown;
+          // Stone-block gradient for real walls, consistent with the
+          // other maze variants; a faint walked-path trail tint for
+          // plain visited floor instead of flat dark.
+          let bg = !isKnown ? "#05010f" : isWallCell ? "linear-gradient(160deg, #4a2a72, #241340)" : isVisited ? "rgba(0,255,157,0.06)" : "#0d0618";
           let content = "";
           if (isShortcut) bg = "rgba(0,217,255,0.12)";
           if (isGate) { bg = gateState === "open" ? "rgba(0,255,157,0.2)" : "rgba(255,56,96,0.18)"; content = gateState === "open" ? "🔓" : "🔒"; }
-          if (isPlayer) { bg = "#ff2d95"; content = "🧍"; }
-          else if (isTarget) { bg = "#00ff9d"; content = "💎"; }
+          if (isPlayer) { bg = "radial-gradient(circle at 35% 30%, #ff8ac8, #ff2d95)"; content = "🧍"; }
+          else if (isTarget) { bg = "radial-gradient(circle at 35% 30%, #baffe6, #00ff9d)"; content = "💎"; }
           else if (isFutureGem) content = "✨";
 
           return (
             <div key={key} style={{
               width: cell, height: cell, background: bg, boxSizing: "border-box",
               fontSize: Math.min(cell, 16), lineHeight: `${cell}px`,
-              border: "1px solid rgba(255,255,255,0.03)",
+              border: isWallCell ? "1px solid rgba(0,0,0,0.3)" : "1px solid rgba(255,255,255,0.03)",
+              boxShadow: isWallCell ? "inset 1px 1px 0 rgba(255,255,255,0.08)" : isTarget ? "inset 0 0 6px rgba(0,255,157,0.6)" : "none",
             }}>
               {content}
             </div>

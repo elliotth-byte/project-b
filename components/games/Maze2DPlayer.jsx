@@ -134,12 +134,19 @@ export default function Maze2DPlayer({ gameId, round, challenge, player }) {
           const isGoal = goal.r === r && goal.c === c;
           const isVisited = visited.has(`${r},${c}`);
           const isKnown = isPlayer || isGoal || isVisited;
-          const bg = !isKnown ? "#05010f" : wall ? "#3d1f5c" : isPlayer ? "#ff2d95" : isGoal ? "#00ff9d" : "#0d0618";
+          let bg = "#05010f";
+          if (isKnown) {
+            if (wall) bg = "linear-gradient(160deg, #4a2a72, #241340)"; // stone-block gradient, consistent with Labyrinth/the other maze variants
+            else if (isPlayer) bg = "radial-gradient(circle at 35% 30%, #ff8ac8, #ff2d95)";
+            else if (isGoal) bg = "radial-gradient(circle at 35% 30%, #baffe6, #00ff9d)";
+            else bg = "rgba(0,255,157,0.06)"; // walked-path trail tint instead of flat dark floor
+          }
           return (
             <div key={`${r}-${c}`} style={{
               width: cell, height: cell, background: bg, boxSizing: "border-box",
               fontSize: Math.min(cell, 22), lineHeight: `${cell}px`,
-              border: isKnown ? "1px solid rgba(255,255,255,0.03)" : "1px solid transparent",
+              border: isKnown ? (wall ? "1px solid rgba(0,0,0,0.3)" : "1px solid rgba(255,255,255,0.03)") : "1px solid transparent",
+              boxShadow: isGoal ? "inset 0 0 6px rgba(0,255,157,0.6)" : wall ? "inset 1px 1px 0 rgba(255,255,255,0.08)" : "none",
             }}>
               {isPlayer ? "🧍" : isGoal ? "🚩" : ""}
             </div>

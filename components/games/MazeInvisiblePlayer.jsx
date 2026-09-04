@@ -151,12 +151,13 @@ export default function MazeInvisiblePlayer({ gameId, round, challenge, player }
           const isFutureGem = gemHereIdx > gemIndex;
           const isVisited = visited.has(`${r},${c}`);
 
-          let bg, content = "";
+          let bg, content = "", isWallCell = false;
           if (mode === "view") {
             // True layout, always visible.
-            bg = wall ? "#3d1f5c" : "#0d0618";
-            if (isPlayer) { bg = "#ff2d95"; content = "🧍"; }
-            else if (isTarget) { bg = "#00ff9d"; content = "💎"; }
+            bg = wall ? "linear-gradient(160deg, #4a2a72, #241340)" : "#0d0618"; // stone-block gradient, consistent with the other maze variants
+            isWallCell = wall;
+            if (isPlayer) { bg = "radial-gradient(circle at 35% 30%, #ff8ac8, #ff2d95)"; content = "🧍"; }
+            else if (isTarget) { bg = "radial-gradient(circle at 35% 30%, #baffe6, #00ff9d)"; content = "💎"; }
             else if (isFutureGem) content = "✨";
           } else {
             // Move mode: walls are invisible. Only visited cells, the
@@ -164,16 +165,17 @@ export default function MazeInvisiblePlayer({ gameId, round, challenge, player }
             // are shown — everything else looks identical whether it's
             // open or a wall.
             const isKnown = isPlayer || isTarget || isVisited;
-            bg = !isKnown ? "#05010f" : "#0d0618";
-            if (isPlayer) { bg = "#ff2d95"; content = "🧍"; }
-            else if (isTarget) { bg = "#00ff9d"; content = "💎"; }
+            bg = !isKnown ? "#05010f" : isVisited ? "rgba(0,255,157,0.06)" : "#0d0618"; // walked-path trail tint
+            if (isPlayer) { bg = "radial-gradient(circle at 35% 30%, #ff8ac8, #ff2d95)"; content = "🧍"; }
+            else if (isTarget) { bg = "radial-gradient(circle at 35% 30%, #baffe6, #00ff9d)"; content = "💎"; }
           }
 
           return (
             <div key={`${r}-${c}`} style={{
               width: cell, height: cell, background: bg, boxSizing: "border-box",
               fontSize: Math.min(cell, 16), lineHeight: `${cell}px`,
-              border: "1px solid rgba(255,255,255,0.03)",
+              border: isWallCell ? "1px solid rgba(0,0,0,0.3)" : "1px solid rgba(255,255,255,0.03)",
+              boxShadow: isWallCell ? "inset 1px 1px 0 rgba(255,255,255,0.08)" : isTarget ? "inset 0 0 6px rgba(0,255,157,0.6)" : "none",
             }}>
               {content}
             </div>

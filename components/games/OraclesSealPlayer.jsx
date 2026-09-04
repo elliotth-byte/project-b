@@ -97,6 +97,7 @@ export default function OraclesSealPlayer({ gameId, round, challenge, player }) 
   const [targetIndex, setTargetIndex] = useState(1); // index into points[] — 0 is the fixed start, so tracing begins aiming at 1
   const [tracedPath, setTracedPath] = useState([points[0]]);
   const [cracks, setCracks] = useState(0);
+  const [crackMarks, setCrackMarks] = useState([]); // {x, y} where each crack actually happened, so they can be drawn on the tablet instead of only counted
   const [wasOffPath, setWasOffPath] = useState(false); // only counts a NEW crack on the on->off transition, not every frame spent off-path
   const [dragging, setDragging] = useState(false);
   const [shattered, setShattered] = useState(false);
@@ -134,6 +135,7 @@ export default function OraclesSealPlayer({ gameId, round, challenge, player }) 
     if (dist > TOLERANCE_PX) {
       if (!wasOffPath) {
         setWasOffPath(true);
+        setCrackMarks((m) => [...m, p]);
         setCracks((c) => {
           const next = c + 1;
           if (next >= MAX_CRACKS) setShattered(true);
@@ -207,10 +209,28 @@ export default function OraclesSealPlayer({ gameId, round, challenge, player }) 
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
       >
+        <defs>
+          <filter id="oracles-seal-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
         <path d={pathD} fill="none" stroke="#3d1f5c" strokeWidth={TOLERANCE_PX * 2} strokeLinejoin="round" opacity={0.35} />
         <path d={pathD} fill="none" stroke="#6b4f99" strokeWidth={2} strokeDasharray="4,4" />
-        {tracedD && <path d={tracedD} fill="none" stroke="#ff2d95" strokeWidth={3} strokeLinecap="round" />}
-        <circle cx={points[0].x} cy={points[0].y} r={8} fill={dragging ? "#00ff9d" : "#ff2d95"} />
+        {/* Crack marks — a small jagged X at every point where the
+            stylus actually strayed off-path, so cracks show up on the
+            tablet itself instead of only as a counter in the badge. */}
+        {crackMarks.map((m, i) => (
+          <g key={i} stroke="#ff3860" strokeWidth={2} strokeLinecap="round">
+            <line x1={m.x - 5} y1={m.y - 5} x2={m.x + 5} y2={m.y + 5} />
+            <line x1={m.x - 5} y1={m.y + 5} x2={m.x + 5} y2={m.y - 5} />
+          </g>
+        ))}
+        {tracedD && <path d={tracedD} fill="none" stroke="#ff2d95" strokeWidth={3} strokeLinecap="round" filter="url(#oracles-seal-glow)" />}
+        <circle cx={points[0].x} cy={points[0].y} r={8} fill={dragging ? "#00ff9d" : "#ff2d95"} filter="url(#oracles-seal-glow)" />
         {targetIndex <= points.length && (
           <circle cx={points[targetIndex % points.length].x} cy={points[targetIndex % points.length].y} r={CAPTURE_RADIUS_PX} fill="rgba(0,255,157,0.15)" stroke="#00ff9d" strokeWidth={1} />
         )}

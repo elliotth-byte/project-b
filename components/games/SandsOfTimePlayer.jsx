@@ -1,5 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { Card } from "../ui";
+
+// A real hourglass silhouette (two bulbs pinched at a narrow neck)
+// instead of a plain rounded-rect "tube" — same polygon used for both
+// the glass outline and to clip the sand fill, so the sand only ever
+// appears where actual glass is.
+const HOURGLASS_CLIP = "polygon(10% 0%, 90% 0%, 90% 8%, 58% 48%, 58% 52%, 90% 92%, 90% 100%, 10% 100%, 10% 92%, 42% 52%, 42% 48%, 10% 8%)";
 import GameResultCard from "./GameResultCard";
 import { useCountdown } from "./useCountdown";
 import { reportScore } from "../../lib/challengeScores";
@@ -135,16 +141,27 @@ export default function SandsOfTimePlayer({ gameId, challenge, round, player }) 
               }}
             >
               <div style={{
-                width: 44, height: 72, borderRadius: 6, position: "relative", overflow: "hidden",
-                border: `2px solid ${eligible ? color.hex : "#3d1f5c"}`, background: "#0d0618",
+                width: 44, height: 72, position: "relative",
                 opacity, transition: "opacity 0.3s",
-                boxShadow: eligible ? `0 0 12px ${color.hex}88` : "none",
+                // drop-shadow (not box-shadow) follows the clipped
+                // shape's actual silhouette, so the glow traces the
+                // hourglass outline itself rather than a rectangular box.
+                filter: eligible ? `drop-shadow(0 0 5px ${color.hex}aa)` : "none",
               }}>
+                {/* Glass outline */}
                 <div style={{
-                  position: "absolute", bottom: 0, left: 0, right: 0,
-                  height: `${Math.max(0, remainingFrac * 100)}%`,
-                  background: color.hex, transition: "height 0.1s linear",
+                  position: "absolute", inset: 0, clipPath: HOURGLASS_CLIP,
+                  background: "#0d0618", border: `2px solid ${eligible ? color.hex : "#3d1f5c"}`,
                 }} />
+                {/* Sand fill, clipped to the same hourglass shape via
+                    overflow:hidden on this wrapper. */}
+                <div style={{ position: "absolute", inset: 0, clipPath: HOURGLASS_CLIP, overflow: "hidden" }}>
+                  <div style={{
+                    position: "absolute", bottom: 0, left: 0, right: 0,
+                    height: `${Math.max(0, remainingFrac * 100)}%`,
+                    background: color.hex, transition: "height 0.1s linear",
+                  }} />
+                </div>
               </div>
               <span style={{ fontSize: 10, color: opacity > 0 ? "#a68fd6" : "#3d1f5c", fontWeight: 700 }}>
                 {durations[i]}s

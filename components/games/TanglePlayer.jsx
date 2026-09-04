@@ -125,15 +125,31 @@ export default function TanglePlayer({ gameId, round, challenge, player }) {
         style={{ width: "100%", maxWidth: 320, aspectRatio: "1", touchAction: "none", background: "#0d0618", borderRadius: 10 }}
         onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}
       >
+        <defs>
+          <radialGradient id="tangle-dot" cx="35%" cy="30%" r="70%">
+            <stop offset="0%" stopColor="#ffffff" />
+            <stop offset="100%" stopColor="#c9d9ff" />
+          </radialGradient>
+          <filter id="tangle-glow" x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur stdDeviation="2.5" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+        {/* Crossing strings get a real glow (thicker + blurred), not
+            just a color swap, so "the problem" reads at a glance. */}
         {puzzle.edges.map(([a, b], i) => (
           <line
             key={i} x1={nodes[a].x} y1={nodes[a].y} x2={nodes[b].x} y2={nodes[b].y}
-            stroke={crossings.has(i) ? "#ff3860" : "#4d96ff"} strokeWidth={2.5} strokeLinecap="round"
+            stroke={crossings.has(i) ? "#ff3860" : "#4d96ff"} strokeWidth={crossings.has(i) ? 3.5 : 2.5} strokeLinecap="round"
+            filter={crossings.has(i) ? "url(#tangle-glow)" : undefined}
           />
         ))}
+        {/* Dots — a soft gradient + glow instead of a flat fill, so
+            they read as small glowing knots rather than plain circles. */}
         {nodes.map((n, i) => (
           <circle
-            key={i} cx={n.x} cy={n.y} r={12} fill="#f5f0ff" stroke="#4d96ff" strokeWidth={2}
+            key={i} cx={n.x} cy={n.y} r={12} fill="url(#tangle-dot)" stroke="#4d96ff" strokeWidth={2}
+            filter="url(#tangle-glow)"
             onPointerDown={onPointerDown(i)} style={{ cursor: "grab" }}
           />
         ))}

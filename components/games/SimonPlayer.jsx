@@ -157,20 +157,34 @@ export default function SimonPlayer({ gameId, round, challenge, player }) {
         margin: "0 auto", width: "fit-content", border: wrongFlash ? "3px solid #ff3860" : "3px solid transparent", borderRadius: 16, padding: 4,
         transition: "border-color 0.1s",
       }}>
-        {PADS.map((pad, i) => (
-          <button
-            key={i}
-            onClick={() => tapPad(i)}
-            disabled={phase !== "input"}
-            style={{
-              width: 90, height: 90, borderRadius: 12, cursor: phase === "input" ? "pointer" : "default",
-              background: activePad === i ? pad.color : `${pad.color}22`,
-              border: `2px solid ${pad.color}`,
-              boxShadow: activePad === i ? `0 0 20px ${pad.color}` : "none",
-              transition: "background 0.08s, box-shadow 0.08s",
-            }}
-          />
-        ))}
+        {PADS.map((pad, i) => {
+          // Only the OUTER corner of each quadrant is rounded (the
+          // other three stay square) — with the small gap between pads
+          // already in the grid, that reads as one circular disc split
+          // into 4 quadrants, the classic Simon look, rather than 4
+          // independent rounded squares.
+          const outerRadius = 45;
+          const cornerRadius = [
+            i === 0 ? outerRadius : 4, i === 1 ? outerRadius : 4,
+            i === 3 ? outerRadius : 4, i === 2 ? outerRadius : 4,
+          ].join("px ") + "px";
+          return (
+            <button
+              key={i}
+              onClick={() => tapPad(i)}
+              disabled={phase !== "input"}
+              style={{
+                width: 90, height: 90, borderRadius: cornerRadius, cursor: phase === "input" ? "pointer" : "default",
+                background: activePad === i
+                  ? `radial-gradient(circle at 50% 50%, ${pad.color}, ${pad.color}cc)`
+                  : `radial-gradient(circle at 50% 50%, ${pad.color}33, ${pad.color}11)`,
+                border: `2px solid ${pad.color}`,
+                boxShadow: activePad === i ? `0 0 20px ${pad.color}` : "none",
+                transition: "background 0.08s, box-shadow 0.08s",
+              }}
+            />
+          );
+        })}
       </div>
       <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 10, fontStyle: "italic" }}>
         {phase === "playback" ? "Memorize the sequence..." : `Tap ${sequence.length - playerStep} more to finish this round.`}

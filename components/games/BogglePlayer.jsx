@@ -105,8 +105,14 @@ export default function BogglePlayer({ gameId, round, challenge, player }) {
               style={{
                 width: 56, height: 56, borderRadius: 8, fontSize: letter.length > 1 ? 18 : 22, fontWeight: 900,
                 cursor: "pointer", fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
-                background: selected ? "rgba(255,45,149,0.25)" : "#0d0618",
+                // A subtle top-lit/bottom-shadowed gradient + bevel, so
+                // each tile reads as a physical die face rather than a
+                // flat colored square.
+                background: selected
+                  ? "linear-gradient(160deg, rgba(255,45,149,0.35), rgba(255,45,149,0.15))"
+                  : "linear-gradient(160deg, #171029, #0a0614)",
                 border: `2px solid ${selected ? "#ff2d95" : "#3d1f5c"}`,
+                boxShadow: selected ? "0 0 10px rgba(255,45,149,0.5)" : "inset 0 -3px 4px rgba(0,0,0,0.4), inset 0 2px 2px rgba(255,255,255,0.04)",
                 color: selected ? "#ff2d95" : "#f5f0ff",
                 position: "relative",
               }}

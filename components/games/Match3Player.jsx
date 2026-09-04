@@ -279,10 +279,20 @@ export default function Match3Player({ gameId, round, challenge, player }) {
               key={i} onClick={() => clickTile(i)}
               onTouchStart={onTileTouchStart(i)} onTouchEnd={onTileTouchEnd(i)}
               style={{
-                width: 42, height: 42, fontSize: 20, borderRadius: 6, cursor: "pointer",
-                background: selected === i ? "rgba(255,45,149,0.25)" : "#0d0618",
+                width: 42, height: 42, fontSize: 20, borderRadius: 10, cursor: "pointer",
+                // Radial glow in the gem's own color instead of a flat
+                // dark fill — reads like a lit gem sitting in a slot
+                // rather than a plain icon button. Symbol/shape itself
+                // (gem.symbol) is untouched — that's the actual
+                // colorblind-safe signal, this is just the setting
+                // around it.
+                background: selected === i
+                  ? `radial-gradient(circle at 35% 30%, ${gem.ring}55, rgba(255,45,149,0.25))`
+                  : `radial-gradient(circle at 35% 30%, ${gem.ring}33, #0d0618 70%)`,
                 border: `2px solid ${selected === i ? "#ff2d95" : gem.ring + "55"}`,
+                boxShadow: selected === i ? `0 0 10px ${gem.ring}aa` : `inset 0 0 6px ${gem.ring}22`,
                 color: gem.ring, touchAction: swipeEnabled ? "none" : "auto",
+                transition: "background 0.15s, box-shadow 0.15s",
               }}
             >{gem.symbol}</button>
           );

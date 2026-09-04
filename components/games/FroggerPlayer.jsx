@@ -6,6 +6,7 @@ import { reportScore } from "../../lib/challengeScores";
 import { useSwipeControls } from "../../lib/games/useSwipeControls";
 import DPad from "./DPad";
 import SwipeControlsCallout from "./SwipeControlsCallout";
+import { roundedRectPath } from "./canvasShapes";
 
 // 9-wide grid so 5 home slots can sit with real gaps between them, the
 // way the original arcade game's 5 lily pads work — landing in a gap (or
@@ -193,20 +194,62 @@ export default function FroggerPlayer({ gameId, round, challenge, player }) {
       if (ctx) {
         ctx.clearRect(0, 0, W, H);
         ctx.fillStyle = "#0f2818"; ctx.fillRect(0, 0, W, CELL);
-        // Home slots — filled ones glow green, open ones just outlined.
+        // Home slots — filled ones glow green (with a soft shadow, not
+        // just a flat tint), open ones a rounded outline slot.
         HOME_COLS.forEach((c, i) => {
-          ctx.fillStyle = st.homes[i] ? "rgba(0,255,157,0.35)" : "rgba(255,255,255,0.08)";
-          ctx.fillRect(c * CELL + 3, 3, CELL - 6, CELL - 6);
+          const x = c * CELL + 3, y = 3, s = CELL - 6;
+          ctx.save();
+          if (st.homes[i]) {
+            ctx.shadowColor = "#00ff9d";
+            ctx.shadowBlur = 6;
+            ctx.fillStyle = "rgba(0,255,157,0.35)";
+          } else {
+            ctx.fillStyle = "rgba(255,255,255,0.08)";
+          }
+          roundedRectPath(ctx, x, y, s, s, 5);
+          ctx.fill();
+          ctx.restore();
         });
         if (st.fly) {
           ctx.font = `${CELL - 14}px sans-serif`;
           ctx.fillText("🪰", HOME_COLS[st.fly.slotIdx] * CELL + 6, CELL - 8);
         }
+        // Road lanes with a subtle center dashed line, instead of a flat
+        // fill — reads as an actual road, not just a dark stripe.
+        LANES.forEach((row) => {
+          ctx.fillStyle = "#1a0a2e";
+          ctx.fillRect(0, row * CELL, W, CELL);
+          ctx.strokeStyle = "rgba(255,255,255,0.12)";
+          ctx.lineWidth = 2;
+          ctx.setLineDash([8, 8]);
+          ctx.beginPath();
+          ctx.moveTo(0, row * CELL + CELL / 2);
+          ctx.lineTo(W, row * CELL + CELL / 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        });
         ctx.fillStyle = "#1a0a2e";
-        LANES.forEach((row) => ctx.fillRect(0, row * CELL, W, CELL));
         ctx.fillRect(0, (ROWS - 1) * CELL, W, CELL);
-        ctx.fillStyle = "#ff3860";
-        st.cars.forEach((car) => ctx.fillRect(car.x, car.row * CELL + 7, car.width, CELL - 14));
+
+        // Cars — rounded body with a gradient + a pair of headlight/
+        // taillight dots on the leading edge (per travel direction),
+        // instead of a flat red rectangle.
+        st.cars.forEach((car) => {
+          const cx = car.x, cy = car.row * CELL + 7, cw = car.width, ch = CELL - 14;
+          ctx.save();
+          const carGrad = ctx.createLinearGradient(cx, cy, cx, cy + ch);
+          carGrad.addColorStop(0, "#ff6f91");
+          carGrad.addColorStop(1, "#ff3860");
+          ctx.fillStyle = carGrad;
+          roundedRectPath(ctx, cx, cy, cw, ch, 5);
+          ctx.fill();
+          const lightX = car.dir > 0 ? cx + cw - 4 : cx + 4;
+          ctx.fillStyle = "#fff6c9";
+          ctx.beginPath();
+          ctx.arc(lightX, cy + ch / 2, 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        });
         if (st.lady) {
           ctx.font = `${CELL - 12}px sans-serif`;
           ctx.fillText("🤍", st.lady.col * CELL + 6, st.lady.row * CELL + CELL - 8);

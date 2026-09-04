@@ -3,9 +3,64 @@ import { Card, Badge } from "../ui";
 import GameResultCard from "./GameResultCard";
 import { useCountdown } from "./useCountdown";
 import { reportScore } from "../../lib/challengeScores";
+import { roundedRectPath, drawGlossHighlight } from "./canvasShapes";
 
 const W = 300, H = 380, PADDLE_W = 60, PADDLE_H = 10, BALL_R = 6;
 const ROWS = 4, COLS = 7, BRICK_W = W / COLS, BRICK_H = 16;
+// One color per row, classic-Breakout style, instead of every brick
+// being the same flat pink — purely visual, doesn't change scoring.
+const ROW_COLORS = ["#ff2d95", "#ff6f4d", "#ffd93d", "#00d9ff"];
+
+function drawBoard(ctx, st) {
+  ctx.clearRect(0, 0, W, H);
+
+  // Bricks — rounded, gradient-shaded per row, with a thin bevel
+  // highlight along the top edge instead of a flat fill.
+  for (const b of st.bricks) {
+    if (!b.alive) continue;
+    const x = b.c * BRICK_W + 1, y = b.r * BRICK_H + 20, w = BRICK_W - 2, h = BRICK_H - 2;
+    const base = ROW_COLORS[b.r % ROW_COLORS.length];
+    ctx.save();
+    const grad = ctx.createLinearGradient(x, y, x, y + h);
+    grad.addColorStop(0, base);
+    grad.addColorStop(1, base + "aa");
+    ctx.fillStyle = grad;
+    roundedRectPath(ctx, x, y, w, h, 3);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + 2, y + 1.5);
+    ctx.lineTo(x + w - 2, y + 1.5);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Paddle — rounded ends + a subtle gradient instead of a flat bar.
+  ctx.save();
+  const paddleGrad = ctx.createLinearGradient(st.paddleX, 0, st.paddleX + PADDLE_W, 0);
+  paddleGrad.addColorStop(0, "#ffffff");
+  paddleGrad.addColorStop(1, "#c9bfe0");
+  ctx.fillStyle = paddleGrad;
+  roundedRectPath(ctx, st.paddleX, H - 20, PADDLE_W, PADDLE_H, PADDLE_H / 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Ball — radial gradient sphere with a soft glow + gloss highlight,
+  // instead of a flat filled circle.
+  ctx.save();
+  ctx.shadowColor = "#ff2d95";
+  ctx.shadowBlur = 6;
+  const ballGrad = ctx.createRadialGradient(st.ballX - BALL_R * 0.3, st.ballY - BALL_R * 0.3, 1, st.ballX, st.ballY, BALL_R);
+  ballGrad.addColorStop(0, "#ffe6f3");
+  ballGrad.addColorStop(1, "#ff2d95");
+  ctx.fillStyle = ballGrad;
+  ctx.beginPath();
+  ctx.arc(st.ballX, st.ballY, BALL_R, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  drawGlossHighlight(ctx, st.ballX, st.ballY, BALL_R, 0.5);
+}
 
 export default function BreakoutPlayer({ gameId, round, challenge, player }) {
   const cfg = challenge?.gameConfig || { lives: 3 };
@@ -71,14 +126,7 @@ export default function BreakoutPlayer({ gameId, round, challenge, player }) {
       if (countdownRef.current > 0) {
         // Still draw the static board during the countdown — just skip
         // all movement/collision this frame.
-        if (ctx) {
-          ctx.clearRect(0, 0, W, H);
-          ctx.fillStyle = "#ff2d95";
-          for (const b of st.bricks) if (b.alive) ctx.fillRect(b.c * BRICK_W + 1, b.r * BRICK_H + 20, BRICK_W - 2, BRICK_H - 2);
-          ctx.fillStyle = "#f5f0ff";
-          ctx.fillRect(st.paddleX, H - 20, PADDLE_W, PADDLE_H);
-          ctx.beginPath(); ctx.arc(st.ballX, st.ballY, BALL_R, 0, Math.PI * 2); ctx.fill();
-        }
+        if (ctx) drawBoard(ctx, st);
         raf = requestAnimationFrame(loop);
         return;
       }
@@ -128,14 +176,7 @@ export default function BreakoutPlayer({ gameId, round, challenge, player }) {
         setLevel(st.level);
       }
 
-      if (ctx) {
-        ctx.clearRect(0, 0, W, H);
-        ctx.fillStyle = "#ff2d95";
-        for (const b of st.bricks) if (b.alive) ctx.fillRect(b.c * BRICK_W + 1, b.r * BRICK_H + 20, BRICK_W - 2, BRICK_H - 2);
-        ctx.fillStyle = "#f5f0ff";
-        ctx.fillRect(st.paddleX, H - 20, PADDLE_W, PADDLE_H);
-        ctx.beginPath(); ctx.arc(st.ballX, st.ballY, BALL_R, 0, Math.PI * 2); ctx.fill();
-      }
+      if (ctx) drawBoard(ctx, st);
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);

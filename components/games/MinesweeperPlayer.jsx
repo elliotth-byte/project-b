@@ -110,8 +110,19 @@ export default function MinesweeperPlayer({ gameId, round, challenge, player }) 
               key={i} onClick={() => tapCell(x, y)}
               style={{
                 width: 30, height: 30, fontSize: 14, fontWeight: 900,
-                background: isMineHit ? "#ff3860" : isRevealed ? "#150a28" : "#0d0618",
+                // Classic Minesweeper bevel: unrevealed cells raised
+                // (light top-left edge, dark bottom-right), revealed
+                // cells sunken in — reads as physical buttons instead
+                // of a flat colored grid.
+                background: isMineHit
+                  ? "linear-gradient(160deg, #ff6f91, #ff3860)"
+                  : isRevealed ? "#150a28" : "linear-gradient(160deg, #1c1230, #0d0618)",
                 border: `1px solid ${isRevealed ? "#3d1f5c" : "#5c3a8c"}`,
+                boxShadow: isMineHit
+                  ? "none"
+                  : isRevealed
+                    ? "inset 0 2px 3px rgba(0,0,0,0.5)"
+                    : "inset 1px 1px 0 rgba(255,255,255,0.08), inset -2px -2px 3px rgba(0,0,0,0.5)",
                 color: isRevealed ? NUMBER_COLORS[num] || "#f5f0ff" : "#f5f0ff",
                 cursor: "pointer",
               }}

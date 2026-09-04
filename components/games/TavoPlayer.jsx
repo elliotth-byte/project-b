@@ -153,18 +153,31 @@ export default function TavoPlayer({ gameId, round, challenge, player }) {
             <div key={i} style={{
               aspectRatio: "1", position: "relative", borderRadius: 4,
               background: isMarker ? "rgba(122,92,255,0.18)" : "rgba(255,255,255,0.03)",
-              border: isMarker ? "1px solid rgba(122,92,255,0.5)" : "none",
+              // Target markers get a glowing dashed outline ring instead
+              // of a flat thin border, so an empty target reads as
+              // something actively waiting for its crate.
+              border: isMarker ? "2px dashed #7a5cff" : "none",
+              boxShadow: isMarker && !onCrate ? "inset 0 0 8px rgba(122,92,255,0.35)" : "none",
             }}>
               {onCrate && (
                 <div style={{
-                  position: "absolute", inset: 3, borderRadius: 4,
-                  background: crateHome ? "#00ff9d" : "#7a5cff", opacity: crateHome ? 0.85 : 1,
+                  position: "absolute", inset: 3, borderRadius: 3,
+                  // A lighter top-face + darker side-face gradient
+                  // (classic isometric-box-lite trick) instead of a
+                  // flat fill, so a crate reads as a 3D box rather than
+                  // a colored square.
+                  background: crateHome
+                    ? "linear-gradient(160deg, #baffe6 0%, #00ff9d 45%, #00b876 100%)"
+                    : "linear-gradient(160deg, #c3b3ff 0%, #7a5cff 45%, #5335c4 100%)",
+                  border: `1px solid ${crateHome ? "#00ff9d" : "#7a5cff"}`,
+                  boxShadow: crateHome ? "0 0 6px rgba(0,255,157,0.5)" : "0 2px 3px rgba(0,0,0,0.4)",
                 }} />
               )}
               {isPlayer && (
                 <div style={{
                   position: "absolute", inset: "22%", borderRadius: "50%",
-                  background: "#ff2d95", boxShadow: "0 0 8px rgba(255,45,149,0.7)",
+                  background: "radial-gradient(circle at 35% 30%, #ffb3d9, #ff2d95)",
+                  boxShadow: "0 0 8px rgba(255,45,149,0.7)",
                 }} />
               )}
             </div>

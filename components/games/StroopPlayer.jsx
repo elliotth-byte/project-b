@@ -125,13 +125,16 @@ export default function StroopPlayer({ gameId, challenge, round, player }) {
             <div
               key={i}
               style={{
-                padding: "10px 4px", borderRadius: 8, fontSize: 13, fontWeight: 900,
+                padding: "10px 4px", borderRadius: 10, fontSize: 13, fontWeight: 900,
                 background: isCleared ? "#0d0618" : isFlashing ? (flash.correct ? "rgba(0,255,157,0.2)" : "rgba(255,56,96,0.2)") : isCurrent ? "rgba(255,45,149,0.15)" : "#150a28",
                 border: `2px solid ${isCleared ? "#3d1f5c" : isCurrent ? "#ff2d95" : "#3d1f5c"}`,
                 color: isCleared ? "#3d1f5c" : tile.inkHex,
                 opacity: isCleared ? 0.4 : 1,
                 fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
-                boxShadow: isCurrent ? "0 0 12px rgba(255,45,149,0.5)" : "none",
+                // Tile depth: a soft outer shadow at rest, a real glow
+                // on the active tile — reads as a raised card instead of
+                // a flat text label.
+                boxShadow: isCurrent ? "0 0 12px rgba(255,45,149,0.5)" : "0 2px 4px rgba(0,0,0,0.3)",
               }}
             >
               {isCleared ? "✓" : tile.word}
@@ -155,9 +158,10 @@ export default function StroopPlayer({ gameId, challenge, round, player }) {
             key={c.name}
             onClick={() => answerColor(c.name)}
             style={{
-              padding: "12px 8px", borderRadius: 8, cursor: "pointer",
-              background: `${c.hex}22`, border: `2px solid ${c.hex}`, color: c.hex,
+              padding: "12px 8px", borderRadius: 10, cursor: "pointer",
+              background: `linear-gradient(160deg, ${c.hex}33, ${c.hex}11)`, border: `2px solid ${c.hex}`, color: c.hex,
               fontSize: 13, fontWeight: 900, fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
+              boxShadow: `0 2px 6px ${c.hex}22`,
             }}
           >
             {c.name}
