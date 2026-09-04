@@ -418,9 +418,11 @@ export default function PlayPage() {
     };
     return (
       <div style={{ ...pageStyle, background: siteTheme.pageBg, fontFamily: siteTheme.font }}>
+        <div style={{ position: "absolute", top: 20, left: 24 }}><HomeLink theme={siteTheme} /></div>
         <div style={{ position: "absolute", top: 20, right: 24 }}><LogoutButton theme={siteTheme} /></div>
         <div style={{ textAlign: "center", maxWidth: 280 }}>
           <p style={{ color: siteTheme.textMuted }}>Ask the host for your join link — it looks like <code>/play?game=...</code>.</p>
+          <p style={{ color: siteTheme.textMuted, fontSize: 12, marginTop: 4 }}>Looking to host instead? Head back to <a href="/" style={{ color: siteTheme.accent }}>Home</a> — hosting starts from there, not here.</p>
           <p style={{ color: siteTheme.textMuted, margin: "12px 0" }}>...or enter your four-letter code:</p>
           <form onSubmit={submitCode} style={{ display: "flex", gap: 8, justifyContent: "center" }}>
             <input

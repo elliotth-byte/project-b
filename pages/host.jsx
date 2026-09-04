@@ -245,8 +245,18 @@ export default function HostPage() {
       `Permanently delete "${g.name}"? This removes every player, vote, confessional, and battle result from this season. This can't be undone.`
     );
     if (!confirmed) return;
-    const { error: err } = await supabase.from("games").delete().eq("id", g.id);
+    // .select() here matters: without it, a delete blocked by RLS (or one
+    // that simply matches no row) returns no error at all — it just quietly
+    // deletes zero rows. Checking the returned rows is how we tell "deleted"
+    // apart from "silently did nothing," which is what let a blocked delete
+    // look successful in the UI right up until the season reappeared on
+    // refresh.
+    const { data: deleted, error: err } = await supabase.from("games").delete().eq("id", g.id).select();
     if (err) { setError(err.message); return; }
+    if (!deleted || deleted.length === 0) {
+      setError("Delete didn't go through — you may not have permission to delete this season.");
+      return;
+    }
     const remaining = (games || []).filter((x) => x.id !== g.id);
     setGames(remaining);
     if (g.id === activeGameId) {

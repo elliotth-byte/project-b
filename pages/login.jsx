@@ -58,8 +58,18 @@ export default function Login() {
     // they'd land on /play having just done all that specifically to
     // go host something, and have to navigate back to /host themselves.
     if (arrivedFromBecomeHost) { router.push("/host"); return; }
+    // Only go straight to /play when this login actually came from a game
+    // link (?game=... in the URL) — that's the one case where skipping
+    // the hub and dropping the player right into their season is the
+    // right shortcut. A plain /login visit (bookmarked, typed, or reached
+    // via "Host a game instead" and then backed out of) has no game
+    // context to jump into, and used to land on /play's "enter your join
+    // code" screen anyway — a dead end for anyone who actually meant to
+    // do something else, like host. Home already covers every case
+    // (Continue to Game if there is one, Host a game, profile, etc.), so
+    // it's the right landing spot whenever there's no game to jump to.
     const game = router.query.game;
-    router.push(game ? `/play?game=${game}` : "/play");
+    router.push(game ? `/play?game=${game}` : "/");
   };
 
   const submitHostSignup = async (e) => {
