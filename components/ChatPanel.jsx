@@ -11,27 +11,7 @@ import { colorFor } from "../lib/playerColors";
 import { isPoseidonDmBlockActive, heraChatBlockActive } from "../lib/characterPowers";
 import { subscribeGameState } from "../lib/gameStorage";
 import { KEY_EXILE, KEY_FINALE, PHASES } from "../lib/gameState";
-import { supabase } from "../lib/supabaseClient";
-
-// Fire-and-forget — a push notification failing to send should never
-// block or show an error for the actual message send, which already
-// succeeded by the time this is called. Needs the caller's own auth
-// token since pages/api/push/notify-message.js verifies the sender is
-// really who they claim, not just an unauthenticated broadcast trigger.
-async function notifyPushForMessage(gameId, kind, senderId, senderName, body, threadId) {
-  try {
-    const { data } = await supabase.auth.getSession();
-    const token = data?.session?.access_token;
-    if (!token) return;
-    await fetch("/api/push/notify-message", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ gameId, kind, senderId, senderName, body, threadId }),
-    });
-  } catch (e) {
-    console.error("Push notify for message failed:", e);
-  }
-}
+import { notifyPushForMessage } from "../lib/pushNotifications";
 
 function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -555,7 +535,7 @@ function MessagesView({ gameId, player, players, byId, openThread, setOpenThread
 // member groups, both the same underlying model — see
 // sql/add-group-chat.sql). Only shown at all when the host has turned
 // chat on for this season (settings.chatEnabled).
-export default function ChatPanel({ gameId, player, players, realName, isExiled, readOnly = false, round, settings }) {
+export default function ChatPanel({ gameId, player, players, realName, isExiled, readOnly = false, round, settings, groupChatLabel = "💬 Panopticon" }) {
   const [mode, setMode] = useState(isExiled ? "exile" : "group"); // "group" | "exile" | "messages"
   const [openThread, setOpenThread] = useState(null);
   const [groupReadAt, setGroupReadAt] = useState(null);
@@ -630,7 +610,7 @@ export default function ChatPanel({ gameId, player, players, realName, isExiled,
   // not just de-emphasized. That only holds DURING the season, though —
   // see gameEnded above for why it's reinstated once the season ends.
   const tabs = [
-    ...(isExiled && !gameEnded ? [] : [{ key: "group", label: "💬 Panopticon", unread: groupUnread }]),
+    ...(isExiled && !gameEnded ? [] : [{ key: "group", label: groupChatLabel, unread: groupUnread }]),
     ...(isExiled ? [{ key: "exile", label: "🔥 Exile" }] : []),
     { key: "messages", label: "✉️ Messages", unread: anyThreadUnread },
   ];

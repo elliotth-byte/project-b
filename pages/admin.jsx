@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import HomeLink from "../components/HomeLink";
 import { supabase } from "../lib/supabaseClient";
 import { checkIsPlatformAdmin, searchPeople, fetchOpenReports, markReportReviewed } from "../lib/adminModeration";
+import { fetchPendingSubmissions, approveSubmission, rejectSubmission, fetchApprovedSubmissions, unpublishSubmission } from "../lib/stereoTypesSubmissions";
+import { SUPERLATIVES } from "../lib/stereoTypesSuperlatives";
 import { upsertProfile, fetchSeasonHistory } from "../lib/profiles";
 import { removeProfilePhoto, uploadProfilePhoto } from "../lib/profilePhotoUpload";
 import { fetchGloballyDisabledChallenges, setGloballyDisabledChallenges } from "../lib/platformSettings";
@@ -32,6 +34,11 @@ export default function AdminPage() {
   const [history, setHistory] = useState(null); // season history for whichever person is currently open, null = not loaded yet
   const [reports, setReports] = useState(null);
   const [reviewingBusy, setReviewingBusy] = useState(null); // reportId currently being marked reviewed, or null
+  const [submissions, setSubmissions] = useState(null); // Stereo Types superlative submissions awaiting moderation
+  const [submissionBusy, setSubmissionBusy] = useState(null); // submissionId currently being approved/rejected, or null
+  const [approvedSubmissions, setApprovedSubmissions] = useState(null); // player-submitted superlatives currently live in the pool
+  const [unpublishBusy, setUnpublishBusy] = useState(null); // submissionId currently being pulled from the pool, or null
+  const [showSeedPool, setShowSeedPool] = useState(false); // the static seeded list is long — collapsed by default
   const [globallyDisabled, setGloballyDisabledState] = useState(null); // null = not loaded yet
   const [savingChallengePool, setSavingChallengePool] = useState(false);
 
@@ -53,6 +60,8 @@ export default function AdminPage() {
     if (isAdmin !== true) return;
     fetchOpenReports().then(setReports);
     fetchGloballyDisabledChallenges().then(setGloballyDisabledState);
+    fetchPendingSubmissions().then(setSubmissions);
+    fetchApprovedSubmissions().then(setApprovedSubmissions);
   }, [isAdmin]);
 
   const toggleGlobalChallenge = async (key, enabled) => {
@@ -70,6 +79,34 @@ export default function AdminPage() {
     const res = await markReportReviewed(reportId);
     setReviewingBusy(null);
     if (res.ok) setReports((rs) => rs.filter((r) => r.reportId !== reportId));
+  };
+
+  // Same busy-state-per-row, remove-from-list-on-success pattern as
+  // reviewReport above — approve/reject just differ in which status they
+  // set (see lib/stereoTypesSubmissions.js), not in how the UI reacts.
+  const decideSubmission = async (submissionId, approve) => {
+    setSubmissionBusy(submissionId);
+    const submission = (submissions || []).find((s) => s.submissionId === submissionId);
+    const res = await (approve ? approveSubmission(submissionId) : rejectSubmission(submissionId));
+    setSubmissionBusy(null);
+    if (res.ok) {
+      setSubmissions((ss) => ss.filter((s) => s.submissionId !== submissionId));
+      // Approving moves it straight into the live pool section below —
+      // re-fetching would work too, but this reflects it immediately
+      // without a second round trip.
+      if (approve && submission) setApprovedSubmissions((as) => [submission, ...(as || [])]);
+    }
+  };
+
+  // Same busy-state-per-row pattern as decideSubmission above — pulling
+  // an approved submission back out of the pool (see
+  // lib/stereoTypesSubmissions.js's unpublishSubmission for why this
+  // isn't just a second "reject").
+  const unpublish = async (submissionId) => {
+    setUnpublishBusy(submissionId);
+    const res = await unpublishSubmission(submissionId);
+    setUnpublishBusy(null);
+    if (res.ok) setApprovedSubmissions((as) => (as || []).filter((s) => s.submissionId !== submissionId));
   };
 
   const runSearch = async (e) => {
@@ -165,6 +202,107 @@ export default function AdminPage() {
                     style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, color: "#a68fd6", fontSize: 11, padding: "5px 10px", cursor: "pointer" }}
                   >
                     {reviewingBusy === r.reportId ? "..." : "Mark reviewed"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Stereo Types' own player-submitted superlatives queue (see
+            lib/stereoTypesSubmissions.js and
+            sql/add-stereo-types-superlative-submissions.sql) — same
+            list-with-action-buttons shape as Open Reports above, just
+            with two actions per row instead of one, since a submission
+            has a real "yes" as well as a "no." Approving actually feeds
+            future games (lib/stereoTypesSuperlatives.js's
+            getSuperlativePool); rejecting just discards it, matching how
+            a reviewed DM report can't be un-reported either. */}
+        <div style={{ ...cardStyle, marginBottom: 20 }}>
+          <div style={{ fontSize: 12, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+            🎤 Stereo Types superlative submissions {submissions && submissions.length > 0 && `(${submissions.length})`}
+          </div>
+          {submissions === null ? (
+            <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>Loading...</p>
+          ) : submissions.length === 0 ? (
+            <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>Nothing pending review.</p>
+          ) : (
+            <div style={{ display: "grid", gap: 10 }}>
+              {submissions.map((s) => (
+                <div key={s.submissionId} style={{ background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "10px 12px" }}>
+                  <p style={{ fontSize: 12, color: "#f5f0ff", margin: "0 0 6px" }}>"{s.body}"</p>
+                  <p style={{ fontSize: 11, color: "#a68fd6", margin: "0 0 8px" }}>
+                    Suggested by <strong>{s.submitterName || "Unknown"}</strong>
+                  </p>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      onClick={() => decideSubmission(s.submissionId, true)} disabled={submissionBusy === s.submissionId}
+                      style={{ background: "#2dd4bf", border: "none", borderRadius: 6, color: "#05010f", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" }}
+                    >
+                      {submissionBusy === s.submissionId ? "..." : "Approve"}
+                    </button>
+                    <button
+                      onClick={() => decideSubmission(s.submissionId, false)} disabled={submissionBusy === s.submissionId}
+                      style={{ background: "none", border: "1px solid #ff3860", borderRadius: 6, color: "#ff3860", fontSize: 11, padding: "5px 10px", cursor: "pointer" }}
+                    >
+                      {submissionBusy === s.submissionId ? "..." : "Reject"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* The actual live pool — everything lib/stereoTypesSuperlatives.js's
+            getSuperlativePool hands out to a real round right now, not just
+            the moderation queue above. Two parts: the static seeded list
+            (fixed content shipped with the app, so nothing to moderate —
+            collapsed behind a <details> the same way GameAccessPanel.jsx's
+            own "Advanced: direct link" hides a long block by default), and
+            every currently-approved player submission, each with an
+            "Unpublish" escape hatch for a submission an admin reconsiders
+            after the fact (see lib/stereoTypesSubmissions.js's
+            unpublishSubmission — same status flip a normal reject already
+            means to the pool, just reachable after approval too). */}
+        <div style={{ ...cardStyle, marginBottom: 20 }}>
+          <div style={{ fontSize: 12, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+            🎧 Stereo Types superlative pool
+          </div>
+
+          <details open={showSeedPool} onToggle={(e) => setShowSeedPool(e.target.open)} style={{ marginBottom: 14 }}>
+            <summary style={{ color: "#6b4f99", fontSize: 11, cursor: "pointer" }}>
+              Seeded pool ({SUPERLATIVES.length}) — built into the app, nothing to moderate
+            </summary>
+            <div style={{ marginTop: 8, display: "grid", gap: 4, maxHeight: 220, overflowY: "auto" }}>
+              {SUPERLATIVES.map((text) => (
+                <p key={text} style={{ fontSize: 11.5, color: "#a68fd6", margin: 0 }}>{text}</p>
+              ))}
+            </div>
+          </details>
+
+          <div style={{ fontSize: 11, color: "#6b4f99", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+            Player-submitted, live in the pool {approvedSubmissions && approvedSubmissions.length > 0 && `(${approvedSubmissions.length})`}
+          </div>
+          {approvedSubmissions === null ? (
+            <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>Loading...</p>
+          ) : approvedSubmissions.length === 0 ? (
+            <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic" }}>No player-submitted superlatives are live yet — approve one above.</p>
+          ) : (
+            <div style={{ display: "grid", gap: 10 }}>
+              {approvedSubmissions.map((s) => (
+                <div key={s.submissionId} style={{ background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                  <div>
+                    <p style={{ fontSize: 12, color: "#f5f0ff", margin: "0 0 4px" }}>"{s.body}"</p>
+                    <p style={{ fontSize: 11, color: "#a68fd6", margin: 0 }}>
+                      Submitted by <strong>{s.submitterName || "Unknown"}</strong>
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => unpublish(s.submissionId)} disabled={unpublishBusy === s.submissionId}
+                    style={{ background: "none", border: "1px solid #ff3860", borderRadius: 6, color: "#ff3860", fontSize: 11, padding: "5px 10px", cursor: "pointer", whiteSpace: "nowrap" }}
+                  >
+                    {unpublishBusy === s.submissionId ? "..." : "Unpublish"}
                   </button>
                 </div>
               ))}

@@ -15,6 +15,41 @@
 -- half the time), doing that rewrite carefully is what actually
 -- resolves this, rather than a targeted one-line fix to code whose
 -- exact fault couldn't be pinned down with certainty.
+--
+-- ⚠ IF YOU'RE RUNNING THIS ON A PROJECT THAT ALREADY HAS
+-- sql/add-season-placement.sql APPLIED (which itself already replaces
+-- both public_season_history and public_season_roster with a newer,
+-- wider shape — elimination_order/total_players added on top of
+-- everything below, plus sql/exclude-stereo-types-from-history.sql on
+-- top of THAT for public_season_history specifically): the two
+-- `create or replace function` blocks below for public_season_history
+-- and public_season_roster will fail with "cannot change return type
+-- of existing function" (42P13), because your database's copies
+-- already have a different, newer column list than what's defined
+-- here, and `create or replace` can't reconcile that (only DROP +
+-- CREATE can, which would be a genuine regression here — it'd throw
+-- away the elimination_order/total_players columns your app already
+-- depends on). This migration predates that one; its own versions of
+-- those two functions are simply obsolete by now.
+--
+-- If that's your situation, don't run this whole file — just run the
+-- two statements that are STILL new relative to everything else in
+-- this repo's sql/ folder and don't conflict with anything later:
+--
+--   alter table profiles add column if not exists quote text;
+--
+--   create or replace function public.search_seasons(p_query text)
+--   returns table (game_id uuid, season_name text, season_date timestamptz, player_count bigint)
+--   language sql security definer set search_path = public stable as $$
+--     select g.id as game_id, g.name as season_name, g.created_at as season_date,
+--       (select count(*) from players p where p.game_id = g.id and p.approved = true) as player_count
+--     from games g where g.name ilike '%' || p_query || '%'
+--     order by g.created_at desc limit 25;
+--   $$;
+--
+-- (search_seasons is untouched by any later migration, so it's always
+-- safe to run as-is regardless of where the rest of your database's
+-- schema history stands.)
 -- ============================================================
 
 alter table profiles add column if not exists quote text;
@@ -23,6 +58,11 @@ alter table profiles add column if not exists quote text;
 -- create or replace is normally needed for a body-only change) — this
 -- one adds is_host on top of the original 9 columns, so Postgres
 -- requires the old version dropped first rather than replaced in place.
+--
+-- ⚠ Getting a 42P13 here (or on public_season_roster further down)
+-- anyway? Your database already has sql/add-season-placement.sql's
+-- newer versions of these two functions — see this file's own header
+-- comment for what to run instead of this whole file.
 drop function if exists public.public_season_history(uuid);
 
 create or replace function public.public_season_history(p_user_id uuid)
@@ -112,6 +152,14 @@ $$;
 -- may not also be a player). Same security-definer exception as
 -- search_seasons, for the same reason: this needs to work for someone
 -- who never played in or hosted the season being looked up.
+--
+-- No `drop function` guard here the way public_season_history above
+-- has one — fine on a fresh install (this is the very first thing that
+-- ever defines public_season_roster, so `create or replace` behaves as
+-- a plain `create`), but see this file's own header comment if you're
+-- hitting 42P13 here: it means sql/add-season-placement.sql's own
+-- later, wider version is already installed, and this file's version
+-- is the one that's obsolete now, not the other way around.
 create or replace function public.public_season_roster(p_game_id uuid)
 returns table (
   user_id uuid,

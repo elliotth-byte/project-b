@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { supabase } from "../lib/supabaseClient";
 import {
   isPushSupported, getExistingSubscription, subscribeToPush, updatePushPrefs, unsubscribeFromPush,
 } from "../lib/pushNotifications";
@@ -17,6 +18,19 @@ export default function NotificationSettings({ gameId, player, readOnly = false,
   const [pushSub, setPushSub] = useState(null); // existing subscription row, or null if not subscribed
   const [pushBusy, setPushBusy] = useState(false);
   const [pushMessage, setPushMessage] = useState("");
+  // Not passed in by any caller today (this component has never needed
+  // to know its own game type before) — fetched directly off gameId so
+  // the copy below can say something accurate for Stereo Types the
+  // moment it's ever mounted for one, without having to thread a new
+  // prop through OptionsPanel.jsx/OnboardingPreferences.jsx first.
+  const [gameType, setGameType] = useState(null);
+
+  useEffect(() => {
+    if (!gameId) return;
+    supabase.from("games").select("game_type").eq("id", gameId).maybeSingle()
+      .then(({ data }) => setGameType(data?.game_type || null));
+  }, [gameId]);
+  const isStereoTypes = gameType === "stereo_types";
 
   useEffect(() => {
     // A push subscription is tied to a specific browser/device (see
@@ -107,11 +121,15 @@ export default function NotificationSettings({ gameId, player, readOnly = false,
       <div style={{ display: "grid", gap: 10, marginBottom: 10 }}>
         <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#f5f0ff", cursor: "pointer" }}>
           <input type="checkbox" checked={!!pushSub.notify_rounds} onChange={() => togglePushPref("notify_rounds")} />
-          Round changes — a new Battle, Exile Vote, or Fates Ceremony starting
+          {isStereoTypes
+            ? "Round changes — a new A Side, The Remix, or On Blast round starting"
+            : "Round changes — a new Battle, Exile Vote, or Fates Ceremony starting"}
         </label>
         <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#f5f0ff", cursor: "pointer" }}>
           <input type="checkbox" checked={!!pushSub.notify_public_messages} onChange={() => togglePushPref("notify_public_messages")} />
-          Public messages — new activity in Panopticon (group chat)
+          {isStereoTypes
+            ? "Public messages — new activity in the group chat"
+            : "Public messages — new activity in Panopticon (group chat)"}
         </label>
         <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#f5f0ff", cursor: "pointer" }}>
           <input type="checkbox" checked={!!pushSub.notify_private_messages} onChange={() => togglePushPref("notify_private_messages")} />

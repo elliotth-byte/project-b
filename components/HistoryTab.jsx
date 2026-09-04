@@ -7,6 +7,7 @@ import AnnouncementsFeed from "./AnnouncementsFeed";
 import { LiveNominationsRecap, ChallengeResultsCard, RoundCeremonyCard, FinaleCard, IdentityRevealCard } from "./CeremonyCards";
 import { subscribeFinaleQa } from "../lib/finaleQaData";
 import { buildVotingRows } from "../lib/votingSpreadsheet";
+import { fetchProfilePhotos } from "../lib/profiles";
 
 // ─── Host: History tab ───
 // Deliberately kept in lockstep with the player-facing Ceremony tab
@@ -23,6 +24,17 @@ export default function HistoryTab({ gameId, players, gameName, round, settings 
   const [reentry, setReentry] = useState([]);
   const [finale, setFinale] = useState(null);
   const [finaleQa, setFinaleQa] = useState({ statements: {}, questions: [] });
+  // Same finalist-photo fetch as CeremonyPlayer.jsx's own copy — kept as
+  // a separate fetch here rather than a shared hook, matching how this
+  // file already duplicates rather than shares state with its player-
+  // facing counterpart (see this file's own header comment).
+  const [profilePhotos, setProfilePhotos] = useState({});
+  useEffect(() => {
+    if (!finale?.finalists?.length) return;
+    const userIds = finale.finalists.map((f) => (players || []).find((p) => p.id === f.playerId)?.user_id);
+    fetchProfilePhotos(userIds).then(setProfilePhotos);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finale?.finalists]);
   const [liveFates, setLiveFates] = useState(null);
   const [liveExile, setLiveExile] = useState(null);
   const [showComments, setShowComments] = useState(false);
@@ -167,7 +179,7 @@ export default function HistoryTab({ gameId, players, gameName, round, settings 
       {currentPage?.type === "finale" && (
         <>
           {round?.phase === PHASES.ENDED && settings?.aliasEnabled && <IdentityRevealCard players={players} />}
-          <FinaleCard finale={finale} rows={finaleRows} byId={byId} showComments={showComments} qa={finaleQa} />
+          <FinaleCard finale={finale} rows={finaleRows} byId={byId} showComments={showComments} qa={finaleQa} players={players} profilePhotos={profilePhotos} />
         </>
       )}
 

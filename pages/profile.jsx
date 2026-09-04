@@ -25,8 +25,10 @@ export default function ProfilePage() {
   const [history, setHistory] = useState(null);
   const [nameDraft, setNameDraft] = useState("");
   const [savingName, setSavingName] = useState(false);
+  const [nameError, setNameError] = useState("");
   const [quoteDraft, setQuoteDraft] = useState("");
   const [savingQuote, setSavingQuote] = useState(false);
+  const [quoteError, setQuoteError] = useState("");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoError, setPhotoError] = useState("");
   const [searchMode, setSearchMode] = useState("people"); // "people" | "seasons"
@@ -98,16 +100,30 @@ export default function ProfilePage() {
     const trimmed = nameDraft.trim();
     if (!trimmed) return;
     setSavingName(true);
+    setNameError("");
     const res = await upsertProfile(user.id, { display_name: trimmed });
     setSavingName(false);
-    if (res.ok) setProfile(res.profile);
+    if (res.ok) { setProfile(res.profile); return; }
+    setNameError(res.error || "Couldn't save — try again.");
   };
 
   const saveQuote = async () => {
     setSavingQuote(true);
+    setQuoteError("");
     const res = await upsertProfile(user.id, { quote: quoteDraft.trim() || null });
     setSavingQuote(false);
-    if (res.ok) setProfile(res.profile);
+    if (res.ok) { setProfile(res.profile); return; }
+    // A missing `quote` column (sql/add-profiles-v2.sql not yet run on
+    // this project — see that migration's own header) is the single
+    // most likely real-world cause of this specific save failing when
+    // every other profile save works fine, so it's worth calling out
+    // by name rather than just surfacing Postgres's own raw wording,
+    // which won't mean anything to whoever's looking at this screen.
+    if (res.error && /column .*quote.* does not exist/i.test(res.error)) {
+      setQuoteError("This project's database hasn't been updated to support quotes yet — an admin needs to run sql/add-profiles-v2.sql.");
+      return;
+    }
+    setQuoteError(res.error || "Couldn't save — try again.");
   };
 
   const handlePhotoChange = async (e) => {
@@ -278,6 +294,7 @@ export default function ProfilePage() {
                   {savingName ? "..." : "Save"}
                 </button>
               </div>
+              {nameError && <p style={{ color: "#ff3860", fontSize: 12, margin: "-10px 0 16px" }}>{nameError}</p>}
 
               <label style={{ display: "block", fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
                 Quote
@@ -298,6 +315,7 @@ export default function ProfilePage() {
                   {savingQuote ? "..." : "Save"}
                 </button>
               </div>
+              {quoteError && <p style={{ color: "#ff3860", fontSize: 12, marginTop: 8, marginBottom: 0 }}>{quoteError}</p>}
               <p style={{ fontSize: 11, color: "#6b4f99", marginTop: 8, marginBottom: 0, fontStyle: "italic" }}>
                 This is separate from whatever alias a specific season gives you — it's how people find and recognize you across every season you've played.
               </p>

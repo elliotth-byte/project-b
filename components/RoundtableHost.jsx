@@ -7,6 +7,7 @@ import {
   computeVoteTally, STORAGE_KEY_ROUND_INFO, VOTES_KEY_PREFIX, STORAGE_KEY_VOTE_HISTORY,
 } from "../lib/roundtableData";
 import { roundtableAnnouncementScript, voteRevealScript, banishScript } from "../lib/slackScripts";
+import { notifyPlayersRoundChange } from "../lib/pushNotifications";
 import PostToSlack from "./PostToSlack";
 import { recordElimination } from "../lib/seasonPlacement";
 import { GROUP_CHAT_KEY } from "../lib/chatData";
@@ -81,6 +82,10 @@ export default function RoundtableHost({ gameId, players, settings }) {
     });
     setRevealOrder(null);
     setRevealIndex(-1);
+    // Single host-triggered click, not an opportunistic multi-client
+    // race the way Stereo Types' own round-starts are — no dedup
+    // concern here, this only ever runs once per actual vote opening.
+    notifyPlayersRoundChange(gameId, "🗳️ Roundtable Vote", `Round ${round} voting is open — head in to cast your vote.`, "round-change");
   };
 
   const closeVoting = async () => {

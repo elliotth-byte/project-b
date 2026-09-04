@@ -15,8 +15,13 @@ import { useSiteTheme } from "../lib/siteTheme";
 // B and Traitors today, more later). Now it's session-gated: logged out,
 // you get the branded splash and nothing else (nothing past that point
 // works without an account anyway); logged in, you get the actual hub —
-// your game-agnostic profile/messages, plus a host console link if
-// you're a host. Which specific SEASON's colors take over from here is
+// your game-agnostic profile/messages, plus a link toward hosting
+// either way: "Host Console" straight in if this account already hosts,
+// "Host a game" toward pages/host.jsx's own self-serve become-a-host
+// prompt (see lib/auth.js's becomeHost) if it doesn't yet — both just
+// point at /host, which is what actually branches on isHost(user), so
+// this file doesn't need to know which state gets shown, only which
+// label/styling fits it. Which specific SEASON's colors take over from here is
 // still entirely lib/uiTheme.js's job, once you're actually in one.
 //
 // The splash itself now swaps between a "day" and "night" brand look
@@ -101,7 +106,9 @@ export default function Home() {
               {game && <Link href={`/play?game=${game}`} style={{ ...linkBtn, borderColor: theme.accent, color: theme.accent }}>▶️ Continue to Game</Link>}
               <Link href="/profile" style={linkBtn}>🪪 My Profile</Link>
               <Link href="/messages" style={linkBtn}>💬 Messages</Link>
-              {isHost(user) && <Link href="/host" style={{ ...linkBtn, borderColor: theme.accent, color: theme.accent }}>👑 Host Console</Link>}
+              {isHost(user)
+                ? <Link href="/host" style={{ ...linkBtn, borderColor: theme.accent, color: theme.accent }}>👑 Host Console</Link>
+                : <Link href="/host" style={linkBtn}>👑 Host a game</Link>}
               {isAdmin && <Link href="/admin" style={linkBtn}>🛠 Platform Admin</Link>}
               <button onClick={signOut} style={{ ...linkBtn, background: "none", cursor: "pointer", color: theme.textDim }}>Log out</button>
             </div>

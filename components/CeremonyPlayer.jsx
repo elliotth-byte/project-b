@@ -7,6 +7,7 @@ import AnnouncementsFeed from "./AnnouncementsFeed";
 import VotingHistorySpreadsheet from "./VotingHistorySpreadsheet";
 import { LiveNominationsRecap, ChallengeResultsCard, RoundCeremonyCard, FinaleCard, IdentityRevealCard } from "./CeremonyCards";
 import { subscribeFinaleQa } from "../lib/finaleQaData";
+import { fetchProfilePhotos } from "../lib/profiles";
 
 // ─── Player-facing Ceremony tab ───
 // Unlike FatesPlayer/ExileVotePlayer/FinalePlayer (which only render while
@@ -31,6 +32,19 @@ export default function CeremonyPlayer({ gameId, players, round, settings }) {
   const [challengeHistory, setChallengeHistory] = useState([]);
   const [finale, setFinale] = useState(null);
   const [finaleQa, setFinaleQa] = useState({ statements: {}, questions: [] });
+  // Finalists' cross-season profile photos, for FinaleCard's tile row —
+  // only fetched once the Finale actually exists (no point querying for
+  // photos before there's anyone to show), and re-fetched if the roster
+  // of finalists itself changes (it never does mid-finale, but a
+  // fast-refresh/page-reload landing after finale.finalists is already
+  // set should still populate this rather than staying empty forever).
+  const [profilePhotos, setProfilePhotos] = useState({});
+  useEffect(() => {
+    if (!finale?.finalists?.length) return;
+    const userIds = finale.finalists.map((f) => (players || []).find((p) => p.id === f.playerId)?.user_id);
+    fetchProfilePhotos(userIds).then(setProfilePhotos);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finale?.finalists]);
   const [liveExile, setLiveExile] = useState(null);
   const [liveFates, setLiveFates] = useState(null);
   const [showComments, setShowComments] = useState(false);
@@ -195,7 +209,7 @@ export default function CeremonyPlayer({ gameId, players, round, settings }) {
       {currentPage?.type === "finale" && (
         <>
           {round?.phase === PHASES.ENDED && settings?.aliasEnabled && <IdentityRevealCard players={players} />}
-          <FinaleCard finale={finale} rows={finaleRows} byId={byId} showComments={showComments} qa={finaleQa} />
+          <FinaleCard finale={finale} rows={finaleRows} byId={byId} showComments={showComments} qa={finaleQa} players={players} profilePhotos={profilePhotos} />
         </>
       )}
 

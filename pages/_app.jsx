@@ -5,6 +5,31 @@ export default function App({ Component, pageProps }) {
     <>
       <Head>
         <title>Cruel Summer House</title>
+        {/* Home-screen install icon + name — see public/manifest.json for
+            the Android/Chrome side of this (icons, standalone display
+            mode, theme color) and public/apple-touch-icon.png for the
+            iOS-specific one (Safari's "Add to Home Screen" ignores the
+            manifest's own icons entirely and only ever looks for this
+            specific link tag). Without either of these, installing this
+            app just showed a blank/generic icon. Both point at PNGs
+            generated from public/brand/'s existing wordmark logo,
+            centered on the app's own background color rather than left
+            transparent — swap those two files (and public/icon-192.png)
+            for different artwork any time; nothing here needs to change
+            to pick up a replacement, since the filenames themselves are
+            what these tags reference. */}
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="icon" href="/icon-192.png" />
+        <meta name="theme-color" content="#05010f" />
+        {/* iOS Safari ignores the manifest's own "display": "standalone"
+            entirely — these three are what actually make it open full-
+            screen (no address bar) once installed there, and set the
+            name shown under the home-screen icon and in the app
+            switcher. */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Cruel Summer" />
         {/* Locks pinch/double-tap zoom — without this, rapid taps on small
             game elements (Match 3 tiles, Whack-a-Mole holes, etc.) could
             get misread by the browser as a double-tap-zoom gesture
@@ -14,7 +39,7 @@ export default function App({ Component, pageProps }) {
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Orbitron:wght@400;600;700;800;900&family=Playfair+Display:wght@400;600;700;800&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Orbitron:wght@400;600;700;800;900&family=Playfair+Display:wght@400;600;700;800&family=Anton&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       </Head>
       <style jsx global>{`
         * { box-sizing: border-box; }

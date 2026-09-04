@@ -18,11 +18,15 @@ import ConfessionalPlayer from "../components/ConfessionalPlayer";
 import MusicPlayer from "../components/MusicPlayer";
 import TraitorsMusicPlayer from "../components/TraitorsMusicPlayer";
 import TraitorsPlayerPanels from "../components/TraitorsPlayerPanels";
+import StereoTypesPlayerPanels from "../components/StereoTypesPlayerPanels";
+import StereoTypesIdentityPicker from "../components/StereoTypesIdentityPicker";
+import StereoTypesLogo from "../components/StereoTypesLogo";
 import HelpPanel from "../components/HelpPanel";
 import FinalWordsPrompt from "../components/FinalWordsPrompt";
 import { hasResolvedFinalWords } from "../lib/finalWords";
 import OptionsPanel from "../components/OptionsPanel";
 import UpdateBanner from "../components/UpdateBanner";
+import ProfilePhotoPrompt from "../components/ProfilePhotoPrompt";
 import NavTourOverlay from "../components/NavTourOverlay";
 import { hasSeenNavTour } from "../lib/navTour";
 import ChatPanel from "../components/ChatPanel";
@@ -110,6 +114,10 @@ export default function PlayPage() {
   // isTraitors just reads false for that one render until the fetch
   // below resolves, same effect as host.jsx's identical situation.
   const isTraitors = gameInfo?.game_type === "traitors";
+  // Stereo Types has no round-phase engine either (same reasoning as
+  // Traitors) — its own rounds (A Side/The Remix/On Blast) each get
+  // their own state shape in later phases, not lib/roundEngine.js's.
+  const isStereoTypes = gameInfo?.game_type === "stereo_types";
   const theme = themeFor(gameInfo?.game_type);
   const pageStyle = { minHeight: "100vh", background: theme.pageBg, color: theme.text, fontFamily: theme.font, padding: 24 };
   // Only used by the "no gameId at all" fallback screen further down —
@@ -118,7 +126,7 @@ export default function PlayPage() {
   // and doesn't exist yet at this point — there's no game to theme by
   // until a gameId shows up in the URL).
   const { theme: siteTheme } = useSiteTheme();
-  useRoundWatcher(gameId, { enabled: !isTraitors });
+  useRoundWatcher(gameId, { enabled: !isTraitors && !isStereoTypes });
 
   // Hooks must run unconditionally, before any early returns below — this
   // is intentionally called this early (using the raw state directly,
@@ -305,13 +313,13 @@ export default function PlayPage() {
     (async () => {
       const { data: existing } = await supabase
         .from("players")
-        .select("id, display_name, alive, elimination_type, elimination_round, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes")
+        .select("id, display_name, alive, elimination_type, elimination_round, approved, color, equipped_sticker, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes")
         .eq("game_id", gameId)
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (existing) {
-        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, eliminationRound: existing.elimination_round, approved: existing.approved, color: existing.color, alias: existing.alias, avatarUrl: existing.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(existing.game_prefs || {}) }, battleBanRound: existing.battle_ban_round, torchedPreset: existing.torched_preset, powerState: existing.power_state, inactivityStrikes: existing.inactivity_strikes });
+        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, eliminationRound: existing.elimination_round, approved: existing.approved, color: existing.color, equippedSticker: existing.equipped_sticker, alias: existing.alias, avatarUrl: existing.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(existing.game_prefs || {}) }, battleBanRound: existing.battle_ban_round, torchedPreset: existing.torched_preset, powerState: existing.power_state, inactivityStrikes: existing.inactivity_strikes });
         setJoined(true);
         return;
       }
@@ -342,12 +350,12 @@ export default function PlayPage() {
       const { data: created, error } = await supabase
         .from("players")
         .insert({ game_id: gameId, user_id: session.user.id, display_name: displayNameFromUser(user), approved: false })
-        .select("id, display_name, alive, elimination_type, elimination_round, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes")
+        .select("id, display_name, alive, elimination_type, elimination_round, approved, color, equipped_sticker, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes")
         .single();
       if (error) {
         setJoinError(`Couldn't join this game: ${error.message}${error.code ? ` [code=${error.code}]` : ""}${error.details ? ` — ${error.details}` : ""} (user_id=${session.user.id})`);
       } else {
-        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, eliminationRound: created.elimination_round, approved: created.approved, color: created.color, alias: created.alias, avatarUrl: created.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(created.game_prefs || {}) }, battleBanRound: created.battle_ban_round, torchedPreset: created.torched_preset, powerState: created.power_state, inactivityStrikes: created.inactivity_strikes });
+        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, eliminationRound: created.elimination_round, approved: created.approved, color: created.color, equippedSticker: created.equipped_sticker, alias: created.alias, avatarUrl: created.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(created.game_prefs || {}) }, battleBanRound: created.battle_ban_round, torchedPreset: created.torched_preset, powerState: created.power_state, inactivityStrikes: created.inactivity_strikes });
         setJoined(true);
         // Fire-and-forget — a host notification failing to send should
         // never block the join itself, which already succeeded. Uses
@@ -382,8 +390,8 @@ export default function PlayPage() {
   useEffect(() => {
     if (!myPlayer?.id) return;
     const load = async () => {
-      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, elimination_round, approved, color, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes").eq("id", myPlayer.id).maybeSingle();
-      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, eliminationRound: data.elimination_round, approved: data.approved, color: data.color, alias: data.alias, avatarUrl: data.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(data.game_prefs || {}) }, battleBanRound: data.battle_ban_round, torchedPreset: data.torched_preset, powerState: data.power_state, inactivityStrikes: data.inactivity_strikes }));
+      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, elimination_round, approved, color, equipped_sticker, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes").eq("id", myPlayer.id).maybeSingle();
+      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, eliminationRound: data.elimination_round, approved: data.approved, color: data.color, equippedSticker: data.equipped_sticker, alias: data.alias, avatarUrl: data.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(data.game_prefs || {}) }, battleBanRound: data.battle_ban_round, torchedPreset: data.torched_preset, powerState: data.power_state, inactivityStrikes: data.inactivity_strikes }));
     };
     const channel = supabase
       .channel(`self-player-${myPlayer.id}`)
@@ -493,13 +501,16 @@ export default function PlayPage() {
   const needsFinalWords = exiled && !quitByChoice && !removedForInactivity && myPlayer.eliminationRound != null && !finalWordsResolved;
   const approved = joined && !!myPlayer?.approved;
   const gameEnded = round?.phase === PHASES.ENDED;
-  const needsIdentity = !isTraitors && joined && myPlayer && !identityComplete(myPlayer, settings);
+  // Stereo Types has its own identity step too (boombox color, once
+  // that lands) — same "not Project B's color+alias onboarding" carve-
+  // out Traitors already gets.
+  const needsIdentity = !isTraitors && !isStereoTypes && joined && myPlayer && !identityComplete(myPlayer, settings);
   // Shown once, right after identity is picked and before the "waiting
   // for host approval" screen — see components/OnboardingPreferences.jsx
   // for the full reasoning. Gated off once approved (an approved player
   // never needs to see this again, even if they somehow never completed
   // it — better to let them into the game than trap them here).
-  const needsOnboardingPrefs = !isTraitors && joined && myPlayer && !needsIdentity && !approved && !myPlayer.gamePrefs?.onboardingComplete;
+  const needsOnboardingPrefs = !isTraitors && !isStereoTypes && joined && myPlayer && !needsIdentity && !approved && !myPlayer.gamePrefs?.onboardingComplete;
   // Traitors' own, much lighter identity step — a free-text alias only,
   // no color, no fixed god-name list, no onboarding-prefs step (see
   // traitorsIdentityComplete's own comment for why this is separate from
@@ -507,6 +518,11 @@ export default function PlayPage() {
   // in the season as Project B's needsIdentity: resolved before the
   // "waiting for host approval" screen, once, right after joining.
   const needsTraitorsAlias = isTraitors && joined && myPlayer && !traitorsIdentityComplete(myPlayer, settings);
+  // Stereo Types' own identity step — boombox color (reusing
+  // players.color as-is) plus an optional sticker, see
+  // components/StereoTypesIdentityPicker.jsx. Same placement in the
+  // season as the other two identity gates above.
+  const needsStereoTypesIdentity = isStereoTypes && joined && myPlayer && !myPlayer.color;
   // Once the game's over, the whole point of keeping exiled players
   // separated from the main chat (protecting the still-competing
   // players from anything an exiled player might reveal or pressure
@@ -541,7 +557,10 @@ export default function PlayPage() {
 
   return (
     <div style={{ ...pageStyle, alignItems: "flex-start", flexDirection: "column" }}>
-      <div style={{ width: "100%", maxWidth: 400, margin: "0 auto" }}><UpdateBanner /></div>
+      <div style={{ width: "100%", maxWidth: 400, margin: "0 auto" }}>
+        <UpdateBanner />
+        {approved && !gameEnded && <ProfilePhotoPrompt userId={user?.id} />}
+      </div>
       <div style={{ display: "flex", justifyContent: "space-between", width: "100%", maxWidth: 400, margin: "0 auto 12px" }}>
         <HomeLink theme={theme} />
         <span style={{ color: theme.textMuted, fontSize: 13 }}>Playing as {effectivePlayerName || "..."}</span>
@@ -591,12 +610,25 @@ export default function PlayPage() {
           />
         )}
 
-        {joined && myPlayer && !needsIdentity && !needsOnboardingPrefs && !needsTraitorsAlias && !myPlayer.approved && (
+        {joined && myPlayer && needsStereoTypesIdentity && (
+          <StereoTypesIdentityPicker
+            player={myPlayer}
+            allPlayers={allPlayers}
+            userId={user?.id}
+            onPicked={(row) => setMyPlayer((p) => p && ({ ...p, color: row.color, equippedSticker: row.equipped_sticker }))}
+          />
+        )}
+
+        {joined && myPlayer && !needsIdentity && !needsOnboardingPrefs && !needsTraitorsAlias && !needsStereoTypesIdentity && !myPlayer.approved && (
           <div style={{
             marginBottom: 20, textAlign: "center", padding: "28px 20px",
             background: theme.cardBg,
             border: `2px solid ${theme.accent}`, borderRadius: 12,
           }}>
+            {/* Same brand moment StereoTypesPlayerPanels/HostPanels show
+                once approved — a Stereo Types player waiting on approval
+                still gets it, not just a bare hourglass. */}
+            {isStereoTypes && <div style={{ marginBottom: 14 }}><StereoTypesLogo size="small" /></div>}
             <div style={{ fontSize: 32, marginBottom: 8 }}>⏳</div>
             <p style={{ color: theme.text, fontSize: 16, fontWeight: 600, margin: "0 0 6px", fontFamily: theme.font }}>
               Waiting for the host to let you in
@@ -653,7 +685,7 @@ export default function PlayPage() {
           </ChallengeErrorBoundary>
         )}
 
-        {!isTraitors && approved && !needsIdentity && playerName && !pendingReveal && (
+        {!isTraitors && !isStereoTypes && approved && !needsIdentity && playerName && !pendingReveal && (
           <>
             <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #3d1f5c" }}>
               {visibleTabs.map((t) => (
@@ -856,9 +888,53 @@ export default function PlayPage() {
             </ChallengeErrorBoundary>
           </>
         )}
+
+        {isStereoTypes && approved && playerName && (
+          <ChallengeErrorBoundary label="Stereo Types">
+            <StereoTypesPlayerPanels
+              gameId={gameId}
+              player={{ id: myPlayer.id, name: playerName, color: myPlayer.color, equippedSticker: myPlayer.equippedSticker }}
+              players={allPlayers}
+            />
+          </ChallengeErrorBoundary>
+        )}
+
+        {/* Stereo Types has no tab bar of its own (StereoTypesPlayerPanels
+            is one continuous scroll of cards, not a tabbed layout like
+            Traitors'/Project B's), so Chat is mounted here as one more
+            card rather than inventing a tab concept just for this. Reuses
+            the exact same group-chat infrastructure (lib/chatData.js's
+            game_state-backed group chat, plus the real chat_threads/
+            chat_messages tables for DMs) as every other game type — none
+            of it is actually game-type-specific. round={null}/isExiled=
+            {false} because Stereo Types has neither Project B's round
+            phases nor an exile mechanic; ChatPanel's Poseidon/Hera
+            deliberation-blocking checks (both gated on a real `round`)
+            naturally no-op on a null round rather than throwing, same as
+            TraitorsPlayerPanels.jsx's own round={null} chat mount above
+            already relies on. Always-visible (not gated on
+            settings.chatEnabled) since Stereo Types has no admin toggle
+            for it — unlike Project B/Traitors, there's nowhere for a host
+            to turn this off. */}
+        {isStereoTypes && approved && playerName && (
+          <ChallengeErrorBoundary label="Chat">
+            <ChatPanel
+              gameId={gameId}
+              player={{ id: myPlayer.id, name: playerName }}
+              players={allPlayers}
+              realName={playerName}
+              isExiled={false}
+              round={null}
+              settings={settings}
+              groupChatLabel="💬 Chat"
+            />
+          </ChallengeErrorBoundary>
+        )}
       </div>
       {approved && isTraitors && <TraitorsMusicPlayer gameId={gameId} isHost={false} />}
-      {approved && !isTraitors && <MusicPlayer gameId={gameId} isHost={false} portalTarget={radioPortalNode} />}
+      {approved && !isTraitors && !isStereoTypes && <MusicPlayer gameId={gameId} isHost={false} portalTarget={radioPortalNode} />}
+      {/* No Stereo Types music player yet — its Spotify embed lands in
+          Phase 4. */}
       {showNavTour && (
         <NavTourOverlay
           visibleTabKeys={visibleTabs.map((t) => t.key)}

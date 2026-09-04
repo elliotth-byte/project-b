@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
-import { signInHost, signOut, isHost } from "../lib/auth";
+import { signInHostFlexible, signOut, isHost, canHostGameType, becomeHost } from "../lib/auth";
 import HostPanels from "../components/HostPanels";
 import TraitorsHostPanels from "../components/TraitorsHostPanels";
+import StereoTypesHostPanels from "../components/StereoTypesHostPanels";
 import GameAccessPanel from "../components/GameAccessPanel";
+import ChatHostPanel from "../components/ChatHostPanel";
 import UpdateBanner from "../components/UpdateBanner";
 import MusicPlayer from "../components/MusicPlayer";
 import TraitorsMusicPlayer from "../components/TraitorsMusicPlayer";
@@ -20,6 +22,8 @@ export default function HostPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [becomingHost, setBecomingHost] = useState(false);
+  const [becomeHostError, setBecomeHostError] = useState("");
 
   const [games, setGames] = useState(null); // null = not loaded yet, [] = loaded, no seasons
   const [activeGameId, setActiveGameId] = useState(null);
@@ -47,7 +51,7 @@ export default function HostPage() {
   // below, can gate on game_type — see that hook's own comment on why
   // a traitors season needs enabled: false.
   const game = useMemo(() => games?.find((g) => g.id === activeGameId) || null, [games, activeGameId]);
-  useRoundWatcher(activeGameId, { enabled: game?.game_type !== "traitors" });
+  useRoundWatcher(activeGameId, { enabled: game?.game_type === "project_b" });
   // Drives every color/font reference below — see lib/uiTheme.js. No
   // active season yet (login, "no active season") just gets Project
   // B's own palette, same as always.
@@ -305,8 +309,28 @@ export default function HostPage() {
   const submitLogin = async (e) => {
     e.preventDefault();
     setError("");
-    const res = await signInHost(email, password);
+    const res = await signInHostFlexible(email, password);
     if (!res.ok) setError(res.error);
+  };
+
+  const submitBecomeHost = async () => {
+    if (!confirm("This adds hosting to your current account — you'll be able to create and run Stereo Types seasons with the same login you already use to play. You'll need to log back in once afterward for it to take effect. Continue?")) return;
+    setBecomingHost(true);
+    setBecomeHostError("");
+    const res = await becomeHost("stereo_types");
+    if (!res.ok) { setBecomingHost(false); setBecomeHostError(res.error); return; }
+    // The role/hostScope change is saved to the database at this point,
+    // but NOT necessarily usable by this same session yet — see
+    // lib/auth.js's becomeHost for why a same-session refresh isn't
+    // reliable here (confirmed by a real RLS failure on the very next
+    // "Create Season" click when this used to just carry on in place).
+    // A real sign-out + fresh login is the only guaranteed-correct way
+    // to get a token that actually reflects the new role, so that's
+    // what this does — signOut() first (so the stale session is fully
+    // gone, not just visually replaced), then straight to /login rather
+    // than leaving them on this page looking done when it isn't yet.
+    await signOut();
+    router.push("/login?hostReady=1");
   };
 
   async function createSeason(name, subtitle, gameType) {
@@ -314,7 +338,7 @@ export default function HostPage() {
     const { data: code } = await supabase.rpc("generate_join_code");
     const { data: created, error } = await supabase
       .from("games")
-      .insert({ name: name || (type === "traitors" ? "The Traitors" : "Panopticon"), subtitle: subtitle || null, host_id: user.id, join_code: code, game_type: type })
+      .insert({ name: name || (type === "traitors" ? "The Traitors" : type === "stereo_types" ? "Stereo Types" : "Panopticon"), subtitle: subtitle || null, host_id: user.id, join_code: code, game_type: type })
       .select()
       .single();
     if (error) { setError(error.message); return null; }
@@ -370,9 +394,9 @@ export default function HostPage() {
           <div style={{ marginBottom: 16 }}><HomeLink theme={siteTheme} /></div>
           <h2 style={{ fontFamily: siteTheme.font, fontSize: 22, marginBottom: 4 }}>Host Access</h2>
           <p style={{ color: siteTheme.textMuted, fontSize: 13, marginBottom: 16, fontStyle: "italic" }}>
-            Log in with the host account created in Supabase.
+            Log in with your host email, or your regular username if you became a host from a player account.
           </p>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Host email" style={siteInputStyle} autoFocus />
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Host email or username" style={siteInputStyle} autoFocus />
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" style={siteInputStyle} />
           {error && <p style={{ color: siteTheme.danger, fontSize: 13 }}>{error}</p>}
           <button type="submit" style={siteBtnStyle}>Enter</button>
@@ -384,9 +408,19 @@ export default function HostPage() {
   if (!isHost(user)) {
     return (
       <div style={sitePageStyle}>
-        <div style={{ textAlign: "center" }}>
+        <div style={{ textAlign: "center", maxWidth: 340 }}>
           <div style={{ marginBottom: 16 }}><HomeLink theme={siteTheme} /></div>
-          <p>This account isn't marked as a host. Set <code>role: "host"</code> in this user's metadata in Supabase, or use a dedicated host account.</p>
+          <p style={{ marginBottom: 14 }}>You're signed in, but this account isn't set up to host yet.</p>
+          <button onClick={submitBecomeHost} disabled={becomingHost} style={siteBtnStyle}>
+            {becomingHost ? "..." : "👑 Become a host"}
+          </button>
+          <p style={{ color: siteTheme.textMuted, fontSize: 11, marginTop: 8, fontStyle: "italic" }}>
+            Uses this same account — you'll still play with it exactly as before, just with the option to run your own Stereo Types seasons too.
+          </p>
+          {becomeHostError && <p style={{ color: siteTheme.danger, fontSize: 13, marginTop: 8 }}>{becomeHostError}</p>}
+          <p style={{ color: siteTheme.textDim, fontSize: 12, marginTop: 20 }}>
+            Prefer a separate host account instead? Log out and use "Host a game instead" on the <a href="/login">login page</a>, or have a platform admin set <code>role: "host"</code> in this account's metadata in Supabase.
+          </p>
           <button onClick={signOut} style={{ background: "none", border: "none", color: siteTheme.textDim, fontSize: 12, cursor: "pointer", marginTop: 12 }}>Log out and try a different account</button>
         </div>
       </div>
@@ -432,7 +466,7 @@ export default function HostPage() {
                   }}
                   title={g.subtitle || undefined}
                 >
-                  {g.game_type === "traitors" ? "🏰" : "🃏"} {g.name}
+                  {g.game_type === "traitors" ? "🏰" : g.game_type === "stereo_types" ? "📻" : "🃏"} {g.name}
                   {g.subtitle && (
                     <span style={{ fontWeight: 400, opacity: 0.8 }}> — {g.subtitle}</span>
                   )}
@@ -501,7 +535,17 @@ export default function HostPage() {
               {[
                 { value: "project_b", label: "🃏 Panopticon", desc: "Challenge → Fates → Exile" },
                 { value: "traitors", label: "🏰 Traitors", desc: "Roundtable & Murder Vote" },
-              ].map((opt) => {
+                { value: "stereo_types", label: "📻 Stereo Types", desc: "A Side → The Remix → On Blast" },
+              ]
+                // A self-serve, Stereo-Types-scoped host account (see
+                // lib/auth.js's canHostGameType) never even sees the
+                // other two options — not just disabled, not offered at
+                // all. The real enforcement is server-side
+                // (sql/add-host-scope.sql's games-insert policy); this
+                // is purely so the UI doesn't dangle an option that
+                // would just fail on submit.
+                .filter((opt) => canHostGameType(user, opt.value))
+                .map((opt) => {
                 const optTheme = themeFor(opt.value);
                 const selected = newGameType === opt.value;
                 return (
@@ -598,7 +642,7 @@ export default function HostPage() {
             }
           />
         )}
-        {game && game.game_type !== "traitors" && (
+        {game && game.game_type === "project_b" && (
           <HostPanels
             key={game.id}
             gameId={game.id}
@@ -630,9 +674,48 @@ export default function HostPage() {
             }
           />
         )}
+        {game && game.game_type === "stereo_types" && (
+          <>
+            <StereoTypesHostPanels
+              key={game.id}
+              gameId={game.id}
+              roomCode={game.join_code}
+              players={players}
+              adminExtra={
+                <GameAccessPanel
+                  game={game}
+                  players={players}
+                  isPrimaryHost={isPrimaryHost}
+                  origin={origin}
+                  userId={user?.id}
+                  coHosts={coHosts}
+                  inviteEmail={inviteEmail}
+                  setInviteEmail={setInviteEmail}
+                  inviteStatus={inviteStatus}
+                  inviteCoHost={inviteCoHost}
+                  removeCoHost={removeCoHost}
+                />
+              }
+            />
+            {/* StereoTypesHostPanels has no tab bar (and no chat surface)
+                of its own, unlike HostPanels/TraitorsHostPanels which
+                already tuck ChatHostPanel behind their own "chat" tab —
+                mounted here instead, same component, same reused group
+                chat + DM-thread infrastructure. Always-visible rather
+                than gated on settings.chatEnabled: Stereo Types has no
+                admin toggle for that setting anywhere (see the matching
+                comment on the player-side mount in pages/play.jsx), so
+                gating on it would just mean chat never appears. */}
+            <ChatHostPanel key={`chat-${game.id}`} gameId={game.id} players={players.filter((p) => p.approved)} groupChatLabel="💬 Chat" />
+          </>
+        )}
       </div>
       {game && game.game_type === "traitors" && <TraitorsMusicPlayer key={`music-${game.id}`} gameId={game.id} isHost={true} />}
-      {game && game.game_type !== "traitors" && <MusicPlayer key={`music-${game.id}`} gameId={game.id} isHost={true} portalTarget={radioPortalNode} />}
+      {game && game.game_type === "project_b" && <MusicPlayer key={`music-${game.id}`} gameId={game.id} isHost={true} portalTarget={radioPortalNode} />}
+      {/* No Stereo Types music player yet — its Spotify embed lands in
+          Phase 4 (see this repo's own session notes on the build order);
+          the built-in Tone.js engine above is specifically Project B's
+          own radio, not something Stereo Types reuses. */}
       <p style={{ fontSize: 10, color: theme.border, textAlign: "center", margin: "16px 0 0" }}>
         Version {process.env.NEXT_PUBLIC_APP_VERSION || "dev"}
       </p>

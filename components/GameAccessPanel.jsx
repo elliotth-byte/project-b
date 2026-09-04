@@ -25,6 +25,15 @@ export default function GameAccessPanel({
   const [showCoHosts, setShowCoHosts] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // This component is otherwise identical across every game type — the
+  // one place that isn't is the notification-prefs copy below, which
+  // namedrops Project B's own phase names (Battle/Exile Vote/Fates
+  // Ceremony/Finale) and its "Panopticon" chat branding. Stereo Types has
+  // neither, so this is the explicit three-way check this build already
+  // uses elsewhere once Stereo Types existed, rather than just negating
+  // isTraitors.
+  const isStereoTypes = game?.game_type === "stereo_types";
+
   const [showNotifications, setShowNotifications] = useState(false);
   const [pushSupported] = useState(() => isPushSupported());
   const [pushLoading, setPushLoading] = useState(true);
@@ -167,11 +176,15 @@ export default function GameAccessPanel({
                   </label>
                   <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#f5f0ff", cursor: "pointer" }}>
                     <input type="checkbox" checked={!!pushSub.notify_round_changes} onChange={() => togglePushPref("notify_round_changes")} />
-                    Round updates — a new Battle, Exile Vote, Fates Ceremony, or Finale starting (including ones the cron job auto-advances without you)
+                    {isStereoTypes
+                      ? "Round updates — a new A Side, The Remix, or On Blast round starting (including ones the cron job auto-advances without you)"
+                      : "Round updates — a new Battle, Exile Vote, Fates Ceremony, or Finale starting (including ones the cron job auto-advances without you)"}
                   </label>
                   <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#f5f0ff", cursor: "pointer" }}>
                     <input type="checkbox" checked={!!pushSub.notify_chat_activity} onChange={() => togglePushPref("notify_chat_activity")} />
-                    Chat activity — any new message, Panopticon or DM. Off by default — you can already read every thread, so this is the noisiest option here.
+                    {isStereoTypes
+                      ? "Chat activity — any new message, group chat or DM. Off by default — you can already read every thread, so this is the noisiest option here."
+                      : "Chat activity — any new message, Panopticon or DM. Off by default — you can already read every thread, so this is the noisiest option here."}
                   </label>
                 </div>
                 <button
