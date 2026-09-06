@@ -319,7 +319,7 @@ export default function AdminHost({ gameId, players, round }) {
       storageDelete(gameId, KEY_FATES),
       storageDelete(gameId, KEY_EXILE),
       storageDelete(gameId, `pb:exile-votes:${roundNum}`),
-      // Power of Khaos state for this specific round's Exile Vote — was
+      // Favor of the Fates state for this specific round's Exile Vote — was
       // previously left behind by a round reset entirely, meaning a
       // holder's already-locked-in nullify pick (or an in-progress draw)
       // could still be sitting there the next time this same round
@@ -366,7 +366,7 @@ export default function AdminHost({ gameId, players, round }) {
       storageDelete(gameId, KEY_FINALE), storageDelete(gameId, KEY_REENTRY),
       storageDelete(gameId, KEY_EXILE_HISTORY), storageDelete(gameId, KEY_CHALLENGE_HISTORY),
       storageDelete(gameId, "pb:finale-votes"),
-      // Same Power of Khaos cleanup as resetCurrentRound, but for every
+      // Same Favor of the Fates cleanup as resetCurrentRound, but for every
       // round this season ever reached (the per-round loop below) plus
       // the finale's own context, and via a single game-wide delete for
       // chaos_secrets rather than one call per round/context.
@@ -508,7 +508,7 @@ export default function AdminHost({ gameId, players, round }) {
           <Card>
             <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🛡 Inactivity</h3>
             <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
-              Strikes and instant removal for missed nominations, Power of Khaos decisions, votes, and challenges — see the Help tab for
+              Strikes and instant removal for missed nominations, Favor of the Fates decisions, votes, and challenges — see the Help tab for
               exactly how this works. Shield a player to make them fully immune to all of it (no strikes, ever, and exempt from instant
               removal) while the shield's on — the game itself still auto-picks a nominee or Khaos decision on their behalf either way,
               only the punishment is what the shield removes.
@@ -780,7 +780,7 @@ export default function AdminHost({ gameId, players, round }) {
                         <div key={p.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
                           <span style={{ color: "#f5f0ff" }}>{p.display_name}</span>
                           <span style={{ color: power ? "#f5f0ff" : "#6b4f99" }}>
-                            {power ? `${meta?.icon || ""} ${power}${meta && !meta.implemented ? " (not yet active)" : ""}` : "— none"}
+                            {power ? `${meta?.icon || ""} ${meta?.powerName || power}${power !== (p.alias || power) ? ` (${power})` : ""}${meta && !meta.implemented ? " (not yet active)" : ""}` : "— none"}
                           </span>
                         </div>
                       );

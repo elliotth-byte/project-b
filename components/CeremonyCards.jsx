@@ -152,7 +152,7 @@ export function RoundCeremonyCard({ entry: e, challenge, rows, byId, showComment
         {e.chaosHolderId && (
           <div style={{ margin: "0 0 4px" }}>
             <p style={{ fontSize: 11, color: "#a68fd6", fontStyle: "italic", margin: 0 }}>
-              🃏 Power of Khaos held by {byId[e.chaosHolderId] || "?"}
+              🃏 Favor of the Fates held by {byId[e.chaosHolderId] || "?"}
               {e.nullifiedId && <> — nullified <strong>{byId[e.nullifiedId] || "?"}</strong>'s votes</>}
             </p>
             {showComments && e.nullifiedReason && (
@@ -273,7 +273,7 @@ export function FinaleCard({ finale, rows, byId, showComments, qa, players, prof
       {finale.chaosHolderId && (
         <div style={{ margin: "0 0 4px" }}>
           <p style={{ fontSize: 11, color: "#a68fd6", fontStyle: "italic", margin: 0 }}>
-            🃏 Power of Khaos held by {byId[finale.chaosHolderId] || "?"}
+            🃏 Favor of the Fates held by {byId[finale.chaosHolderId] || "?"}
             {finale.nullifiedFinalistId && <> — nullified <strong>{byId[finale.nullifiedFinalistId] || "?"}</strong>, who couldn't win</>}
           </p>
           {showComments && finale.nullifiedReason && (

@@ -2,14 +2,15 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { completeAuth, decodeState } from "../lib/spotify/auth";
 
-// ─── Spotify OAuth callback — host-only ───
-// Spotify redirects here after the host approves (or denies) access on
-// accounts.spotify.com — this page's only job is finishing the PKCE
-// code exchange (lib/spotify/auth.js's completeAuth) and bouncing
-// straight back to the host console it started from. A player never
-// lands here: only the host ever calls beginAuth in the first place
-// (see StereoTypesSpotifyWidget.jsx), so this route has nothing
-// game-type-specific to gate on beyond that.
+// ─── Spotify OAuth callback ───
+// Spotify redirects here after whoever started the connection — the
+// host, or a player connecting their own account (see
+// lib/spotify/auth.js's beginAuth and StereoTypesPlayerSpotifySync.jsx)
+// — approves (or denies) access on accounts.spotify.com. This page's
+// only job is finishing the PKCE code exchange (lib/spotify/auth.js's
+// completeAuth) and bouncing back to wherever that connection actually
+// started: `state`'s decoded `role` says host or player, so this
+// doesn't need to know anything else game-type-specific beyond that.
 //
 // This exact path — `${origin}/stereo-types-spotify-callback` — is the
 // redirect URI that has to be registered in the Spotify app dashboard.
@@ -32,15 +33,16 @@ export default function StereoTypesSpotifyCallback() {
     }
 
     const decoded = typeof state === "string" ? decodeState(state) : null;
+    const backTo = decoded?.role === "player" ? "/play" : "/host";
 
     completeAuth(code)
       .then(() => {
-        setStatus("Connected — heading back to the host console…");
+        setStatus("Connected — heading back...");
         // A brief pause just so "Connected" is actually readable
         // before the redirect fires, not because anything async is
         // still pending.
         setTimeout(() => {
-          router.replace(decoded?.gameId ? `/host?game=${decoded.gameId}` : "/host");
+          router.replace(decoded?.gameId ? `${backTo}?game=${decoded.gameId}` : backTo);
         }, 600);
       })
       .catch((err) => setError(err.message || "Something went wrong connecting to Spotify."));
@@ -70,7 +72,7 @@ export default function StereoTypesSpotifyCallback() {
           <>
             <p style={{ color: "#ff5a4d", fontWeight: 700, margin: "0 0 8px" }}>{error}</p>
             <p style={{ color: "#c9b98a", fontSize: 13, margin: 0 }}>
-              Head back to the host console and try connecting again.
+              Head back and try connecting again.
             </p>
           </>
         ) : (

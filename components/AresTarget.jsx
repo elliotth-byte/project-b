@@ -53,7 +53,7 @@ export default function AresTarget({ gameId, round, player, players, settings })
     <Card style={{ marginBottom: 20, borderColor: "#dc2626" }}>
       <div style={{ textAlign: "center", marginBottom: 12 }}>
         <div style={{ fontSize: 22, marginBottom: 4 }}>⚔️</div>
-        <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15 }}>Ares's Power</h3>
+        <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15 }}>Power of Rivalry <span style={{ color: "#a68fd6", fontWeight: 400, fontSize: 12 }}>(Ares)</span></h3>
         {immuneThisRound && (
           <p style={{ color: "#00ff9d", fontSize: 12, fontWeight: 700, margin: "0 0 6px" }}>🛡 You're immune from nomination this round.</p>
         )}

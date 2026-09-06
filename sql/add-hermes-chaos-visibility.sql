@@ -3,7 +3,7 @@
 -- Run this AFTER sql/add-chaos-secrets.sql and sql/add-character-powers.sql.
 --
 -- Hermes's character power (see lib/characterPowers.js): "Can see and
--- discuss the player saved by the Power of Chaos ahead of the vote
+-- discuss the player saved by the Favor of the Fates ahead of the vote
 -- reveal." chaos_secrets' existing read policy (add-chaos-secrets.sql)
 -- only ever allows the host or the actual current holder — this adds
 -- Hermes as a third, narrowly-scoped case, via the same is_game_host-OR

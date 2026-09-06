@@ -44,7 +44,7 @@ export default function PoseidonTrigger({ player, round }) {
   return (
     <Card style={{ marginBottom: 20, textAlign: "center", borderColor: "#0891b2" }}>
       <div style={{ fontSize: 22, marginBottom: 4 }}>🌊</div>
-      <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15 }}>Poseidon's Power</h3>
+      <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15 }}>Power of Storms <span style={{ color: "#a68fd6", fontWeight: 400, fontSize: 12 }}>(Poseidon)</span></h3>
       <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 10px" }}>
         Once per game, turn off DMs for a Fates Ceremony and Exile Vote — usable once, ever. Activating now applies it to THIS round's Fates and Exile.
       </p>

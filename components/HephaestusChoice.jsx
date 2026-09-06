@@ -50,7 +50,7 @@ export default function HephaestusChoice({ gameId, round, player, settings }) {
     <Card style={{ marginBottom: 20, borderColor: "#f97316" }}>
       <div style={{ textAlign: "center", marginBottom: 12 }}>
         <div style={{ fontSize: 22, marginBottom: 4 }}>🔥</div>
-        <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15 }}>Hephaestus's Power</h3>
+        <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15 }}>Power of the Forge <span style={{ color: "#a68fd6", fontWeight: 400, fontSize: 12 }}>(Hephaestus)</span></h3>
         <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>Pick this round's challenge.</p>
       </div>
       <div style={{ display: "grid", gap: 10 }}>

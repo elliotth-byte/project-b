@@ -9,7 +9,7 @@ import { chaosCardLabel } from "../lib/chaosCardNames";
 import { powerFor, filterCancelledVote } from "../lib/characterPowers";
 import MemoryWall from "./MemoryWall";
 
-// ─── The Power of Khaos ───
+// ─── The Favor of the Fates ───
 // Two stages. First, every eligible player (alive players during the
 // Exile Vote; exiled players during the Finale) sees a row of N mystery
 // buttons — N being however many players are actually in the draw that
@@ -43,13 +43,13 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
   // SOME renders and not others, which is exactly the "Rendered more
   // hooks than during the previous render" class of crash. This
   // component hit that exact bug: a player's screen would crash the
-  // moment they actually became the Power of Khaos holder, right when
+  // moment they actually became the Favor of the Fates holder, right when
   // they'd need to act on it.
   const [pendingPick, setPendingPick] = useState(null); // candidate selected but not yet locked in — reason is required before it actually submits
   // Athena's character power (see lib/characterPowers.js): forces the
   // holder to swap their current pick for a different one — the holder
   // chooses the replacement themselves (confirmed against the season's
-  // host: "Power of Chaos chooses", not Athena picking for them).
+  // host: "Favor of the Fates chooses", not Athena picking for them).
   // forcedFromId captures whatever the holder's pick WAS at the moment
   // Athena's flag first turns true, so the picker below can specifically
   // exclude re-selecting that same one — this has to live in local
@@ -115,22 +115,22 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
   // not truthiness.
   const myDrawPick = drawPicks[player?.id];
   const hasPicked = myDrawPick !== undefined;
-  // Hestia's character power (see lib/characterPowers.js): two draws
+  // Hera's character power (see lib/characterPowers.js): two draws
   // instead of one, improving her odds of winning the draw. Tracked
-  // under a SEPARATE key (":hestia2") in the same flat drawPicks object
+  // under a SEPARATE key (":hera2") in the same flat drawPicks object
   // rather than changing myDrawPick's own shape — deliberately, so
   // triedIndices below (which just reads every value in the whole
   // object) picks up her second pick automatically, and nobody else's
   // single-pick logic has to change to accommodate this at all.
-  const isHestia = powerFor(player, settings) === "Hestia";
-  const myHestiaSecondPick = drawPicks[`${player?.id}:hestia2`];
-  // If she's not Hestia, one pick is everyone's whole allotment, same as
-  // always. If she IS Hestia, she's not truly finished until she's used
+  const isHera = powerFor(player, settings) === "Hera";
+  const myHeraSecondPick = drawPicks[`${player?.id}:hera2`];
+  // If she's not Hera, one pick is everyone's whole allotment, same as
+  // always. If she IS Hera, she's not truly finished until she's used
   // both — note this only matters at all while iAmHolder is still
   // false, since winning on either pick routes her out of this whole
   // branch into the Stage 2 holder view below regardless of which pick
   // it was.
-  const trulyDone = hasPicked && (!isHestia || myHestiaSecondPick !== undefined);
+  const trulyDone = hasPicked && (!isHera || myHeraSecondPick !== undefined);
   const drawOpen = !state.chaosHolderId && state.votingOpen;
   const holderName = state.chaosHolderId ? (players || []).find((p) => p.id === state.chaosHolderId)?.display_name : null;
   const poolSize = isExile
@@ -147,7 +147,7 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
       if (!drawOpen && !hasPicked && !holderName) return null;
       return (
         <Card style={{ marginBottom: 20, textAlign: "center" }}>
-          <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#ff2d95", marginBottom: 6 }}>🃏 Power of Khaos</div>
+          <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#ff2d95", marginBottom: 6 }}>🃏 Favor of the Fates</div>
           <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>
             {holderName ? `${holderName} claimed it this round.` : trulyDone ? "Already made their pick." : drawOpen ? "Hasn't picked yet." : "The draw has closed."}
           </p>
@@ -161,7 +161,7 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
         <Card style={{ marginBottom: 20, textAlign: "center" }}>
           <div style={{ fontSize: 22, marginBottom: 4 }}>🃏</div>
           <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>
-            <strong style={{ color: "#ff3860" }}>{holderName}</strong> claimed the Power of Khaos this round.
+            <strong style={{ color: "#ff3860" }}>{holderName}</strong> claimed the Favor of the Fates this round.
           </p>
         </Card>
       );
@@ -172,8 +172,8 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
         <Card style={{ marginBottom: 20, textAlign: "center" }}>
           <div style={{ fontSize: 28, marginBottom: 6 }}>🃏</div>
           <p style={{ color: "#f5f0ff", fontSize: 14, margin: 0 }}>
-            {isHestia
-              ? `You picked ${chaosCardLabel(myDrawPick)} and ${chaosCardLabel(myHestiaSecondPick)} — ${justWon ? "🎉 you claimed it!" : "hang tight."}`
+            {isHera
+              ? `You picked ${chaosCardLabel(myDrawPick)} and ${chaosCardLabel(myHeraSecondPick)} — ${justWon ? "🎉 you claimed it!" : "hang tight."}`
               : `You picked ${chaosCardLabel(myDrawPick)} — ${justWon ? "🎉 you claimed it!" : "hang tight."}`}
           </p>
         </Card>
@@ -191,18 +191,18 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
     return (
       <Card style={{ marginBottom: 20, textAlign: "center" }}>
         <div style={{ fontSize: 28, marginBottom: 6 }}>🃏</div>
-        <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 16, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>The Power of Khaos</h3>
+        <h3 style={{ color: "#f5f0ff", margin: "0 0 6px", fontSize: 16, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>The Favor of the Fates</h3>
         <p style={{ color: "#a68fd6", fontSize: 12.5, fontStyle: "italic", margin: "0 0 12px", lineHeight: 1.5 }}>
           Some are born great, some achieve greatness, and some have greatness thrust upon them. In front of you are relics from
           mythology. Few bestowed glory — others brought disaster, but each of these iconic items promises chaos. In one of them,
           Khaos himself and his power lies. Can you guess where?
         </p>
         <p style={{ color: "#a68fd6", fontSize: 13, margin: "0 0 18px" }}>
-          {isHestia && hasPicked
-            ? `🔥 Hestia's power: one more pick.`
-            : isHestia
-              ? `${poolSize} relics, one Power of Khaos. Hestia's power: you get two shots, not one.`
-              : `${poolSize} relics, one Power of Khaos. Pick one — you get one shot.`}
+          {isHera && hasPicked
+            ? `👑 Hera's power: one more pick.`
+            : isHera
+              ? `${poolSize} relics, one Favor of the Fates. Hera's power: you get two shots, not one.`
+              : `${poolSize} relics, one Favor of the Fates. Pick one — you get one shot.`}
           {triedIndices.size > 0 && ` Already tried (and wrong): ${[...triedIndices].sort((a, b) => a - b).map((i) => chaosCardLabel(i)).join(", ")}.`}
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 10 }}>
@@ -234,7 +234,7 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 32, marginBottom: 4 }}>🃏</div>
           <h3 style={{ color: "#ff2d95", margin: "0 0 4px", fontSize: 16, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
-            Holds the Power of Khaos
+            Holds the Favor of the Fates
           </h3>
           <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>Their pick is kept secret until the reveal — even from this viewer.</p>
         </div>
@@ -313,7 +313,7 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
       <div style={{ textAlign: "center", marginBottom: 14 }}>
         <div style={{ fontSize: 32, marginBottom: 4 }}>🃏</div>
         <h3 style={{ color: "#ff2d95", margin: "0 0 4px", fontSize: 16, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
-          You hold the Power of Khaos
+          You hold the Favor of the Fates
         </h3>
         <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>
           {isExile

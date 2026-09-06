@@ -9,6 +9,9 @@ import { initMasquerade } from "../lib/games/masqueradeData";
 import { initPit } from "../lib/games/pitData";
 import { initScavengerHunt } from "../lib/games/scavengerHuntData";
 import { initTorched } from "../lib/games/torchedData";
+import { initPandorasBoxes } from "../lib/games/pandorasBoxesData";
+import { initMusicalChairs } from "../lib/games/musicalChairsData";
+import { initFloor } from "../lib/games/floorData";
 
 // ─── Test Lab ───
 // Lets the host preview any game at any time, without needing a live
@@ -22,19 +25,30 @@ import { initTorched } from "../lib/games/torchedData";
 //
 // Two honest limits, surfaced directly in the UI rather than left for
 // the host to discover by confusion:
-//   1. Six games (see SHARED_GAME_INIT) only ever get their real
+//   1. Nine games (see SHARED_GAME_INIT) only ever get their real
 //      server state set up by the host's own Start Battle click or by
 //      random-mode's auto-start (see components/ChallengeHost.jsx and
 //      lib/roundEngine.js) — normally. Here, the Test Lab calls that
-//      same init function itself, using two synthetic participants
-//      (Chains, Close to 20, Masquerade, and Torched all explicitly
-//      refuse to initialize with fewer than 2 — confirmed by reading
-//      each one directly, not assumed uniform). Only ONE of those two
-//      is actually playable in this preview; the second exists purely
-//      to satisfy that minimum and never acts.
+//      same init function itself, using two synthetic participants.
+//      Six of the nine (Chains, Close to 20, Masquerade, Torched,
+//      Musical Chairs, The Floor) explicitly refuse to initialize with
+//      fewer than 2 — confirmed by reading each one directly, not
+//      assumed uniform — so two is exactly enough to init, but only ONE
+//      of the two is actually playable; the second (the Ghost) exists
+//      purely to satisfy that minimum and never acts. Musical Chairs
+//      and The Floor still run a real, complete round or duel this way:
+//      the Ghost never claims a chair (or never answers a question), so
+//      the test player wins simply by answering/acting correctly
+//      themselves — a fine way to preview the actual flow, just not an
+//      actual contest against a second live participant.
+//      Pandora's Boxes needs 3 to init AT ALL (see
+//      lib/games/pandorasBoxesData.js) — its own entry below is
+//      harmless but this sandbox can't exercise it until it grows a
+//      third synthetic participant.
 //   2. Server-side automation that runs on a live poll cycle — Torched's
 //      placement timeout, Masquerade's turn timeout, Scavenger Hunt's
-//      round auto-advance, Chains' auto-lock-on-resolve — is all driven
+//      round auto-advance, Chains' auto-lock-on-resolve, Musical
+//      Chairs' own phase timers — is all driven
 //      by lib/roundEngine.js reading the REAL, current round's phase.
 //      A sandboxed round number is invisible to that entirely, so none
 //      of that safety-net automation fires here. The core, player-
@@ -52,6 +66,15 @@ const GHOST_PARTICIPANT = { id: "00000000-0000-0000-0000-000000000002", name: "T
 // imports — none of them import an init function themselves, unlike
 // e.g. Deal or No Deal, which deliberately self-initializes and needs
 // nothing here).
+//
+// pandorasboxes is a seventh, registered below for completeness, but
+// genuinely can't be previewed here at all: it refuses to initialize
+// below 3 real participants (round 2's "never back to whoever gave it
+// to you" rule is structurally impossible with only 2 people — see
+// lib/games/pandorasBoxesData.js), and this sandbox only ever has the
+// two synthetic ones above. Calling its init here is harmless — it
+// just no-ops — but the Test Lab has no way to actually exercise this
+// one until it grows a third synthetic participant.
 const SHARED_GAME_INIT = {
   chains: (gameId, round, participants) => initChains(gameId, round, participants),
   closeto20: (gameId, round, participants) => initCloseToTwenty(gameId, round, participants, Date.now()),
@@ -59,6 +82,16 @@ const SHARED_GAME_INIT = {
   pit: (gameId, round, participants) => initPit(gameId, round, participants, Date.now()),
   scavengerhunt: (gameId, round, participants) => initScavengerHunt(gameId, round, participants, Date.now()),
   torched: (gameId, round, participants) => initTorched(gameId, round, participants, Date.now(), {}),
+  pandorasboxes: (gameId, round, participants) => initPandorasBoxes(gameId, round, participants),
+  // Unlike pandorasboxes above, this one only needs 2 participants
+  // (MIN_PARTICIPANTS in lib/games/musicalChairsData.js) — so this IS
+  // fully exercisable here, just as a single-chair, one-round game.
+  musicalchairs: (gameId, round, participants) => initMusicalChairs(gameId, round, participants, Date.now(), 60),
+  // Neither synthetic participant below has a floor_specialty set, so
+  // this always exercises the auto-assign fallback for both — a fine
+  // way to preview the actual duel/choosing flow, just never the
+  // "player picked their own category ahead of time" path.
+  floor: (gameId, round, participants) => initFloor(gameId, round, participants, Date.now(), 60),
 };
 
 const gameOptions = Object.entries(GAME_REGISTRY).filter(([key]) => key !== "manual");

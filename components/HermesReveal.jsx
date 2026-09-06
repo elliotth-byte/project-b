@@ -4,7 +4,7 @@ import { subscribeChaosSecret, exileContext, FINALE_CONTEXT } from "../lib/chaos
 import { powerFor } from "../lib/characterPowers";
 
 // ─── Hermes's character power (see lib/characterPowers.js) ───
-// "Can see and discuss the player saved by the Power of Chaos ahead of
+// "Can see and discuss the player saved by the Favor of the Fates ahead of
 // the vote reveal." Reuses subscribeChaosSecret exactly as
 // ChaosPowerPlayer.jsx does for the actual holder — no new data-layer
 // function needed at all, since the only thing that had to change was
@@ -30,9 +30,9 @@ export default function HermesReveal({ gameId, round, player, players, settings 
   return (
     <Card style={{ marginBottom: 20, textAlign: "center", borderColor: "#facc15" }}>
       <div style={{ fontSize: 22, marginBottom: 4 }}>🪽</div>
-      <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15 }}>Hermes's Power</h3>
+      <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15 }}>Power of Insight <span style={{ color: "#a68fd6", fontWeight: 400, fontSize: 12 }}>(Hermes)</span></h3>
       <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>
-        The Power of Khaos is protecting <strong style={{ color: "#facc15" }}>{savedName}</strong> — you can see (and talk about) this ahead of the reveal.
+        The Favor of the Fates is protecting <strong style={{ color: "#facc15" }}>{savedName}</strong> — you can see (and talk about) this ahead of the reveal.
       </p>
     </Card>
   );

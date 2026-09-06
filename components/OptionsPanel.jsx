@@ -3,6 +3,7 @@ import { Card } from "./ui";
 import { supabase } from "../lib/supabaseClient";
 import NotificationSettings from "./NotificationSettings";
 import GamePreferencesToggles from "./GamePreferencesToggles";
+import { TRIVIA_CATEGORIES } from "../lib/games/triviaData";
 
 // Reference grid the picker itself renders at — doesn't need to match
 // whatever grid size an actual future Torched battle ends up using
@@ -25,12 +26,36 @@ const PRESET_MARKER_LENGTH = 3; // mirrors torchedData.js's MARKER_LENGTH, just 
 // NotificationSettings and GamePreferencesToggles are shared with
 // OnboardingPreferences.jsx — same components, same logic, just shown
 // at a different point in a player's time with the app.
-export default function OptionsPanel({ gameId, player, onPrefsChanged, onQuit, quitBusy, readOnly = false, musicPortalRef }) {
+export default function OptionsPanel({ gameId, player, allPlayers, onPrefsChanged, onQuit, quitBusy, readOnly = false, musicPortalRef }) {
   const [torchedPreset, setTorchedPreset] = useState(player?.torchedPreset || null);
   const [presetRow, setPresetRow] = useState(null);
   const [presetCol, setPresetCol] = useState(null);
   const [presetOrientation, setPresetOrientation] = useState("horizontal");
   const [presetSaving, setPresetSaving] = useState(false);
+  const [floorSpecialty, setFloorSpecialty] = useState(player?.floorSpecialty || null);
+  const [floorSearch, setFloorSearch] = useState("");
+  const [floorSaving, setFloorSaving] = useState(false);
+  const [floorPicking, setFloorPicking] = useState(false);
+
+  const floorTakenByOthers = new Set(
+    (allPlayers || [])
+      .filter((p) => p.id !== player?.id && p.floor_specialty)
+      .map((p) => p.floor_specialty)
+  );
+
+  const saveFloorSpecialty = async (category) => {
+    setFloorSaving(true);
+    const { error } = await supabase.from("players").update({ floor_specialty: category }).eq("id", player.id);
+    setFloorSaving(false);
+    if (!error) { setFloorSpecialty(category); setFloorPicking(false); setFloorSearch(""); }
+  };
+
+  const clearFloorSpecialty = async () => {
+    setFloorSaving(true);
+    const { error } = await supabase.from("players").update({ floor_specialty: null }).eq("id", player.id);
+    setFloorSaving(false);
+    if (!error) setFloorSpecialty(null);
+  };
 
   const savePreset = async (row, col, orientation) => {
     setPresetSaving(true);
@@ -145,6 +170,69 @@ export default function OptionsPanel({ gameId, player, onPrefsChanged, onQuit, q
                 <p style={{ marginTop: 8 }}>
                   <button onClick={() => { setPresetRow(null); setPresetCol(null); }} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 11, cursor: "pointer" }}>
                     ← cancel, keep existing preset
+                  </button>
+                </p>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {player && !readOnly && (
+        <Card>
+          <div style={{ fontSize: 12, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+            🏛️ The Floor — Your Area of Expertise
+          </div>
+          <p style={{ fontSize: 12, color: "#a68fd6", margin: "0 0 12px" }}>
+            Pick a category ahead of time — whenever a Floor battle starts, you'll defend it in head-to-head duels. Each category can only belong to one player per battle; set this whenever, it applies the next time The Floor comes up. If you never pick one, you'll be assigned something at random when the battle begins.
+          </p>
+          {floorSpecialty && !floorPicking ? (
+            <div style={{ textAlign: "center" }}>
+              <p style={{ fontSize: 13, color: "#00ff9d", margin: "0 0 10px", fontWeight: 700 }}>✓ {floorSpecialty}</p>
+              <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+                <button onClick={() => setFloorPicking(true)} style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 14px", color: "#a68fd6", fontSize: 12, cursor: "pointer" }}>
+                  Change
+                </button>
+                <button onClick={clearFloorSpecialty} disabled={floorSaving} style={{ background: "none", border: "1px solid #ff3860", borderRadius: 6, padding: "6px 14px", color: "#ff3860", fontSize: 12, cursor: floorSaving ? "default" : "pointer" }}>
+                  {floorSaving ? "..." : "Clear"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <input
+                value={floorSearch}
+                onChange={(e) => setFloorSearch(e.target.value)}
+                placeholder="Search categories..."
+                style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #3d1f5c", background: "#0d0618", color: "#f5f0ff", fontSize: 13, marginBottom: 10, boxSizing: "border-box" }}
+              />
+              <div style={{ display: "grid", gap: 6, maxHeight: 240, overflowY: "auto" }}>
+                {TRIVIA_CATEGORIES
+                  .map((c) => c.category)
+                  .filter((c) => c.toLowerCase().includes(floorSearch.toLowerCase()))
+                  .map((c) => {
+                    const taken = floorTakenByOthers.has(c);
+                    return (
+                      <button
+                        key={c}
+                        disabled={taken || floorSaving}
+                        onClick={() => saveFloorSpecialty(c)}
+                        style={{
+                          textAlign: "left", padding: "8px 12px", borderRadius: 8,
+                          cursor: taken ? "default" : "pointer", background: c === floorSpecialty ? "rgba(0,255,157,0.15)" : "#0d0618",
+                          border: `1px solid ${c === floorSpecialty ? "#00ff9d" : "#3d1f5c"}`,
+                          color: taken ? "#6b4f99" : "#f5f0ff", fontSize: 13, fontWeight: 600, opacity: taken ? 0.5 : 1,
+                        }}
+                      >
+                        {c}{taken ? " — taken" : ""}
+                      </button>
+                    );
+                  })}
+              </div>
+              {floorSpecialty && (
+                <p style={{ marginTop: 8, textAlign: "center" }}>
+                  <button onClick={() => { setFloorPicking(false); setFloorSearch(""); }} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 11, cursor: "pointer" }}>
+                    ← cancel, keep {floorSpecialty}
                   </button>
                 </p>
               )}

@@ -4,14 +4,14 @@ import { subscribeGameState, storageUpdate } from "../lib/gameStorage";
 import { KEY_EXILE, KEY_FINALE } from "../lib/gameState";
 import { powerFor } from "../lib/characterPowers";
 
-// ─── Hera's character power (see lib/characterPowers.js) ───
+// ─── Hestia's character power (see lib/characterPowers.js) ───
 // "At the start of each voting deliberation period, you may exile one
 // player from the main chat" — usable any time voting's open (there's
 // no clean way to enforce "only at the very start" specifically), once
 // per round, locked in once set — same shape as Artemis's vote
 // cancellation. Auto-reinstatement falls out of being scoped to this
 // round's own state key: a new round starts with a clean slate.
-export default function HeraTrigger({ round, player, players, gameId, settings }) {
+export default function HestiaTrigger({ round, player, players, gameId, settings }) {
   const isExile = round?.phase === "exile";
   const isFinale = round?.phase === "finale";
   const key = isExile ? KEY_EXILE : isFinale ? KEY_FINALE : null;
@@ -25,15 +25,15 @@ export default function HeraTrigger({ round, player, players, gameId, settings }
     return unsubscribe;
   }, [gameId, key, round?.round]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const isHera = powerFor(player, settings) === "Hera";
-  if (!isHera || !key || !state) return null;
+  const isHestia = powerFor(player, settings) === "Hestia";
+  if (!isHestia || !key || !state) return null;
   if (!state.votingOpen) return null;
 
-  if (state.heraExiledPlayerId) {
-    const exiledName = (players || []).find((p) => p.id === state.heraExiledPlayerId)?.display_name || "?";
+  if (state.hestiaExiledPlayerId) {
+    const exiledName = (players || []).find((p) => p.id === state.hestiaExiledPlayerId)?.display_name || "?";
     return (
       <Card style={{ marginBottom: 20, textAlign: "center", borderColor: "#a855f7" }}>
-        <div style={{ fontSize: 22, marginBottom: 4 }}>👑</div>
+        <div style={{ fontSize: 22, marginBottom: 4 }}>🔥</div>
         <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>
           You exiled <strong style={{ color: "#f5f0ff" }}>{exiledName}</strong> from the main chat for this deliberation.
         </p>
@@ -42,22 +42,22 @@ export default function HeraTrigger({ round, player, players, gameId, settings }
   }
 
   // Same pool the deliberation itself involves — alive players for
-  // Exile, exiled players for Finale — minus Hera herself.
+  // Exile, exiled players for Finale — minus Hestia herself.
   const targets = (players || []).filter((p) => p.id !== player.id && p.approved && (isExile ? p.alive : p.alive === false));
 
   const exileFromChat = async () => {
     if (!selected) return;
     if (!confirm(`Exile ${targets.find((p) => p.id === selected)?.display_name || "this player"} from the main chat for this deliberation? They'll be back once it ends.`)) return;
     setSaving(true);
-    await storageUpdate(gameId, key, (fresh) => (fresh && !fresh.heraExiledPlayerId ? { ...fresh, heraExiledPlayerId: selected } : fresh));
+    await storageUpdate(gameId, key, (fresh) => (fresh && !fresh.hestiaExiledPlayerId ? { ...fresh, hestiaExiledPlayerId: selected } : fresh));
     setSaving(false);
   };
 
   return (
     <Card style={{ marginBottom: 20, borderColor: "#a855f7" }}>
       <div style={{ textAlign: "center", marginBottom: 12 }}>
-        <div style={{ fontSize: 22, marginBottom: 4 }}>👑</div>
-        <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15 }}>Hera's Power</h3>
+        <div style={{ fontSize: 22, marginBottom: 4 }}>🔥</div>
+        <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15 }}>Power of Isolation <span style={{ color: "#a68fd6", fontWeight: 400, fontSize: 12 }}>(Hestia)</span></h3>
         <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>
           Exile one player from the main chat for this deliberation — they're automatically back once it ends.
         </p>
@@ -79,7 +79,7 @@ export default function HeraTrigger({ round, player, players, gameId, settings }
         ))}
       </div>
       <div style={{ textAlign: "center" }}>
-        <Btn onClick={exileFromChat} disabled={!selected || saving}>{saving ? "Exiling..." : "👑 Exile From Chat"}</Btn>
+        <Btn onClick={exileFromChat} disabled={!selected || saving}>{saving ? "Exiling..." : "🔥 Exile From Chat"}</Btn>
       </div>
     </Card>
   );

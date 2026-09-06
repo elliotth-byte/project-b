@@ -13,20 +13,24 @@ const SDK_SCRIPT_ID = "spotify-web-playback-sdk";
 const SDK_SCRIPT_SRC = "https://sdk.scdn.co/spotify-player.js";
 
 // ─── Stereo Types — the host's own Spotify boombox ───
-// Host-only, on purpose: the Web Playback SDK creates exactly one
-// "device" per browser tab that's authenticated into it, and Spotify
-// Connect then treats that device as one of the account's real
+// Host-authoritative, on purpose: the Web Playback SDK creates exactly
+// one "device" per browser tab that's authenticated into it, and
+// Spotify Connect then treats that device as one of the account's real
 // playback targets — there's no supported way for multiple browser
-// tabs (i.e. multiple players) to all drive the SAME device, and
-// letting every player run their own independent player would just
-// mean N different accounts playing N different things, not one
-// shared soundtrack. So: one connection, the host's, same as one
-// person's speakers are the actual boombox at a real party — everyone
-// else just hears it and watches the room react (StereoTypesCityscape's
-// reactive mode, driven by the now-playing broadcast at the bottom of
-// this file). This pass intentionally has no search/queue UI — the
-// host picks what plays from their own Spotify app or another device;
-// this widget only shows what's already playing and offers
+// tabs to all drive the SAME device. So this widget is still the one
+// thing that actually decides what plays and when, same as one
+// person's speakers are the real boombox at a real party — but a
+// player who wants it in their own ears too can now connect their OWN
+// Spotify account from their own screen (see
+// StereoTypesPlayerSpotifySync.jsx) and have their device follow along
+// with whatever this widget is doing, via the same now-playing
+// broadcast StereoTypesCityscape's reactive mode already reads (now
+// carrying a track URI + playhead position for that purpose, not just
+// display fields — see lib/stereoTypesNowPlaying.js). Anyone who
+// doesn't bother connecting still just watches the room react, exactly
+// as before. This pass intentionally has no search/queue UI — the host
+// picks what plays from their own Spotify app or another device; this
+// widget only shows what's already playing and offers
 // play/pause/skip-next on top of it.
 export default function StereoTypesSpotifyWidget({ gameId, onStateChange }) {
   const configured = isSpotifyConfigured();
@@ -172,6 +176,7 @@ export default function StereoTypesSpotifyWidget({ gameId, onStateChange }) {
   const trackName = track?.name || null;
   const artistName = track?.artists?.map((a) => a.name).join(", ") || null;
   const albumArt = track?.album?.images?.[0]?.url || null;
+  const trackUri = track?.uri || null;
 
   // isPlaying-only fallback signal for everything BPM doesn't cover
   // (pulse depth/scale always use this; scroll speed only falls back
@@ -188,12 +193,50 @@ export default function StereoTypesSpotifyWidget({ gameId, onStateChange }) {
   // genuinely change (e.g. a seek within the same track), and this
   // keeps the game_state write (and the parent's re-render) tied to
   // things that actually look different on screen, not every SDK tick.
-  useEffect(() => {
-    const payload = { isPlaying, intensity, bpm, trackName, artistName, albumArt, updatedAt: Date.now() };
+  // positionMs is read fresh from playbackState at publish time rather
+  // than added to the dependency list itself — it changes constantly
+  // during normal playback, and re-publishing on every millisecond tick
+  // would be both pointless (see the heartbeat effect below for the
+  // actual drift-correction mechanism) and a much noisier game_state
+  // write pattern than this key has ever had.
+  const publish = (extra) => {
+    if (!gameId) return;
+    const payload = {
+      isPlaying, intensity, bpm, trackName, artistName, albumArt, trackUri,
+      positionMs: playbackState?.position ?? null,
+      updatedAt: Date.now(),
+      ...extra,
+    };
     onStateChange?.(payload);
-    if (gameId) publishNowPlaying(gameId, payload);
+    publishNowPlaying(gameId, payload);
+  };
+
+  useEffect(() => {
+    publish();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameId, isPlaying, intensity, bpm, trackName, artistName, albumArt]);
+  }, [gameId, isPlaying, intensity, bpm, trackName, artistName, albumArt, trackUri]);
+
+  // Drift-correction heartbeat: a connected player's own Spotify.Player
+  // (StereoTypesPlayerSpotifySync.jsx) only ever gets a fresh position
+  // to check itself against when this key changes — the effect above
+  // only fires on an actual track/play-state change, so two listeners
+  // who started in perfect sync could quietly drift apart (clock skew,
+  // network jitter, a player's own brief buffering stall) for as long
+  // as the host just lets a track play through untouched. Re-publishing
+  // the CURRENT position every few seconds, even when nothing else
+  // about it looks different, is what gives a player's own periodic
+  // resync check something to compare against. Reads playerRef
+  // directly (not playbackState) since this only needs a snapshot at
+  // the moment it fires, not a live subscription.
+  useEffect(() => {
+    if (!isPlaying || !playerRef.current) return;
+    const interval = window.setInterval(async () => {
+      const state = await playerRef.current?.getCurrentState();
+      if (state) publish({ positionMs: state.position, updatedAt: Date.now() });
+    }, 8000);
+    return () => window.clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying, deviceId]);
 
   const togglePlay = () => playerRef.current?.togglePlay();
   const skipNext = () => playerRef.current?.nextTrack();
@@ -223,7 +266,7 @@ export default function StereoTypesSpotifyWidget({ gameId, onStateChange }) {
       <Card style={{ borderColor: "#f4c430" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <p style={{ color: "#c9b98a", fontSize: 13, margin: 0, flex: 1, minWidth: 200 }}>
-            Connect Spotify to play music through your own account and light up the skyline. Needs Spotify Premium — only you, the host, ever connect; players just see the room react.
+            Connect Spotify to play music through your own account and light up the skyline. Needs Spotify Premium — this is the "boombox" everyone in the room hears; players can optionally connect their own Spotify too (their own screen has that option) to also get audio on their own device, but they'll always see the room react either way.
           </p>
           <Btn small onClick={() => beginAuth(gameId)}>Connect Spotify</Btn>
         </div>
@@ -242,6 +285,7 @@ export default function StereoTypesSpotifyWidget({ gameId, onStateChange }) {
         </p>
       )}
       {deviceId && (
+        <>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {albumArt ? (
             /* eslint-disable-next-line @next/next/no-img-element */
@@ -269,6 +313,10 @@ export default function StereoTypesSpotifyWidget({ gameId, onStateChange }) {
           <Btn small variant="ghost" onClick={togglePlay}>{isPlaying ? "⏸" : "▶️"}</Btn>
           <Btn small variant="ghost" onClick={skipNext}>⏭</Btn>
         </div>
+        <p style={{ color: "#6b6558", fontSize: 10.5, fontStyle: "italic", margin: "8px 0 0" }}>
+          This is the shared boombox everyone hears in the room. Players can also connect their own Spotify from their own screen to get audio on their own device too — otherwise they'll just see the room react.
+        </p>
+        </>
       )}
       <button
         onClick={handleDisconnect}

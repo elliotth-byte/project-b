@@ -44,6 +44,13 @@ import OperatorPlayer from "./games/OperatorPlayer";
 import TavoPlayer from "./games/TavoPlayer";
 import TanglePlayer from "./games/TanglePlayer";
 import BloomPlayer from "./games/BloomPlayer";
+import HermesGraspPlayer from "./games/HermesGraspPlayer";
+import PandorasBoxesPlayer from "./games/PandorasBoxesPlayer";
+import MusicalChairsPlayer from "./games/MusicalChairsPlayer";
+import FloorPlayer from "./games/FloorPlayer";
+import BasketballPlayer from "./games/BasketballPlayer";
+import StackPlayer from "./games/StackPlayer";
+import StockMarketPlayer from "./games/StockMarketPlayer";
 import GameResultCard from "./games/GameResultCard";
 
 export const GAME_COMPONENTS = {
@@ -83,6 +90,13 @@ export const GAME_COMPONENTS = {
   tavo: TavoPlayer,
   tangle: TanglePlayer,
   bloom: BloomPlayer,
+  hermesgrasp: HermesGraspPlayer,
+  pandorasboxes: PandorasBoxesPlayer,
+  musicalchairs: MusicalChairsPlayer,
+  floor: FloorPlayer,
+  basketball: BasketballPlayer,
+  stack: StackPlayer,
+  stockmarket: StockMarketPlayer,
 };
 
 export default function ChallengePlayer({ gameId, player, players, round, settings, readOnly = false }) {
@@ -266,7 +280,7 @@ export default function ChallengePlayer({ gameId, player, players, round, settin
           {canRetry && (
             <Card style={{ marginBottom: 20, textAlign: "center" }}>
               <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 10px" }}>
-                🌾 Demeter's power: you may make a second attempt — it will completely replace this result.
+                🌾 Power of Redemption (Demeter): you may make a second attempt — it will completely replace this result.
               </p>
               <Btn small onClick={retryAsDemeter} disabled={retrying}>
                 {retrying ? "Preparing..." : "🌾 Retry (Demeter)"}

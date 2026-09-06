@@ -36,7 +36,7 @@ import AphroditePicker from "../components/AphroditePicker";
 import PoseidonTrigger from "../components/PoseidonTrigger";
 import AresTarget from "../components/AresTarget";
 import ArtemisTrigger from "../components/ArtemisTrigger";
-import HeraTrigger from "../components/HeraTrigger";
+import HestiaTrigger from "../components/HestiaTrigger";
 import DionysusSwap from "../components/DionysusSwap";
 import HephaestusChoice from "../components/HephaestusChoice";
 import JuryPreferencePanel from "../components/JuryPreferencePanel";
@@ -313,13 +313,13 @@ export default function PlayPage() {
     (async () => {
       const { data: existing } = await supabase
         .from("players")
-        .select("id, display_name, alive, elimination_type, elimination_round, approved, color, equipped_sticker, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes")
+        .select("id, display_name, alive, elimination_type, elimination_round, approved, color, equipped_sticker, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, floor_specialty, power_state, inactivity_strikes")
         .eq("game_id", gameId)
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (existing) {
-        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, eliminationRound: existing.elimination_round, approved: existing.approved, color: existing.color, equippedSticker: existing.equipped_sticker, alias: existing.alias, avatarUrl: existing.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(existing.game_prefs || {}) }, battleBanRound: existing.battle_ban_round, torchedPreset: existing.torched_preset, powerState: existing.power_state, inactivityStrikes: existing.inactivity_strikes });
+        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, eliminationRound: existing.elimination_round, approved: existing.approved, color: existing.color, equippedSticker: existing.equipped_sticker, alias: existing.alias, avatarUrl: existing.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(existing.game_prefs || {}) }, battleBanRound: existing.battle_ban_round, torchedPreset: existing.torched_preset, floorSpecialty: existing.floor_specialty, powerState: existing.power_state, inactivityStrikes: existing.inactivity_strikes });
         setJoined(true);
         return;
       }
@@ -350,12 +350,12 @@ export default function PlayPage() {
       const { data: created, error } = await supabase
         .from("players")
         .insert({ game_id: gameId, user_id: session.user.id, display_name: displayNameFromUser(user), approved: false })
-        .select("id, display_name, alive, elimination_type, elimination_round, approved, color, equipped_sticker, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes")
+        .select("id, display_name, alive, elimination_type, elimination_round, approved, color, equipped_sticker, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, floor_specialty, power_state, inactivity_strikes")
         .single();
       if (error) {
         setJoinError(`Couldn't join this game: ${error.message}${error.code ? ` [code=${error.code}]` : ""}${error.details ? ` — ${error.details}` : ""} (user_id=${session.user.id})`);
       } else {
-        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, eliminationRound: created.elimination_round, approved: created.approved, color: created.color, equippedSticker: created.equipped_sticker, alias: created.alias, avatarUrl: created.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(created.game_prefs || {}) }, battleBanRound: created.battle_ban_round, torchedPreset: created.torched_preset, powerState: created.power_state, inactivityStrikes: created.inactivity_strikes });
+        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, eliminationRound: created.elimination_round, approved: created.approved, color: created.color, equippedSticker: created.equipped_sticker, alias: created.alias, avatarUrl: created.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(created.game_prefs || {}) }, battleBanRound: created.battle_ban_round, torchedPreset: created.torched_preset, floorSpecialty: created.floor_specialty, powerState: created.power_state, inactivityStrikes: created.inactivity_strikes });
         setJoined(true);
         // Fire-and-forget — a host notification failing to send should
         // never block the join itself, which already succeeded. Uses
@@ -390,8 +390,8 @@ export default function PlayPage() {
   useEffect(() => {
     if (!myPlayer?.id) return;
     const load = async () => {
-      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, elimination_round, approved, color, equipped_sticker, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, power_state, inactivity_strikes").eq("id", myPlayer.id).maybeSingle();
-      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, eliminationRound: data.elimination_round, approved: data.approved, color: data.color, equippedSticker: data.equipped_sticker, alias: data.alias, avatarUrl: data.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(data.game_prefs || {}) }, battleBanRound: data.battle_ban_round, torchedPreset: data.torched_preset, powerState: data.power_state, inactivityStrikes: data.inactivity_strikes }));
+      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, elimination_round, approved, color, equipped_sticker, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, floor_specialty, power_state, inactivity_strikes").eq("id", myPlayer.id).maybeSingle();
+      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, eliminationRound: data.elimination_round, approved: data.approved, color: data.color, equippedSticker: data.equipped_sticker, alias: data.alias, avatarUrl: data.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(data.game_prefs || {}) }, battleBanRound: data.battle_ban_round, torchedPreset: data.torched_preset, floorSpecialty: data.floor_specialty, powerState: data.power_state, inactivityStrikes: data.inactivity_strikes }));
     };
     const channel = supabase
       .channel(`self-player-${myPlayer.id}`)
@@ -462,7 +462,7 @@ export default function PlayPage() {
   // including to themselves, right down to what shows up in "Playing
   // as..." up top and what name their own chat/confessional posts carry.
   const effectivePlayerName = settings?.aliasEnabled && myPlayer?.alias && !aliasRevealed ? myPlayer.alias : playerName;
-  const player = myPlayer ? { id: myPlayer.id, name: effectivePlayerName, gamePrefs: myPlayer.gamePrefs || DEFAULT_GAME_PREFS, battleBanRound: myPlayer.battleBanRound, torchedPreset: myPlayer.torchedPreset, powerState: myPlayer.powerState, alias: myPlayer.alias, inactivityStrikes: myPlayer.inactivityStrikes } : null;
+  const player = myPlayer ? { id: myPlayer.id, name: effectivePlayerName, gamePrefs: myPlayer.gamePrefs || DEFAULT_GAME_PREFS, battleBanRound: myPlayer.battleBanRound, torchedPreset: myPlayer.torchedPreset, floorSpecialty: myPlayer.floorSpecialty, powerState: myPlayer.powerState, alias: myPlayer.alias, inactivityStrikes: myPlayer.inactivityStrikes } : null;
 
   // Who Said It pulls its quiz straight from Panopticon chat history, and
   // Close to 20 needs every bank kept a total mystery until the reveal
@@ -736,7 +736,7 @@ export default function PlayPage() {
                   </button>
                   {showMemoryWall && (
                     <div style={{ marginTop: 12 }}>
-                      <PlayerMemoryWall players={identityAllPlayers.filter((p) => p.approved)} hideNameLabels={settings?.avatarMode === "collection" && settings?.avatarCollectionId === "default-gods"} winnerIds={winnerIds} nomineeIds={nomineeIds} />
+                      <PlayerMemoryWall players={identityAllPlayers.filter((p) => p.approved)} hideNameLabels={settings?.avatarMode === "collection" && settings?.avatarCollectionId === "default-gods"} winnerIds={winnerIds} nomineeIds={nomineeIds} settings={settings} fatesHolderId={latestExileEntry?.chaosHolderId || null} />
                     </div>
                   )}
                 </div>
@@ -771,7 +771,7 @@ export default function PlayPage() {
                     <AthenaTrigger gameId={gameId} round={round} player={player} settings={settings} />
                     <HermesReveal gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
                     <ArtemisTrigger gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
-                    <HeraTrigger gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
+                    <HestiaTrigger gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
                     <DionysusSwap gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
                     <ExileVotePlayer gameId={gameId} player={player} round={round} players={identityAllPlayers} settings={settings} />
                   </ChallengeErrorBoundary>
@@ -782,7 +782,7 @@ export default function PlayPage() {
                     <AthenaTrigger gameId={gameId} round={round} player={player} settings={settings} />
                     <HermesReveal gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
                     <ArtemisTrigger gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
-                    <HeraTrigger gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
+                    <HestiaTrigger gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
                     <FinalePlayer gameId={gameId} player={player} round={round} players={identityAllPlayers} settings={settings} />
                   </ChallengeErrorBoundary>
                 )}
@@ -841,6 +841,7 @@ export default function PlayPage() {
                 onQuit={approved && myPlayer.alive !== false && !gameEnded ? handleQuit : undefined}
                 quitBusy={quitBusy}
                 musicPortalRef={setRadioPortalNode}
+                allPlayers={allPlayers}
               />
             )}
           </>
@@ -910,7 +911,7 @@ export default function PlayPage() {
             chat_messages tables for DMs) as every other game type — none
             of it is actually game-type-specific. round={null}/isExiled=
             {false} because Stereo Types has neither Project B's round
-            phases nor an exile mechanic; ChatPanel's Poseidon/Hera
+            phases nor an exile mechanic; ChatPanel's Poseidon/Hestia
             deliberation-blocking checks (both gated on a real `round`)
             naturally no-op on a null round rather than throwing, same as
             TraitorsPlayerPanels.jsx's own round={null} chat mount above

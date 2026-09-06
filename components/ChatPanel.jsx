@@ -8,7 +8,7 @@ import {
 } from "../lib/chatData";
 
 import { colorFor } from "../lib/playerColors";
-import { isPoseidonDmBlockActive, heraChatBlockActive } from "../lib/characterPowers";
+import { isPoseidonDmBlockActive, hestiaChatBlockActive } from "../lib/characterPowers";
 import { subscribeGameState } from "../lib/gameStorage";
 import { KEY_EXILE, KEY_FINALE, PHASES } from "../lib/gameState";
 import { notifyPushForMessage } from "../lib/pushNotifications";
@@ -219,18 +219,18 @@ function Composer({ onSend, placeholder, readOnly = false, disabledMessage = nul
 function GroupChatView({ gameId, player, players, realName, onRead, readOnly = false, round, settings }) {
   const [messages, setMessages] = useState([]);
   const listRef = useRef(null);
-  // Hera's character power (see lib/characterPowers.js) — only ever
+  // Hestia's character power (see lib/characterPowers.js) — only ever
   // subscribes when the round is actually in a deliberation phase, same
   // scoping ChatPanel.jsx's Poseidon block already uses; there's no
   // relevant state to read outside Exile/Finale anyway.
-  const heraKey = round?.phase === "exile" ? KEY_EXILE : round?.phase === "finale" ? KEY_FINALE : null;
-  const [heraState, setHeraState] = useState(null);
+  const hestiaKey = round?.phase === "exile" ? KEY_EXILE : round?.phase === "finale" ? KEY_FINALE : null;
+  const [hestiaState, setHestiaState] = useState(null);
 
   useEffect(() => {
-    if (!heraKey) { setHeraState(null); return; }
-    const unsubscribe = subscribeGameState(gameId, heraKey, setHeraState);
+    if (!hestiaKey) { setHestiaState(null); return; }
+    const unsubscribe = subscribeGameState(gameId, hestiaKey, setHestiaState);
     return unsubscribe;
-  }, [gameId, heraKey]);
+  }, [gameId, hestiaKey]);
 
   useEffect(() => {
     const unsubscribe = subscribeGroupChat(gameId, setMessages);
@@ -245,19 +245,19 @@ function GroupChatView({ gameId, player, players, realName, onRead, readOnly = f
   // rooms work (opening a thread marks it read the same way).
   useEffect(() => { onRead?.(); }, [messages.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Hera's character power: "exile" is stronger language than "mute" —
+  // Hestia's character power: "exile" is stronger language than "mute" —
   // reads as losing access to the room itself for this deliberation
   // window, not just being unable to send, so this replaces the whole
   // view (message history included) rather than just disabling the
   // composer — the same shape actual game-elimination already uses to
   // remove the Group Chat tab entirely for an exiled player.
-  if (!readOnly && heraChatBlockActive(heraState, player.id)) {
+  if (!readOnly && hestiaChatBlockActive(hestiaState, player.id)) {
     return (
       <div style={{ height: "60vh", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 20 }}>
         <div>
           <div style={{ fontSize: 32, marginBottom: 10 }}>👑</div>
           <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>
-            Hera has exiled you from the main chat for this deliberation — you'll be back once it ends.
+            Hestia has exiled you from the main chat for this deliberation — you'll be back once it ends.
           </p>
         </div>
       </div>

@@ -9,7 +9,7 @@
 -- in schema.sql), so that comparison was never true for the actual chaos
 -- holder. In practice this meant the RLS policies on chaos_secrets (see
 -- add-chaos-secrets.sql) worked correctly for the HOST, but the player who
--- actually held the Power of Chaos could never read their own secret pick
+-- actually held the Favor of the Fates could never read their own secret pick
 -- — the one thing that table exists to let them see.
 --
 -- This corrects it by joining players to translate chaosHolderId (a

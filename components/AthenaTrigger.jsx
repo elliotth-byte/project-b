@@ -5,12 +5,12 @@ import { KEY_EXILE, KEY_FINALE } from "../lib/gameState";
 import { powerFor } from "../lib/characterPowers";
 
 // ─── Athena's character power (see lib/characterPowers.js) ───
-// "Can make the player with the Power of Chaos swap their initial
+// "Can make the player with the Favor of the Fates swap their initial
 // choice for a secondary choice." Athena never sees or picks the new
 // choice herself — she can only flip a public flag (athenaForceSwapPending)
 // that the holder's own screen (ChaosPowerPlayer.jsx) reacts to; the
 // actual replacement pick is still entirely the holder's own doing,
-// confirmed against the season's host ("Power of Chaos chooses", not
+// confirmed against the season's host ("Favor of the Fates chooses", not
 // Athena). Limited to once per round — see athenaForceSwapUsed below —
 // so this can't be used to endlessly harass whoever's holding it.
 export default function AthenaTrigger({ gameId, player, round, settings }) {
@@ -35,13 +35,13 @@ export default function AthenaTrigger({ gameId, player, round, settings }) {
     return (
       <Card style={{ marginBottom: 20, textAlign: "center", borderColor: "#0ea5e9" }}>
         <div style={{ fontSize: 22, marginBottom: 4 }}>🦉</div>
-        <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>Waiting on the Power of Khaos holder to pick their replacement...</p>
+        <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>Waiting on the Favor of the Fates holder to pick their replacement...</p>
       </Card>
     );
   }
 
   const trigger = async () => {
-    if (!confirm("Force the Power of Khaos holder to swap their pick? They'll choose the replacement themselves — you won't see what either pick was.")) return;
+    if (!confirm("Force the Favor of the Fates holder to swap their pick? They'll choose the replacement themselves — you won't see what either pick was.")) return;
     setTriggering(true);
     await storageUpdate(gameId, key, (fresh) => (fresh ? { ...fresh, athenaForceSwapPending: true, athenaForceSwapUsed: true } : fresh));
     setTriggering(false);
@@ -50,9 +50,9 @@ export default function AthenaTrigger({ gameId, player, round, settings }) {
   return (
     <Card style={{ marginBottom: 20, textAlign: "center", borderColor: "#0ea5e9" }}>
       <div style={{ fontSize: 22, marginBottom: 4 }}>🦉</div>
-      <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15 }}>Athena's Power</h3>
+      <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15 }}>Power of Manipulation <span style={{ color: "#a68fd6", fontWeight: 400, fontSize: 12 }}>(Athena)</span></h3>
       <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 10px" }}>
-        Force the Power of Khaos holder to swap their pick for a different one — usable once per round, and you'll never learn what either pick was.
+        Force the Favor of the Fates holder to swap their pick for a different one — usable once per round, and you'll never learn what either pick was.
       </p>
       <Btn small onClick={trigger} disabled={triggering}>{triggering ? "Forcing..." : "🦉 Force a Swap"}</Btn>
     </Card>

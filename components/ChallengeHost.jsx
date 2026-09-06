@@ -15,8 +15,12 @@ import { initMasquerade } from "../lib/games/masqueradeData";
 import { initCloseToTwenty } from "../lib/games/closeToTwentyData";
 import { initTorched } from "../lib/games/torchedData";
 import { initChains, subscribeChains } from "../lib/games/chainsData";
+import { initPandorasBoxes } from "../lib/games/pandorasBoxesData";
+import { initMusicalChairs } from "../lib/games/musicalChairsData";
+import { initFloor } from "../lib/games/floorData";
 import { initScavengerHunt, subscribeScavengerHunt, OFFERING_TYPES as SCAVENGER_OFFERING_TYPES } from "../lib/games/scavengerHuntData";
 import { pickRandomChallenge, hephaestusDrawKey, randomPickKey } from "../lib/challengeSelection";
+import { canRunStockMarketChallenge } from "../lib/games/stockMarketData";
 import { fetchGloballyDisabledChallenges } from "../lib/platformSettings";
 import { powerFor } from "../lib/characterPowers";
 import ParticipantPicker from "./ParticipantPicker";
@@ -158,14 +162,15 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   useEffect(() => {
     if (globallyDisabled === null) return;
     const disabledTypes = [...(settings?.disabledChallenges || []), ...globallyDisabled];
-    if (!disabledTypes.includes(gameType)) return;
-    const firstEnabled = Object.keys(GAME_REGISTRY).find((k) => k !== "manual" && !disabledTypes.includes(k));
+    const stockMarketBlocked = gameType === "stockmarket" && !canRunStockMarketChallenge(Date.now(), settings?.challengeDurationSec || 900);
+    if (!disabledTypes.includes(gameType) && !stockMarketBlocked) return;
+    const firstEnabled = Object.keys(GAME_REGISTRY).find((k) => k !== "manual" && !disabledTypes.includes(k) && !(k === "stockmarket" && stockMarketBlocked));
     if (firstEnabled) setGameType(firstEnabled);
-  }, [globallyDisabled, settings?.disabledChallenges, gameType]);
+  }, [globallyDisabled, settings?.disabledChallenges, settings?.challengeDurationSec, gameType]);
   useEffect(() => {
     if (settings?.challengeSelectionMode !== "random" || hephaestusPlayer || !round?.round || challenge?.active || randomPickState || globallyDisabled === null) return;
     const disabledTypes = [...(settings?.disabledChallenges || []), ...globallyDisabled];
-    storageUpdate(gameId, randomPickKey(round.round), (fresh) => (fresh ? fresh : { gameType: pickRandomChallenge(challengeHistory, disabledTypes) }));
+    storageUpdate(gameId, randomPickKey(round.round), (fresh) => (fresh ? fresh : { gameType: pickRandomChallenge(challengeHistory, disabledTypes, Date.now(), settings?.challengeDurationSec) }));
   }, [settings?.challengeSelectionMode, settings?.disabledChallenges, hephaestusPlayer, round?.round, challenge?.active, randomPickState, globallyDisabled, gameId, challengeHistory]);
 
   // Keeps gameType (the state everything else in this component — maze
@@ -233,7 +238,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     // or a lock-in-gated reveal forced to stop mid-way (possibly even
     // before it's really begun) has no clean resolution the way a
     // scored game does.
-    const endsAt = (settings?.infiniteTime || gameType === "masquerade" || gameType === "torched" || gameType === "chains") ? null : now + (settings?.challengeDurationSec || 900) * 1000;
+    const endsAt = (settings?.infiniteTime || gameType === "masquerade" || gameType === "torched" || gameType === "chains" || gameType === "pandorasboxes") ? null : now + (settings?.challengeDurationSec || 900) * 1000;
     const configOverrides = MAZE_TYPES.includes(gameType) ? { size: mazeSize } : undefined;
     await storageSet(gameId, KEY_CHALLENGE, {
       round: round.round, active: true, startedAt: now, endsAt,
@@ -262,6 +267,15 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     }
     if (gameType === "chains") {
       await initChains(gameId, round.round, participants);
+    }
+    if (gameType === "pandorasboxes") {
+      await initPandorasBoxes(gameId, round.round, participants);
+    }
+    if (gameType === "musicalchairs") {
+      await initMusicalChairs(gameId, round.round, participants, now, settings?.challengeDurationSec);
+    }
+    if (gameType === "floor") {
+      await initFloor(gameId, round.round, participants, now, settings?.challengeDurationSec);
     }
     if (gameType === "scavengerhunt") {
       await initScavengerHunt(gameId, round.round, participants, now);
@@ -368,7 +382,19 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 6, marginBottom: 10 }}>
-            {Object.entries(GAME_REGISTRY).filter(([key]) => key !== "manual" && !(settings?.disabledChallenges || []).includes(key) && !(globallyDisabled || []).includes(key)).map(([key, g]) => (
+            {Object.entries(GAME_REGISTRY).filter(([key]) => {
+              if (key === "manual") return false;
+              if ((settings?.disabledChallenges || []).includes(key) || (globallyDisabled || []).includes(key)) return false;
+              // Stock Market specifically also needs the battle's own
+              // scheduled window to overlap real market hours — see
+              // lib/games/stockMarketData.js's own reasoning. Filtered
+              // out entirely here (with the note below explaining why)
+              // rather than shown-but-disabled, same treatment the
+              // disabledChallenges/globallyDisabled filters just above
+              // already get.
+              if (key === "stockmarket" && !canRunStockMarketChallenge(Date.now(), settings?.challengeDurationSec || 900)) return false;
+              return true;
+            }).map(([key, g]) => (
               <button key={key} onClick={() => pickGameType(key)} style={{
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
                 padding: "10px 8px", borderRadius: 8, cursor: "pointer",
@@ -383,6 +409,11 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
           </div>
         )}
         <p style={{ fontSize: 11.5, color: "#6b4f99", margin: "0 0 14px", fontStyle: "italic" }}>{GAME_REGISTRY[gameType].blurb}</p>
+        {gameType !== "stockmarket" && !canRunStockMarketChallenge(Date.now(), settings?.challengeDurationSec || 900) && (
+          <p style={{ fontSize: 11, color: "#6b4f99", margin: "0 0 10px", fontStyle: "italic" }}>
+            📈 Stock Market isn't shown right now — it's only offered when the battle's scheduled hours overlap real stock market trading hours (weekdays, 9:30am-4:00pm ET).
+          </p>
+        )}
 
         {MAZE_TYPES.includes(gameType) && (
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>

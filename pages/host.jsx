@@ -81,6 +81,28 @@ export default function HostPage() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // A scoped host account (see lib/auth.js's canHostGameType) never sees
+  // "project_b" in the picker below — it's filtered out entirely, not
+  // just disabled. But newGameType's own default never accounted for
+  // that: it stays hardcoded at "project_b" until something calls
+  // setNewGameType, which only ever happens by clicking one of the
+  // rendered options. For an account scoped to, say, "stereo_types",
+  // that meant submitting the form without ever touching the (only,
+  // already only-option-available) Stereo Types button still sent
+  // game_type: "project_b" — which doesn't match this account's
+  // hostScope, and sql/add-host-scope.sql's insert policy rejects it:
+  // "new row violates row-level security policy for table \"games\"".
+  // This keeps newGameType pointed at something the account can
+  // actually use as soon as we know who's logged in (or if hostScope
+  // itself changes, e.g. via becomeHost), without touching it at all
+  // for an unrestricted account, where "project_b" was always valid.
+  useEffect(() => {
+    if (!user) return;
+    if (canHostGameType(user, newGameType)) return;
+    const allowed = ["project_b", "traitors", "stereo_types"].find((t) => canHostGameType(user, t));
+    if (allowed) setNewGameType(allowed);
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Load every season this host can manage — seasons they created
   // (host_id = them) plus any they've been added to as a co-host (see
   // sql/add-game-hosts.sql). Two queries because Supabase's client can't

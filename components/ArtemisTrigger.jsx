@@ -8,7 +8,7 @@ import { powerFor } from "../lib/characterPowers";
 // "You may cancel the vote of another player of your choice at each
 // elimination. You must announce you are choosing to do so before the
 // deliberation period ends." Public and permanent once set (not secret
-// like the Power of Chaos holder's pick, and not changeable afterward —
+// like the Favor of the Fates holder's pick, and not changeable afterward —
 // "announce... before the deliberation period ends" reads as a one-time
 // decision, not something to freely flip-flop on) — every place that
 // tallies votes (lib/characterPowers.js's filterCancelledVote, wired
@@ -61,7 +61,7 @@ export default function ArtemisTrigger({ gameId, round, player, players, setting
     <Card style={{ marginBottom: 20, borderColor: "#22c55e" }}>
       <div style={{ textAlign: "center", marginBottom: 12 }}>
         <div style={{ fontSize: 22, marginBottom: 4 }}>🏕</div>
-        <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15 }}>Artemis's Power</h3>
+        <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15 }}>Power of the Snare <span style={{ color: "#a68fd6", fontWeight: 400, fontSize: 12 }}>(Artemis)</span></h3>
         <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>
           Cancel one player's vote this elimination — announced publicly, permanent once confirmed, and only usable while voting is still open.
         </p>

@@ -1,20 +1,26 @@
+import { useState } from "react";
 import { colorFor } from "../lib/playerColors";
+import PlayerPowerModal from "./PlayerPowerModal";
 
 // ─── Player Memory Wall ───
 // The classic reality-show "wall of houseguest photos, turned black-and-
 // white once someone's out" — same tile size/style as the interactive
 // MemoryWall.jsx used for actual votes (deliberately, so it visually
 // reads as the same wall, just non-interactive and showing EVERYONE, not
-// just this moment's candidates), but this one is a pure gallery: no
-// selection, no click handlers, alive and eliminated players alike.
+// just this moment's candidates). Tapping a portrait opens
+// PlayerPowerModal.jsx — their current power (if any), and whether
+// they've won a battle, are up for exile this round, or held the Favor
+// of the Fates last round; the gold/red glow below is the same
+// information at a glance, this is that same information in words.
 // players: full roster, already alias/avatar-resolved same as everywhere
 // else (see lib/avatarIdentity.js / lib/playerIdentity.js).
 // hideNameLabels: see MemoryWall.jsx's matching prop — suppresses the
 // overlaid name only on avatar tiles (the Default Gods collection has
 // each name baked into the portrait itself), never on the color-swatch
-// fallback, and never the "OUT" badge, which is separate information
+// fallback, and never the \"OUT\" badge, which is separate information
 // the photo doesn't carry.
-export default function PlayerMemoryWall({ players, hideNameLabels = false, winnerIds, nomineeIds }) {
+export default function PlayerMemoryWall({ players, hideNameLabels = false, winnerIds, nomineeIds, settings, fatesHolderId }) {
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
   const roster = [...(players || [])].sort((a, b) => {
     if (a.alive !== b.alive) return a.alive ? -1 : 1; // alive players first
     return (a.display_name || "").localeCompare(b.display_name || "");
@@ -62,11 +68,13 @@ export default function PlayerMemoryWall({ players, hideNameLabels = false, winn
           return (
             <div
               key={p.id}
+              onClick={() => setSelectedPlayer(p)}
               style={{
                 aspectRatio: "1", borderRadius: 14,
                 border: `4px solid ${borderColor}`,
                 opacity: eliminated ? 0.75 : 1,
                 position: "relative", overflow: "hidden", background: "#0d0618",
+                cursor: "pointer",
               }}
             >
               <img
@@ -105,6 +113,7 @@ export default function PlayerMemoryWall({ players, hideNameLabels = false, winn
         return (
           <div
             key={p.id}
+            onClick={() => setSelectedPlayer(p)}
             style={{
               aspectRatio: "1", borderRadius: 14,
               background: "#0d0618",
@@ -113,6 +122,7 @@ export default function PlayerMemoryWall({ players, hideNameLabels = false, winn
               opacity: eliminated ? 0.55 : 1,
               padding: 8,
               position: "relative",
+              cursor: "pointer",
             }}
           >
             <div style={{
@@ -131,6 +141,16 @@ export default function PlayerMemoryWall({ players, hideNameLabels = false, winn
           </div>
         );
       })}
+      {selectedPlayer && (
+        <PlayerPowerModal
+          player={selectedPlayer}
+          settings={settings}
+          isWinner={winnerIds?.has(selectedPlayer.id)}
+          isNominee={nomineeIds?.has(selectedPlayer.id)}
+          heldFatesLastRound={fatesHolderId === selectedPlayer.id}
+          onClose={() => setSelectedPlayer(null)}
+        />
+      )}
     </div>
   );
 }

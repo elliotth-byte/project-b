@@ -54,7 +54,7 @@ export default function HelpPanel({ player, onReplayTour, readOnly = false }) {
             {player.inactivityStrikes || 0} / 3
           </p>
           <p style={{ fontSize: 12, color: "#a68fd6", margin: 0, lineHeight: 1.5 }}>
-            Missing a nomination, a Power of Khaos decision, a vote, or a Battle you were expected to compete in adds one — 3 removes
+            Missing a nomination, a Favor of the Fates decision, a vote, or a Battle you were expected to compete in adds one — 3 removes
             you from the game. One strike comes off automatically every 3 rounds.
           </p>
         </Card>

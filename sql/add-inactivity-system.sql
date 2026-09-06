@@ -14,7 +14,7 @@
 -- instant-removal rule — for as long as the shield is on. Deliberately
 -- does NOT exempt them from the underlying GAME-INTEGRITY guarantees
 -- that exist independent of punishment (a nominee always gets picked
--- for Fates, the Power of Khaos is always exercised) — those still
+-- for Fates, the Favor of the Fates is always exercised) — those still
 -- auto-resolve on a shielded player's behalf exactly the same way, the
 -- shield only removes what would otherwise happen TO them for it.
 -- ============================================================

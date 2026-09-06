@@ -1,8 +1,8 @@
 -- ============================================================
--- Migration: Power of Chaos button-draw index
+-- Migration: Favor of the Fates button-draw index
 -- Run this in Supabase SQL Editor (New query -> paste -> Run).
 --
--- The Power of Chaos draw now shows players a row of N mystery buttons
+-- The Favor of the Fates draw now shows players a row of N mystery buttons
 -- (N = however many players are actually in the draw that round) with
 -- exactly one secretly correct — this column holds which one (0-based),
 -- written and read only by pages/api/chaos-draw.js via the service-role

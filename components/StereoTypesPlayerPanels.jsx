@@ -7,6 +7,7 @@ import StereoTypesASidePlayer from "./StereoTypesASidePlayer";
 import StereoTypesRemixPlayer from "./StereoTypesRemixPlayer";
 import StereoTypesOnBlastPlayer from "./StereoTypesOnBlastPlayer";
 import { subscribeStereoTypesNowPlaying } from "../lib/stereoTypesNowPlaying";
+import StereoTypesPlayerSpotifySync from "./StereoTypesPlayerSpotifySync";
 import { subscribeStereoTypesRound } from "../lib/stereoTypesASide";
 import { supabase } from "../lib/supabaseClient";
 import StereoTypesRulesPanel from "./StereoTypesRulesPanel";
@@ -190,6 +191,8 @@ export default function StereoTypesPlayerPanels({ gameId, player, players }) {
     // grid track sizing, only for flex rows).
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16 }}>
       <StereoTypesTitleScreen fullscreen reactive={!!nowPlaying?.isPlaying} intensity={nowPlaying?.intensity || 0} bpm={nowPlaying?.bpm || null} />
+
+      <StereoTypesPlayerSpotifySync gameId={gameId} nowPlaying={nowPlaying} />
 
       <StereoTypesRulesPanel />
 

@@ -130,7 +130,7 @@ export default function ExileVoteHost({ gameId, players, round }) {
 
   const buildResultsSummary = () => {
     const lines = voteRows.map((r) => `${players.find((p) => p.id === r.voterId)?.display_name || "?"} → ${byId[r.targetId] || "?"}${r.reason ? ` ("${r.reason}")` : ""}`);
-    const chaosLine = nullifiedId ? `🃏 ${chaosHolder?.display_name || "The Power of Khaos"} nullified ${byId[nullifiedId] || "?"}.${chaosSecret?.reason ? ` ("${chaosSecret.reason}")` : ""}` : "";
+    const chaosLine = nullifiedId ? `🃏 ${chaosHolder?.display_name || "The Favor of the Fates"} nullified ${byId[nullifiedId] || "?"}.${chaosSecret?.reason ? ` ("${chaosSecret.reason}")` : ""}` : "";
     return `🃏 Exile Vote results — Round ${round.round}\n\n${lines.join("\n")}\n\n${chaosLine}`.trim();
   };
 
@@ -156,13 +156,13 @@ export default function ExileVoteHost({ gameId, players, round }) {
       <p style={{ color: "#6b4f99", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
         Nominees: {exile.nominees.map((n) => n.name).join(", ")}.{" "}
         {exile.mode === "save"
-          ? "Everyone votes for who to SAVE. Whoever the Power of Khaos nullifies, and whoever has the fewest save votes among the rest, are both exiled."
-          : "Everyone votes for who to eliminate. Whoever the Power of Khaos nullifies can't be exiled no matter how many votes they get."}
+          ? "Everyone votes for who to SAVE. Whoever the Favor of the Fates nullifies, and whoever has the fewest save votes among the rest, are both exiled."
+          : "Everyone votes for who to eliminate. Whoever the Favor of the Fates nullifies can't be exiled no matter how many votes they get."}
       </p>
 
       <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
         <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
-          🃏 Power of Khaos
+          🃏 Favor of the Fates
         </div>
         {chaosHolder ? (
           <p style={{ fontSize: 12, color: nullifiedId ? "#00ff9d" : "#a68fd6", margin: 0 }}>
@@ -175,7 +175,7 @@ export default function ExileVoteHost({ gameId, players, round }) {
           </p>
         ) : (
           <p style={{ fontSize: 12, color: "#a68fd6", margin: 0 }}>
-            Every voter got one shot at a mystery-card draw on their own screen ({alive.length} cards, one Power of Khaos) — {Object.keys(drawPicks).length}/{alive.length} have picked so far.
+            Every voter got one shot at a mystery-card draw on their own screen ({alive.length} cards, one Favor of the Fates) — {Object.keys(drawPicks).length}/{alive.length} have picked so far.
             {exile.votingOpen ? " Still up for grabs." : " Voting's closed with nobody claiming it — no one holds it this round."}
           </p>
         )}
@@ -194,7 +194,7 @@ export default function ExileVoteHost({ gameId, players, round }) {
         <div style={{ fontSize: 12, fontWeight: 700, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>
           Votes: {voteRows.length}/{alive.length} in
         </div>
-        <div style={{ fontSize: 10, color: "#6b4f99", marginBottom: 8 }}>🃏 next to a name shows their Power of Khaos draw status — green = won it, red = picked but didn't win, gray = hasn't picked yet.</div>
+        <div style={{ fontSize: 10, color: "#6b4f99", marginBottom: 8 }}>🃏 next to a name shows their Favor of the Fates draw status — green = won it, red = picked but didn't win, gray = hasn't picked yet.</div>
         <div style={{ display: "grid", gap: 6 }}>
           {alive.map((voter) => (
             <div key={voter.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -244,7 +244,7 @@ export default function ExileVoteHost({ gameId, players, round }) {
             </p>
           ) : (
             <p style={{ color: "#ff3860", fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>
-              🃏 It's tied — waiting on {chaosHolder?.display_name || "the Power of Khaos holder"} to break it from their own screen.
+              🃏 It's tied — waiting on {chaosHolder?.display_name || "the Favor of the Fates holder"} to break it from their own screen.
             </p>
           )}
           <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 8px", fontStyle: "italic" }}>Host fallback, if needed:</p>
@@ -303,7 +303,7 @@ export default function ExileVoteHost({ gameId, players, round }) {
                 </div>
               ) : !chaosRevealed ? (
                 <Btn onClick={() => setChaosRevealed(true)} disabled={tieBreakUnresolved}>
-                  🃏 Reveal the Power of Khaos — {chaosHolder?.display_name || "?"} chose {nullifiedId ? byId[nullifiedId] || "?" : "no one"}
+                  🃏 Reveal the Favor of the Fates — {chaosHolder?.display_name || "?"} chose {nullifiedId ? byId[nullifiedId] || "?" : "no one"}
                 </Btn>
               ) : (
                 <div>
@@ -321,7 +321,7 @@ export default function ExileVoteHost({ gameId, players, round }) {
       )}
 
       <CopyMessage icon="🃏" label="Exile Vote Announcement"
-        text={`In Olympus, all crave power. Power, however, comes at a cost. Whom are you willing to betray, to manipulate, to exile?\n\n🃏 The Exile Vote is underway. Nominees: ${exile.nominees.map((n) => n.name).join(", ")}. Power of Khaos: ${chaosHolder?.display_name || "?"}.`} />
+        text={`In Olympus, all crave power. Power, however, comes at a cost. Whom are you willing to betray, to manipulate, to exile?\n\n🃏 The Exile Vote is underway. Nominees: ${exile.nominees.map((n) => n.name).join(", ")}. Favor of the Fates: ${chaosHolder?.display_name || "?"}.`} />
     </Card>
   );
 }

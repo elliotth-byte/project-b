@@ -1,15 +1,15 @@
 -- ============================================================
--- Migration: secret Power of Chaos picks
+-- Migration: secret Favor of the Fates picks
 -- Run this in Supabase SQL Editor (New query -> paste -> Run).
 --
 -- Why this needs its own table rather than just another key in
 -- game_state: game_state's RLS is game-wide (any host or player can
 -- read ANY key for their own game), which is fine for almost everything
--- in this app — but "who did the Power of Chaos holder nullify" needs
+-- in this app — but "who did the Favor of the Fates holder nullify" needs
 -- to be genuinely unreadable by other players until the reveal, not just
 -- hidden in the UI (a player who opened dev tools could otherwise read
 -- it straight out of the table). This table's own RLS policies restrict
--- reading it to the host and whoever currently holds the Power of Chaos.
+-- reading it to the host and whoever currently holds the Favor of the Fates.
 --
 -- `context` distinguishes which vote this pick belongs to:
 --   'exile:<round>'  — a given round's Exile Vote
@@ -30,7 +30,7 @@ alter publication supabase_realtime add table chaos_secrets;
 
 -- Checks (via a definer function, so this doesn't need its own broad
 -- read access to game_state) whether the CURRENT user is whoever
--- game_state currently says holds the Power of Chaos for this context.
+-- game_state currently says holds the Favor of the Fates for this context.
 --
 -- chaosHolderId (stored in game_state) is a players.id, not an auth user
 -- id — so this has to join players to translate it to that player's

@@ -4,7 +4,7 @@ import { KEY_ROUND, KEY_EXILE, KEY_FINALE, KEY_SETTINGS, DEFAULT_SETTINGS } from
 import { powerFor } from "../../lib/characterPowers";
 
 // ============================================================
-// The Power of Khaos "draw" — replaces the old host-side Fan of Cards
+// The Favor of the Fates "draw" — replaces the old host-side Fan of Cards
 // flavor button. When the Exile Vote (or Finale) begins, the game lays
 // out N mystery buttons on every eligible player's screen — N being
 // however many players are actually in the draw that round (alive
@@ -18,7 +18,7 @@ import { powerFor } from "../../lib/characterPowers";
 // pick via this endpoint's response.
 //
 // Every eligible player gets one shot: pick one button, any button. Hit
-// the right one and you win the Power of Khaos this round — recorded
+// the right one and you win the Favor of the Fates this round — recorded
 // immediately as this round's public chaosHolderId, same as before.
 // Everyone else's pick is just recorded (so the UI can show which
 // buttons have already been tried and are safely known-wrong) with no
@@ -78,28 +78,28 @@ export default async function handler(req, res) {
   if (buttonIndex >= poolSize) return res.status(400).json({ error: "That button doesn't exist." });
 
   const state = await db.get(gameId, stateKey);
-  if (!state || !state.votingOpen) return res.status(400).json({ error: "The Power of Khaos draw isn't open right now." });
+  if (!state || !state.votingOpen) return res.status(400).json({ error: "The Favor of the Fates draw isn't open right now." });
 
   const picksKey = `pb:chaos-picks:${context}`;
   const picks = (await db.get(gameId, picksKey)) || {};
 
-  // Hestia's character power (see lib/characterPowers.js): two draws
+  // Hera's character power (see lib/characterPowers.js): two draws
   // instead of one, improving her odds of becoming the holder — not
   // two nullify picks once already holding it (that's a different
   // reading the season's host confirmed against when this was built).
   // Determined server-side from settings + this player's own row, same
   // as everything else here — never trusted from the request body,
-  // since a forged "I'm Hestia" claim from the client would otherwise
+  // since a forged "I'm Hera" claim from the client would otherwise
   // just be a free second pick for anyone.
   const settingsRaw = await db.get(gameId, KEY_SETTINGS);
   const settings = { ...DEFAULT_SETTINGS, ...(settingsRaw || {}) };
-  const isHestia = powerFor(me, settings) === "Hestia";
+  const isHera = powerFor(me, settings) === "Hera";
 
   let pickSlot = me.id; // where THIS pick gets recorded — usually just the player's own id
   if (picks[me.id] !== undefined) {
-    const hestiaSlot = `${me.id}:hestia2`;
-    if (isHestia && picks[hestiaSlot] === undefined) {
-      pickSlot = hestiaSlot;
+    const heraSlot = `${me.id}:hera2`;
+    if (isHera && picks[heraSlot] === undefined) {
+      pickSlot = heraSlot;
     } else {
       return res.status(400).json({ error: "You've already made your pick." });
     }

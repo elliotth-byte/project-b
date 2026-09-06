@@ -59,7 +59,7 @@ export default function AphroditePicker({ gameId, player, players, settings }) {
     <Card style={{ marginBottom: 20, borderColor: "#ff2d95" }}>
       <div style={{ textAlign: "center", marginBottom: 12 }}>
         <div style={{ fontSize: 22, marginBottom: 4 }}>💘</div>
-        <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15 }}>Aphrodite's Power</h3>
+        <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15 }}>Power of Seduction <span style={{ color: "#a68fd6", fontWeight: 400, fontSize: 12 }}>(Aphrodite)</span></h3>
         <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>
           Choose one player now, in round 1 — they can never nominate or vote for you, for the rest of the season. This is permanent once confirmed, so choose carefully.
         </p>

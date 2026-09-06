@@ -60,7 +60,7 @@ export default function DionysusSwap({ gameId, round, player, players, settings 
     <Card style={{ marginBottom: 20, borderColor: "#c026d3" }}>
       <div style={{ textAlign: "center", marginBottom: 12 }}>
         <div style={{ fontSize: 22, marginBottom: 4 }}>🍇</div>
-        <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15 }}>Dionysus's Power</h3>
+        <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15 }}>Power of Intoxication <span style={{ color: "#a68fd6", fontWeight: 400, fontSize: 12 }}>(Dionysus)</span></h3>
         <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>
           Swap power cards with any player — if they held a target (Aphrodite or Ares), you inherit it. Once per round.
         </p>
