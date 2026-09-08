@@ -148,17 +148,6 @@ export default function PlayPage() {
     if (round?.phase === PHASES.ENDED) setTab((t) => (t === "game" ? "ceremony" : t));
   }, [round?.phase]);
 
-  // Bounces a player OFF the Ceremony tab the instant a
-  // history-drawing challenge (see ceremonyTabLocked's own comment
-  // below, near visibleTabs) goes active — covers the case where they
-  // were already sitting on that tab from earlier in the round when
-  // the Battle started.
-  useEffect(() => {
-    if (currentChallenge?.active && GAME_REGISTRY[currentChallenge.gameType]?.locksCeremonyTab) {
-      setTab((t) => (t === "ceremony" ? "game" : t));
-    }
-  }, [currentChallenge?.active, currentChallenge?.gameType]);
-
   useEffect(() => {
     if (!gameId) return;
     (async () => {
@@ -197,6 +186,27 @@ export default function PlayPage() {
     const unsubscribe = subscribeGameState(gameId, KEY_CHALLENGE, setCurrentChallenge);
     return unsubscribe;
   }, [gameId]);
+
+  // Bounces a player OFF the Ceremony tab the instant a
+  // history-drawing challenge (see ceremonyTabLocked's own comment
+  // further down, near visibleTabs) goes active — covers the case
+  // where they were already sitting on that tab from earlier in the
+  // round when the Battle started. Deliberately placed here, right
+  // after currentChallenge's own declaration and subscription effect
+  // just above (not up near the OTHER ceremony-related effect near the
+  // top of this component, which was its original — and buggy —
+  // location): currentChallenge is declared via useState further down
+  // in this file than that original spot, and a dependency array is
+  // evaluated immediately as part of calling useEffect itself, not
+  // deferred into the callback the way the callback BODY is — so
+  // referencing it from up there was a genuine temporal-dead-zone
+  // ReferenceError on every render, not just a style nitpick about
+  // where related effects live.
+  useEffect(() => {
+    if (currentChallenge?.active && GAME_REGISTRY[currentChallenge.gameType]?.locksCeremonyTab) {
+      setTab((t) => (t === "ceremony" ? "game" : t));
+    }
+  }, [currentChallenge?.active, currentChallenge?.gameType]);
   useEffect(() => {
     if (!gameId) return;
     const unsubscribe = subscribeGameState(gameId, KEY_EXILE, setLiveExile);
