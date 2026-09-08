@@ -7,11 +7,13 @@ import {
   claimChair,
   placementValue,
 } from "../../lib/games/musicalChairsData";
+import { startMusic, stopMusic } from "../../lib/games/musicalChairsAudio";
 
 export default function MusicalChairsPlayer({ gameId, round, challenge, player, players }) {
   const [state, setState] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [, forceTick] = useState(0);
+  const [soundOn, setSoundOn] = useState(false);
   const reportedRef = useRef(false);
 
   useEffect(() => {
@@ -20,6 +22,20 @@ export default function MusicalChairsPlayer({ gameId, round, challenge, player, 
   }, [gameId, round.round]);
 
   const byName = (id) => players?.find((p) => p.id === id)?.display_name || "?";
+
+  // Actual audio — see lib/games/musicalChairsAudio.js for the
+  // synthesized loop itself. Only plays once soundOn is true (that
+  // flag only ever flips via a real tap on the button below — browsers
+  // block audio from starting any other way), and only WHILE this
+  // player is both still in it and the round is actually in its music
+  // phase; stops the instant either stops being true, including on
+  // unmount, so leaving this screen (or the round moving on) never
+  // leaves a loop playing in the background.
+  useEffect(() => {
+    const shouldPlay = soundOn && state?.gamePhase === "playing" && state?.roundPhase === "music" && state?.remainingPlayerIds?.includes(player.id);
+    if (shouldPlay) startMusic(); else stopMusic();
+    return () => stopMusic();
+  }, [soundOn, state?.gamePhase, state?.roundPhase, state?.remainingPlayerIds, player.id]);
 
   // The actual phase-change clock — see musicalChairsData.js's own
   // comment on why this ALSO needs to run server-side (roundEngine.js),
@@ -136,7 +152,18 @@ export default function MusicalChairsPlayer({ gameId, round, challenge, player, 
   if (state.roundPhase === "music") {
     return (
       <Card style={{ marginBottom: 20, textAlign: "center" }}>
-        <h3 style={{ color: "#ff2d95", margin: "0 0 8px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🎵 Musical Chairs — Round {state.roundIndex + 1}/{state.totalRounds}</h3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🎵 Musical Chairs — Round {state.roundIndex + 1}/{state.totalRounds}</h3>
+          <button
+            onClick={() => setSoundOn((v) => !v)}
+            style={{
+              background: "none", border: `1px solid ${soundOn ? "#00ff9d" : "#3d1f5c"}`, borderRadius: 6,
+              color: soundOn ? "#00ff9d" : "#a68fd6", fontSize: 11, padding: "4px 10px", cursor: "pointer", flexShrink: 0,
+            }}
+          >
+            {soundOn ? "🔊 Sound On" : "🔈 Tap for Sound"}
+          </button>
+        </div>
         <p style={{ color: "#f5f0ff", fontSize: 16, fontWeight: 700, margin: "10px 0" }}>The music is playing...</p>
         <p style={{ color: "#6b4f99", fontSize: 12, margin: 0, fontStyle: "italic" }}>
           {chairsThisRound} chair{chairsThisRound === 1 ? "" : "s"} this round, {state.remainingPlayerIds.length} player{state.remainingPlayerIds.length === 1 ? "" : "s"} left. Stay ready — nobody knows when it stops.
@@ -168,7 +195,18 @@ export default function MusicalChairsPlayer({ gameId, round, challenge, player, 
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
         <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🎵 The Music Stopped!</h3>
-        <Badge>{timeLeftLabel}</Badge>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <button
+            onClick={() => setSoundOn((v) => !v)}
+            style={{
+              background: "none", border: `1px solid ${soundOn ? "#00ff9d" : "#3d1f5c"}`, borderRadius: 6,
+              color: soundOn ? "#00ff9d" : "#a68fd6", fontSize: 10, padding: "3px 8px", cursor: "pointer",
+            }}
+          >
+            {soundOn ? "🔊" : "🔈"}
+          </button>
+          <Badge>{timeLeftLabel}</Badge>
+        </div>
       </div>
       {myClaim ? (
         <p style={{ color: "#00ff9d", fontSize: 14, fontWeight: 700, margin: "10px 0" }}>You got a chair!</p>

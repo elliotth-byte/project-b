@@ -13,8 +13,11 @@ import { exileDrawContext, chaosPicksKey, FINALE_DRAW_CONTEXT } from "../lib/cha
 import { AVATAR_COLLECTIONS } from "../lib/avatarCollections";
 import { uploadAvatar, removeAvatar } from "../lib/avatarUpload";
 import { CHARACTER_POWERS, powerFor, assignRandomPowers } from "../lib/characterPowers";
+import { GAME_REGISTRY } from "../lib/challenges/registry";
 import { formatDurationHours } from "../lib/fatesLogic";
 import { fetchGloballyDisabledChallenges } from "../lib/platformSettings";
+import { subscribeFeedback } from "../lib/feedback";
+import FeedbackInbox from "./FeedbackInbox";
 
 // ─── Season Length ───
 // "12-Hour Round" is the one fixed preset: each phase (Battle, Fates,
@@ -57,7 +60,13 @@ export default function AdminHost({ gameId, players, round }) {
   const [settings, setLocalSettings] = useState(DEFAULT_SETTINGS);
   const [savingSettings, setSavingSettings] = useState(false);
   const [assigningPowers, setAssigningPowers] = useState(false);
-  const [adminSubTab, setAdminSubTab] = useState("roster"); // "roster" | "setup"
+  const [adminSubTab, setAdminSubTab] = useState("roster"); // "roster" | "setup" | "feedback"
+  const [feedbackEntries, setFeedbackEntries] = useState([]);
+  useEffect(() => {
+    const unsubscribe = subscribeFeedback(gameId, (v) => setFeedbackEntries(v || []));
+    return unsubscribe;
+  }, [gameId]);
+  const unreadFeedbackCount = feedbackEntries.filter((f) => !f.read).length;
   const [resettingId, setResettingId] = useState(null);
   const [resetResult, setResetResult] = useState(null); // { playerId, username, newPassword } | null
   const [resetError, setResetError] = useState("");
@@ -392,7 +401,7 @@ export default function AdminHost({ gameId, players, round }) {
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #3d1f5c" }}>
-        {[{ key: "roster", label: "👥 Roster & Resets" }, { key: "setup", label: "⚙️ Season Setup" }].map((t) => (
+        {[{ key: "roster", label: "👥 Roster & Resets" }, { key: "setup", label: "⚙️ Season Setup" }, { key: "feedback", label: "💬 Feedback" }].map((t) => (
           <button key={t.key} onClick={() => setAdminSubTab(t.key)} style={{
             background: adminSubTab === t.key ? "rgba(255,45,149,0.13)" : "transparent",
             color: adminSubTab === t.key ? "#ff2d95" : "#a68fd6",
@@ -400,10 +409,14 @@ export default function AdminHost({ gameId, players, round }) {
             fontSize: 12.5, fontWeight: 600, cursor: "pointer",
             borderBottom: adminSubTab === t.key ? "2px solid #ff2d95" : "2px solid transparent",
           }}>
-            {t.label}{t.key === "roster" && pending.length > 0 ? ` (${pending.length})` : ""}
+            {t.label}
+            {t.key === "roster" && pending.length > 0 ? ` (${pending.length})` : ""}
+            {t.key === "feedback" && unreadFeedbackCount > 0 ? ` (${unreadFeedbackCount})` : ""}
           </button>
         ))}
       </div>
+
+      {adminSubTab === "feedback" && <FeedbackInbox gameId={gameId} />}
 
       {adminSubTab === "roster" && (
         <>

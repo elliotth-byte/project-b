@@ -12,6 +12,8 @@ import { initTorched } from "../lib/games/torchedData";
 import { initPandorasBoxes } from "../lib/games/pandorasBoxesData";
 import { initMusicalChairs } from "../lib/games/musicalChairsData";
 import { initFloor } from "../lib/games/floorData";
+import { initArtAuction } from "../lib/games/artAuctionData";
+import { initMysteryButton } from "../lib/games/mysteryButtonData";
 
 // ─── Test Lab ───
 // Lets the host preview any game at any time, without needing a live
@@ -25,22 +27,25 @@ import { initFloor } from "../lib/games/floorData";
 //
 // Two honest limits, surfaced directly in the UI rather than left for
 // the host to discover by confusion:
-//   1. Nine games (see SHARED_GAME_INIT) only ever get their real
+//   1. Eleven games (see SHARED_GAME_INIT) only ever get their real
 //      server state set up by the host's own Start Battle click or by
 //      random-mode's auto-start (see components/ChallengeHost.jsx and
 //      lib/roundEngine.js) — normally. Here, the Test Lab calls that
 //      same init function itself, using two synthetic participants.
-//      Six of the nine (Chains, Close to 20, Masquerade, Torched,
-//      Musical Chairs, The Floor) explicitly refuse to initialize with
-//      fewer than 2 — confirmed by reading each one directly, not
-//      assumed uniform — so two is exactly enough to init, but only ONE
-//      of the two is actually playable; the second (the Ghost) exists
-//      purely to satisfy that minimum and never acts. Musical Chairs
-//      and The Floor still run a real, complete round or duel this way:
-//      the Ghost never claims a chair (or never answers a question), so
-//      the test player wins simply by answering/acting correctly
-//      themselves — a fine way to preview the actual flow, just not an
-//      actual contest against a second live participant.
+//      Eight of the eleven (Chains, Close to 20, Masquerade, Torched,
+//      Musical Chairs, The Floor, Art Auction, Mystery Button) explicitly refuse to
+//      initialize with fewer than 2 — confirmed by reading each one
+//      directly, not assumed uniform — so two is exactly enough to
+//      init, but only ONE of the two is actually playable; the second
+//      (the Ghost) exists purely to satisfy that minimum and never
+//      acts. Musical Chairs and The Floor still run a real, complete
+//      round or duel this way: the Ghost never claims a chair (or
+//      never answers a question), so the test player wins simply by
+//      answering/acting correctly themselves — a fine way to preview
+//      the actual flow, just not an actual contest against a second
+//      live participant. Art Auction similarly still shows the real
+//      painting canvas and a real (if lot-of-one) auction, since the
+//      Ghost never submits a painting or a bid.
 //      Pandora's Boxes needs 3 to init AT ALL (see
 //      lib/games/pandorasBoxesData.js) — its own entry below is
 //      harmless but this sandbox can't exercise it until it grows a
@@ -92,6 +97,20 @@ const SHARED_GAME_INIT = {
   // way to preview the actual duel/choosing flow, just never the
   // "player picked their own category ahead of time" path.
   floor: (gameId, round, participants) => initFloor(gameId, round, participants, Date.now(), 60),
+  // 2 synthetic participants is exactly MIN_PARTICIPANTS, so this
+  // fully exercises the painting canvas and the bidding UI's own
+  // controls — just against a Ghost who never actually submits a
+  // painting or a bid, so there's only ever one real lot in the
+  // gallery and nothing to bid on.
+  artauction: (gameId, round, participants) => initArtAuction(gameId, round, participants, Date.now(), 60),
+  // Same 2-participant floor as Musical Chairs/Floor — fully
+  // exercisable here, including both scenarios (whichever one the
+  // random 50/50 lands on for a given preview). The Ghost never presses
+  // or passes, so Scenario A's race is trivially won by the test
+  // player, and Scenario B just... never gets its first press at all
+  // unless the test player provides it themselves — a fine way to
+  // preview both branches, just not a real contest.
+  mysterybutton: (gameId, round, participants) => initMysteryButton(gameId, round, participants, Date.now(), 60),
 };
 
 const gameOptions = Object.entries(GAME_REGISTRY).filter(([key]) => key !== "manual");

@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import HomeLink from "../components/HomeLink";
 import { supabase } from "../lib/supabaseClient";
-import { fetchProfile, fetchSeasonHistory, fetchMostRecentAvatars, upsertProfile, searchSeasons } from "../lib/profiles";
+import { fetchProfile, fetchSeasonHistory, fetchAchievements, fetchMostRecentAvatars, upsertProfile, searchSeasons } from "../lib/profiles";
 import { searchPeopleToDm } from "../lib/profileDms";
 import { uploadProfilePhoto, removeProfilePhoto } from "../lib/profilePhotoUpload";
 import { fetchFriendedUserIds, addFriend, removeFriend } from "../lib/friendships";
@@ -23,6 +23,7 @@ export default function ProfilePage() {
   const [user, setUser] = useState(undefined); // undefined = not checked yet, null = checked and not logged in
   const [profile, setProfile] = useState(null);
   const [history, setHistory] = useState(null);
+  const [achievements, setAchievements] = useState(null);
   const [nameDraft, setNameDraft] = useState("");
   const [savingName, setSavingName] = useState(false);
   const [nameError, setNameError] = useState("");
@@ -64,6 +65,7 @@ export default function ProfilePage() {
       }
     });
     fetchSeasonHistory(viewingUserId).then(setHistory);
+    fetchAchievements(viewingUserId).then(setAchievements);
   }, [viewingUserId]);
 
   // profile.photo_url wins if set; otherwise this person's own most
@@ -349,6 +351,43 @@ export default function ProfilePage() {
                 </Link>
               ))}
             </div>
+          )}
+        </div>
+
+        <div style={cardStyle}>
+          <div style={{ fontSize: 12, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 }}>
+            🏅 Achievements
+          </div>
+          {achievements === null ? (
+            <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic" }}>Loading...</p>
+          ) : achievements.length === 0 ? (
+            <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic" }}>None earned yet — these are awarded once a season ends.</p>
+          ) : (
+            Object.entries(
+              achievements.reduce((groups, a) => {
+                (groups[a.category] = groups[a.category] || []).push(a);
+                return groups;
+              }, {})
+            ).map(([category, items]) => (
+              <div key={category} style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 11, color: "#6b4f99", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>{category}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: 8 }}>
+                  {items.map((a) => (
+                    <div
+                      key={a.key}
+                      title={a.description}
+                      style={{
+                        background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8,
+                        padding: "10px 6px", textAlign: "center",
+                      }}
+                    >
+                      <div style={{ fontSize: 22, marginBottom: 4 }}>{a.icon}</div>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, color: "#f5f0ff", lineHeight: 1.3 }}>{a.name}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
           )}
         </div>
 

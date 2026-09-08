@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Btn, Card, Badge } from "./ui";
 import { storageSet, storageUpdate, subscribeGameState } from "../lib/gameStorage";
-import { KEY_CHALLENGE, KEY_ROUND, KEY_CHALLENGE_HISTORY } from "../lib/gameState";
+import { KEY_CHALLENGE, KEY_ROUND, KEY_CHALLENGE_HISTORY, KEY_EXILE_HISTORY } from "../lib/gameState";
 import { placementsComplete } from "../lib/challengeLogic";
 import { GAME_REGISTRY, gameConfigWithDefaults } from "../lib/challengeGames";
 import { subscribeScores, scoresToPlacements, resetPlayerAttempt, overridePlayerScore } from "../lib/challengeScores";
@@ -18,9 +18,13 @@ import { initChains, subscribeChains } from "../lib/games/chainsData";
 import { initPandorasBoxes } from "../lib/games/pandorasBoxesData";
 import { initMusicalChairs } from "../lib/games/musicalChairsData";
 import { initFloor } from "../lib/games/floorData";
+import { initArtAuction } from "../lib/games/artAuctionData";
+import { initMysteryButton } from "../lib/games/mysteryButtonData";
 import { initScavengerHunt, subscribeScavengerHunt, OFFERING_TYPES as SCAVENGER_OFFERING_TYPES } from "../lib/games/scavengerHuntData";
 import { pickRandomChallenge, hephaestusDrawKey, randomPickKey } from "../lib/challengeSelection";
 import { canRunStockMarketChallenge } from "../lib/games/stockMarketData";
+import { hasEnoughHistoryForSelection as hasEnoughTriviaHistory } from "../lib/games/seasonTriviaData";
+import { hasEnoughHistoryForSelection as hasEnoughTimelineHistory } from "../lib/games/timelineData";
 import { fetchGloballyDisabledChallenges } from "../lib/platformSettings";
 import { powerFor } from "../lib/characterPowers";
 import ParticipantPicker from "./ParticipantPicker";
@@ -58,6 +62,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   const [scavengerState, setScavengerState] = useState(null);
   const [resettingId, setResettingId] = useState(null);
   const [challengeHistory, setChallengeHistory] = useState([]);
+  const [exileHistory, setExileHistory] = useState([]);
   const [randomPickState, setRandomPickState] = useState(null);
   const [globallyDisabled, setGloballyDisabled] = useState(null); // null = not loaded yet; the random-pick effect below waits for this rather than risk picking before it's known
   const [hephaestusDraw, setHephaestusDraw] = useState(null);
@@ -130,6 +135,11 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   }, [gameId]);
 
   useEffect(() => {
+    const unsubscribe = subscribeGameState(gameId, KEY_EXILE_HISTORY, (v) => setExileHistory(v || []));
+    return unsubscribe;
+  }, [gameId]);
+
+  useEffect(() => {
     if (!round?.round) return;
     const unsubscribe = subscribeGameState(gameId, randomPickKey(round.round), setRandomPickState);
     return unsubscribe;
@@ -163,15 +173,20 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     if (globallyDisabled === null) return;
     const disabledTypes = [...(settings?.disabledChallenges || []), ...globallyDisabled];
     const stockMarketBlocked = gameType === "stockmarket" && !canRunStockMarketChallenge(Date.now(), settings?.challengeDurationSec || 900);
-    if (!disabledTypes.includes(gameType) && !stockMarketBlocked) return;
-    const firstEnabled = Object.keys(GAME_REGISTRY).find((k) => k !== "manual" && !disabledTypes.includes(k) && !(k === "stockmarket" && stockMarketBlocked));
+    const triviaBlocked = gameType === "seasontrivia" && !hasEnoughTriviaHistory(challengeHistory, exileHistory);
+    const timelineBlocked = gameType === "timeline" && !hasEnoughTimelineHistory(challengeHistory, exileHistory);
+    if (!disabledTypes.includes(gameType) && !stockMarketBlocked && !triviaBlocked && !timelineBlocked) return;
+    const firstEnabled = Object.keys(GAME_REGISTRY).find((k) => k !== "manual" && !disabledTypes.includes(k)
+      && !(k === "stockmarket" && stockMarketBlocked)
+      && !(k === "seasontrivia" && triviaBlocked)
+      && !(k === "timeline" && timelineBlocked));
     if (firstEnabled) setGameType(firstEnabled);
-  }, [globallyDisabled, settings?.disabledChallenges, settings?.challengeDurationSec, gameType]);
+  }, [globallyDisabled, settings?.disabledChallenges, settings?.challengeDurationSec, gameType, challengeHistory, exileHistory]);
   useEffect(() => {
     if (settings?.challengeSelectionMode !== "random" || hephaestusPlayer || !round?.round || challenge?.active || randomPickState || globallyDisabled === null) return;
     const disabledTypes = [...(settings?.disabledChallenges || []), ...globallyDisabled];
-    storageUpdate(gameId, randomPickKey(round.round), (fresh) => (fresh ? fresh : { gameType: pickRandomChallenge(challengeHistory, disabledTypes, Date.now(), settings?.challengeDurationSec) }));
-  }, [settings?.challengeSelectionMode, settings?.disabledChallenges, hephaestusPlayer, round?.round, challenge?.active, randomPickState, globallyDisabled, gameId, challengeHistory]);
+    storageUpdate(gameId, randomPickKey(round.round), (fresh) => (fresh ? fresh : { gameType: pickRandomChallenge(challengeHistory, disabledTypes, Date.now(), settings?.challengeDurationSec, exileHistory) }));
+  }, [settings?.challengeSelectionMode, settings?.disabledChallenges, hephaestusPlayer, round?.round, challenge?.active, randomPickState, globallyDisabled, gameId, challengeHistory, exileHistory]);
 
   // Keeps gameType (the state everything else in this component — maze
   // size, duration, the start button — already reads from) in sync with
@@ -276,6 +291,12 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     }
     if (gameType === "floor") {
       await initFloor(gameId, round.round, participants, now, settings?.challengeDurationSec);
+    }
+    if (gameType === "artauction") {
+      await initArtAuction(gameId, round.round, participants, now, settings?.challengeDurationSec);
+    }
+    if (gameType === "mysterybutton") {
+      await initMysteryButton(gameId, round.round, participants, now, settings?.challengeDurationSec);
     }
     if (gameType === "scavengerhunt") {
       await initScavengerHunt(gameId, round.round, participants, now);
@@ -393,6 +414,15 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
               // disabledChallenges/globallyDisabled filters just above
               // already get.
               if (key === "stockmarket" && !canRunStockMarketChallenge(Date.now(), settings?.challengeDurationSec || 900)) return false;
+              // Season Trivia and Timeline both need a real season's
+              // worth of history to draw from — see
+              // lib/games/seasonTriviaData.js / lib/games/timelineData.js.
+              // Same filtered-out-with-a-note treatment as Stock
+              // Market immediately above, for the same reason: a
+              // brand-new season just doesn't have enough real events
+              // yet for either to be a fair (or even possible) battle.
+              if (key === "seasontrivia" && !hasEnoughTriviaHistory(challengeHistory, exileHistory)) return false;
+              if (key === "timeline" && !hasEnoughTimelineHistory(challengeHistory, exileHistory)) return false;
               return true;
             }).map(([key, g]) => (
               <button key={key} onClick={() => pickGameType(key)} style={{
@@ -412,6 +442,16 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
         {gameType !== "stockmarket" && !canRunStockMarketChallenge(Date.now(), settings?.challengeDurationSec || 900) && (
           <p style={{ fontSize: 11, color: "#6b4f99", margin: "0 0 10px", fontStyle: "italic" }}>
             📈 Stock Market isn't shown right now — it's only offered when the battle's scheduled hours overlap real stock market trading hours (weekdays, 9:30am-4:00pm ET).
+          </p>
+        )}
+        {gameType !== "seasontrivia" && !hasEnoughTriviaHistory(challengeHistory, exileHistory) && (
+          <p style={{ fontSize: 11, color: "#6b4f99", margin: "0 0 10px", fontStyle: "italic" }}>
+            📜 Season Trivia isn't shown right now — it needs a few completed rounds of real history to draw questions from.
+          </p>
+        )}
+        {gameType !== "timeline" && !hasEnoughTimelineHistory(challengeHistory, exileHistory) && (
+          <p style={{ fontSize: 11, color: "#6b4f99", margin: "0 0 10px", fontStyle: "italic" }}>
+            🕰️ Timeline isn't shown right now — it needs a few completed rounds of real history to build a puzzle from.
           </p>
         )}
 

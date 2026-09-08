@@ -51,6 +51,10 @@ import FloorPlayer from "./games/FloorPlayer";
 import BasketballPlayer from "./games/BasketballPlayer";
 import StackPlayer from "./games/StackPlayer";
 import StockMarketPlayer from "./games/StockMarketPlayer";
+import ArtAuctionPlayer from "./games/ArtAuctionPlayer";
+import SeasonTriviaPlayer from "./games/SeasonTriviaPlayer";
+import TimelinePlayer from "./games/TimelinePlayer";
+import MysteryButtonPlayer from "./games/MysteryButtonPlayer";
 import GameResultCard from "./games/GameResultCard";
 
 export const GAME_COMPONENTS = {
@@ -97,9 +101,13 @@ export const GAME_COMPONENTS = {
   basketball: BasketballPlayer,
   stack: StackPlayer,
   stockmarket: StockMarketPlayer,
+  artauction: ArtAuctionPlayer,
+  seasontrivia: SeasonTriviaPlayer,
+  timeline: TimelinePlayer,
+  mysterybutton: MysteryButtonPlayer,
 };
 
-export default function ChallengePlayer({ gameId, player, players, round, settings, readOnly = false }) {
+export default function ChallengePlayer({ gameId, player, players, round, settings, readOnly = false, challengeHistory, exileHistory }) {
   const [challenge, setChallenge] = useState(null);
   const [scores, setScores] = useState({});
   const [reentry, setReentry] = useState([]);
@@ -363,7 +371,7 @@ export default function ChallengePlayer({ gameId, player, players, round, settin
                 99vw/538px post-scale — comfortably fits without triggering
                 horizontal overflow on typical phone widths. */}
             <div style={{ width: "78vw", maxWidth: 420, transform: "scale(1.28)", transformOrigin: "center top", marginTop: 20 }}>
-              <GameComponent key={attemptKey} gameId={gameId} round={round} challenge={challenge} player={player} players={players} />
+              <GameComponent key={attemptKey} gameId={gameId} round={round} challenge={challenge} player={player} players={players} challengeHistory={challengeHistory} exileHistory={exileHistory} />
               <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 10 }}>
                 <Btn small variant="ghost" onClick={() => setMinimized(true)}>↙ Minimize</Btn>
                 <Btn small variant="ghost" onClick={forfeitDigital} disabled={forfeiting}>

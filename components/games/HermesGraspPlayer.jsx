@@ -5,6 +5,7 @@ import { useCountdown } from "./useCountdown";
 import { usePersistedStart } from "./usePersistedStart";
 import { reportScore } from "../../lib/challengeScores";
 import { RELICS, generateDeck } from "../../lib/games/hermesGraspData";
+import RelicIcon from "./RelicIcons";
 
 const ROUND_COUNT = 8;
 const MISTAKE_PENALTY_MS = 2000; // steeper than Stroop's 1500ms — a wrong grab here means misreading which of only 2 possible logic branches applied, not a simple mixup
@@ -101,7 +102,7 @@ export default function HermesGraspPlayer({ gameId, challenge, round, player }) 
                 boxShadow: `0 2px 8px ${s.hex}22`,
               }}
             >
-              <div style={{ fontSize: 34, marginBottom: 6 }}>{relic.emoji}</div>
+              <div style={{ marginBottom: 6 }}><RelicIcon type={relic.id} color={s.hex} size={40} /></div>
               <div style={{ color: s.hex, fontSize: 11.5, fontWeight: 900, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
                 {s.colorName}
               </div>
@@ -124,7 +125,7 @@ export default function HermesGraspPlayer({ gameId, challenge, round, player }) 
               }}
               title={`${r.owner} ${r.name} — true color ${r.colorName}`}
             >
-              <div style={{ fontSize: 22 }}>{r.emoji}</div>
+              <div style={{ marginBottom: 2 }}><RelicIcon type={r.id} color={r.hex} size={24} /></div>
               <div style={{ color: r.hex, fontSize: 9.5, fontWeight: 800, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>{r.colorName}</div>
             </button>
           );

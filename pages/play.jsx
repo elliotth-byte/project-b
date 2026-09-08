@@ -32,6 +32,8 @@ import { hasSeenNavTour } from "../lib/navTour";
 import ChatPanel from "../components/ChatPanel";
 import PlayerAvatarUpload from "../components/PlayerAvatarUpload";
 import PlayerMemoryWall from "../components/PlayerMemoryWall";
+import FeedbackButton from "../components/FeedbackButton";
+import { GAME_REGISTRY } from "../lib/challengeGames";
 import AphroditePicker from "../components/AphroditePicker";
 import PoseidonTrigger from "../components/PoseidonTrigger";
 import AresTarget from "../components/AresTarget";
@@ -145,6 +147,17 @@ export default function PlayPage() {
   useEffect(() => {
     if (round?.phase === PHASES.ENDED) setTab((t) => (t === "game" ? "ceremony" : t));
   }, [round?.phase]);
+
+  // Bounces a player OFF the Ceremony tab the instant a
+  // history-drawing challenge (see ceremonyTabLocked's own comment
+  // below, near visibleTabs) goes active — covers the case where they
+  // were already sitting on that tab from earlier in the round when
+  // the Battle started.
+  useEffect(() => {
+    if (currentChallenge?.active && GAME_REGISTRY[currentChallenge.gameType]?.locksCeremonyTab) {
+      setTab((t) => (t === "ceremony" ? "game" : t));
+    }
+  }, [currentChallenge?.active, currentChallenge?.gameType]);
 
   useEffect(() => {
     if (!gameId) return;
@@ -464,6 +477,14 @@ export default function PlayPage() {
   const effectivePlayerName = settings?.aliasEnabled && myPlayer?.alias && !aliasRevealed ? myPlayer.alias : playerName;
   const player = myPlayer ? { id: myPlayer.id, name: effectivePlayerName, gamePrefs: myPlayer.gamePrefs || DEFAULT_GAME_PREFS, battleBanRound: myPlayer.battleBanRound, torchedPreset: myPlayer.torchedPreset, floorSpecialty: myPlayer.floorSpecialty, powerState: myPlayer.powerState, alias: myPlayer.alias, inactivityStrikes: myPlayer.inactivityStrikes } : null;
 
+  // What actually gets shown to the host as "which page they were on"
+  // (see components/FeedbackButton.jsx) — this app is one route with
+  // tabs, not multiple real pages, so this just reads whichever tab
+  // label is currently showing. Traitors/Stereo Types don't use
+  // BASE_TABS at all (see the tab bar's own isTraitors/isStereoTypes
+  // gate below), so those get a fixed label instead of an empty one.
+  const currentPageLabel = isTraitors ? "Traitors" : isStereoTypes ? "Stereo Types" : (BASE_TABS.find((t) => t.key === tab)?.label || tab || "Game");
+
   // Who Said It pulls its quiz straight from Panopticon chat history, and
   // Close to 20 needs every bank kept a total mystery until the reveal
   // — leaving chat open mid-challenge would let a player either read off
@@ -541,7 +562,16 @@ export default function PlayPage() {
   // round ever triggers this.
   const pendingReveal = approved && !needsIdentity && !!playerName && !!latestExileEntry && !revealAck[player?.id];
 
-  const visibleTabs = BASE_TABS.filter((t) => t.key !== "chat" || settings?.chatEnabled);
+  // A challenge that draws its questions/events from the season's own
+  // real history (see lib/games/seasonTriviaData.js and
+  // lib/games/timelineData.js) would trivially be solved by just
+  // checking the Ceremony tab's own recap — so both of those
+  // specifically hide it while they're actually running, the same way
+  // chatTreatsAsExiled above hides chat access for an exiled player.
+  // Restored automatically the instant the challenge ends (this is
+  // read fresh every render, not a one-time snapshot).
+  const ceremonyTabLocked = !!(currentChallenge?.active && GAME_REGISTRY[currentChallenge.gameType]?.locksCeremonyTab);
+  const visibleTabs = BASE_TABS.filter((t) => (t.key !== "chat" || settings?.chatEnabled) && (t.key !== "ceremony" || !ceremonyTabLocked));
   const { winnerIds, nomineeIds } = computeWinnerAndNomineeIds(challengeHistory, liveExile, round?.round);
 
   const handleQuit = async () => {
@@ -559,6 +589,7 @@ export default function PlayPage() {
 
   return (
     <div style={{ ...pageStyle, alignItems: "flex-start", flexDirection: "column" }}>
+      <FeedbackButton gameId={gameId} player={player} currentPage={currentPageLabel} />
       <div style={{ width: "100%", maxWidth: 400, margin: "0 auto" }}>
         <UpdateBanner />
         {approved && !gameEnded && <ProfilePhotoPrompt userId={user?.id} />}
@@ -759,7 +790,7 @@ export default function PlayPage() {
                 {round?.phase === PHASES.CHALLENGE && (
                   <>
                     <ChallengeErrorBoundary label="Hephaestus's Choice"><HephaestusChoice gameId={gameId} round={round} player={player} settings={settings} /></ChallengeErrorBoundary>
-                    <ChallengeErrorBoundary label="Battle"><ChallengePlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} settings={settings} /></ChallengeErrorBoundary>
+                    <ChallengeErrorBoundary label="Battle"><ChallengePlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} settings={settings} challengeHistory={challengeHistory} exileHistory={exileHistory} /></ChallengeErrorBoundary>
                   </>
                 )}
                 {round?.phase === PHASES.FATES && (

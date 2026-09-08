@@ -8,6 +8,8 @@ import { DEFAULT_SETTINGS, setSettings, subscribeSettings } from "../lib/gameSta
 import { uploadAvatar, removeAvatar } from "../lib/avatarUpload";
 import { STORAGE_KEY_WORDS } from "../lib/wordGameData";
 import { STORAGE_KEY_CASINO } from "../lib/casinoData";
+import { subscribeFeedback } from "../lib/feedback";
+import FeedbackInbox from "./FeedbackInbox";
 import { STORAGE_KEY_HOT_POTATO } from "../lib/hotPotatoData";
 import { STORAGE_KEY_ZOMBIE } from "../lib/zombieData";
 import { STORAGE_KEY_PIGGY } from "../lib/piggyData";
@@ -37,6 +39,13 @@ export default function AdminHost({ gameId, players }) {
   const [confirmSeason, setConfirmSeason] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackEntries, setFeedbackEntries] = useState([]);
+  useEffect(() => {
+    const unsubscribe = subscribeFeedback(gameId, (v) => setFeedbackEntries(v || []));
+    return unsubscribe;
+  }, [gameId]);
+  const unreadFeedbackCount = feedbackEntries.filter((f) => !f.read).length;
   const [finale, setFinale] = useState(undefined); // undefined = loading, null = not declared yet
   const [selectedWinnerId, setSelectedWinnerId] = useState("");
   const [declaring, setDeclaring] = useState(false);
@@ -122,6 +131,25 @@ export default function AdminHost({ gameId, players }) {
     setDeclaring(false);
     if (!ok) { alert("Couldn't declare a winner — try again."); return; }
     setSelectedWinnerId("");
+    // Best-effort — see pages/api/evaluate-achievements.js's own
+    // comment on why this needs a server round-trip at all (a regular
+    // browser session can't be handed the access this needs directly).
+    // Never blocks the winner declaration itself on this succeeding.
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token;
+      if (token) {
+        fetch("/api/evaluate-achievements", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ gameId }),
+        }).catch(() => {});
+      }
+    } catch {
+      // achievements are a bonus, not core to declaring a winner — a
+      // failure here is silently swallowed rather than surfaced to the
+      // host as if the declaration itself had a problem
+    }
   };
 
   const clearFinale = async () => {
@@ -204,6 +232,28 @@ export default function AdminHost({ gameId, players }) {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
+      <Card style={{ borderColor: unreadFeedbackCount > 0 ? "#c9a84c" : undefined }}>
+        <div
+          onClick={() => setShowFeedback((v) => !v)}
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
+        >
+          <h3 style={{ color: "#c9a84c", margin: 0, fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>
+            💬 Feedback{unreadFeedbackCount > 0 ? ` (${unreadFeedbackCount})` : ""}
+          </h3>
+          <span style={{ color: "#a09080", fontSize: 12 }}>{showFeedback ? "Hide ▲" : "Show ▼"}</span>
+        </div>
+        {showFeedback && (
+          <div style={{ marginTop: 12 }}>
+            <FeedbackInbox
+              gameId={gameId}
+              Card={Card}
+              Btn={Btn}
+              colors={{ muted: "#a09080", text: "#f0e6d3", accent: "#c9a84c", body: "#d8ccb8", unread: "#c9a84c", read: "#3a3020" }}
+            />
+          </div>
+        )}
+      </Card>
+
       {pending.length > 0 && (
         <Card style={{ borderColor: "rgba(201,168,76,0.5)" }}>
           <h3 style={{ color: "#c9a84c", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>

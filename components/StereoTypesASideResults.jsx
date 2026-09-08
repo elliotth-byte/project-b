@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card } from "./ui";
+import { supabase } from "../lib/supabaseClient";
 import { getSuperlativeAttributions } from "../lib/stereoTypesSuperlatives";
 import { subscribeStereoTypesReactions, toggleStereoTypesReaction } from "../lib/stereoTypesReactions";
 import StereoTypesReactionBar from "./StereoTypesReactionBar";
@@ -47,6 +48,37 @@ export default function StereoTypesASideResults({ round, players, myPlayerId, ga
     if (!gameId || !round?.round) return;
     return subscribeStereoTypesReactions(gameId, `a-side:${round.round}`, setReactions);
   }, [gameId, round?.round]);
+
+  // Achievement evaluation (Stereo Types Champion / Round Perfect /
+  // Pump Up the Volume — see lib/achievements/evaluate.js's own
+  // evaluateStereoTypesAchievements) has no other reliable trigger for
+  // Stereo Types the way Project B/Traitors do (see
+  // pages/api/evaluate-achievements.js's header comment) — this
+  // component only ever mounts once round.status === "scored" is
+  // already true, which is the closest thing Stereo Types currently
+  // has to "this is done." Fires once per mount, from whichever
+  // client (host or player) happens to render these results first —
+  // idempotent server-side, so there's no harm if more than one does.
+  const evaluatedRef = useRef(false);
+  useEffect(() => {
+    if (!gameId || !round?.result || evaluatedRef.current) return;
+    evaluatedRef.current = true;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data?.session?.access_token;
+        if (!token) return;
+        fetch("/api/evaluate-achievements", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ gameId }),
+        }).catch(() => {});
+      } catch {
+        // best-effort — achievements are a bonus, never worth surfacing a failure here
+      }
+    })();
+  }, [gameId, round?.result]);
+
   if (!result) return null;
 
   const anonMap = round.anonMap || {};
