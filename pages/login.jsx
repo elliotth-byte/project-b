@@ -49,6 +49,10 @@ export default function Login() {
   const submit = async (e) => {
     e.preventDefault();
     setError("");
+    if (!username.trim()) {
+      setError("Please enter a username.");
+      return;
+    }
     setLoading(true);
     const res = await signInPlayer(username, password);
     setLoading(false);

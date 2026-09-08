@@ -30,6 +30,10 @@ export default function Signup() {
   const submit = async (e) => {
     e.preventDefault();
     setError("");
+    if (!username.trim()) {
+      setError("Please enter a username.");
+      return;
+    }
     if (password.length < 6) {
       setError("Password must be at least 6 characters.");
       return;

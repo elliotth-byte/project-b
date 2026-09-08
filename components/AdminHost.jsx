@@ -20,11 +20,11 @@ import { subscribeFeedback } from "../lib/feedback";
 import FeedbackInbox from "./FeedbackInbox";
 
 // ─── Season Length ───
-// "12-Hour Round" is the one fixed preset: each phase (Battle, Fates,
-// Exile Vote) gets its own 12 hours, evenly — not 12 hours split
-// across all three. No player-count math needed since it doesn't
-// target a season total at all, just a flat, predictable per-phase
-// pace regardless of how many people are playing.
+// Each preset here sets a flat, predictable per-phase pace: Battle,
+// Fates, and Exile Vote each get the SAME number of hours, evenly —
+// not that number split across all three. No player-count math
+// needed since none of these target a season total at all, just a
+// fixed rhythm regardless of how many people are playing.
 //
 // A season's TOTAL length can't be preset the same way, because this
 // app has no fixed round count — a season runs until only 3 players
@@ -48,6 +48,13 @@ const SEASON_LENGTH_PRESETS = [
     label: "12-Hour Round",
     summary: "Battle, Fates, and Exile Vote each get 12 hours",
     patch: { challengeDurationSec: 12 * 3600, fatesDurationSec: 12 * 3600, voteDurationSec: 12 * 3600, infiniteTime: false },
+  },
+  {
+    key: "16hour",
+    icon: "⏳",
+    label: "16-Hour Round",
+    summary: "Battle, Fates, and Exile Vote each get 16 hours",
+    patch: { challengeDurationSec: 16 * 3600, fatesDurationSec: 16 * 3600, voteDurationSec: 16 * 3600, infiniteTime: false },
   },
 ];
 
