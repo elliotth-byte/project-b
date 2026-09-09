@@ -408,7 +408,7 @@ export default function AdminHost({ gameId, players, round }) {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #3d1f5c" }}>
+      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #3d1f5c", flexWrap: "wrap" }}>
         {[{ key: "roster", label: "👥 Roster & Resets" }, { key: "setup", label: "⚙️ Season Setup" }, { key: "feedback", label: "💬 Feedback" }, { key: "debuglog", label: "🔍 Debug Log" }].map((t) => (
           <button key={t.key} onClick={() => setAdminSubTab(t.key)} style={{
             background: adminSubTab === t.key ? "rgba(255,45,149,0.13)" : "transparent",
