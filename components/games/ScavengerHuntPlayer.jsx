@@ -5,6 +5,7 @@ import { reportScore } from "../../lib/challengeScores";
 import {
   OFFERING_TYPES, chooseFirstTemple, takeItem, chooseNextLocation, placementValue, subscribeScavengerHunt,
 } from "../../lib/games/scavengerHuntData";
+import { OFFERING_ICON_BY_TYPE, TempleIcon, OlympusIcon } from "./ScavengerHuntIcons";
 
 // See lib/games/scavengerHuntData.js's own header comment for the full
 // rules and every judgment call behind them. This component is a thin
@@ -59,16 +60,22 @@ export default function ScavengerHuntPlayer({ gameId, round, player, players }) 
 
   const collectionStrip = (
     <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 4, marginBottom: 14 }}>
-      {OFFERING_TYPES.map((type) => (
-        <span key={type} style={{
-          fontSize: 10, padding: "3px 7px", borderRadius: 4,
-          background: distinctTypes.has(type) ? "rgba(0,255,157,0.12)" : "#0d0618",
-          border: `1px solid ${distinctTypes.has(type) ? "#00ff9d" : "#3d1f5c"}`,
-          color: distinctTypes.has(type) ? "#00ff9d" : "#6b4f99",
-        }}>
-          {distinctTypes.has(type) ? "✓ " : ""}{type}
-        </span>
-      ))}
+      {OFFERING_TYPES.map((type) => {
+        const Icon = OFFERING_ICON_BY_TYPE[type];
+        const got = distinctTypes.has(type);
+        return (
+          <span key={type} style={{
+            display: "flex", alignItems: "center", gap: 3, fontSize: 10, padding: "3px 7px 3px 4px", borderRadius: 4,
+            background: got ? "rgba(0,255,157,0.12)" : "#0d0618",
+            border: `1px solid ${got ? "#00ff9d" : "#3d1f5c"}`,
+            color: got ? "#00ff9d" : "#6b4f99",
+            opacity: got ? 1 : 0.6,
+          }}>
+            {Icon && <Icon size={14} />}
+            {got ? "✓ " : ""}{type}
+          </span>
+        );
+      })}
     </div>
   );
 
@@ -86,7 +93,7 @@ export default function ScavengerHuntPlayer({ gameId, round, player, players }) 
   if (me.finishedRound != null) {
     return (
       <Card style={{ marginBottom: 20, textAlign: "center" }}>
-        <div style={{ fontSize: 28, marginBottom: 6 }}>🏛</div>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}><OlympusIcon size={36} /></div>
         <p style={{ color: "#f5f0ff", fontSize: 14, margin: 0 }}>You've returned to Olympus with a complete set — waiting to see if you're among the first 3.</p>
       </Card>
     );
@@ -103,9 +110,10 @@ export default function ScavengerHuntPlayer({ gameId, round, player, players }) 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
           {state.temples.map((t, i) => (
             <button key={i} onClick={() => chooseFirstTemple(gameId, round.round, player.id, i)} style={{
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
               padding: "14px 8px", borderRadius: 10, cursor: "pointer", background: "#0d0618", border: "2px solid #3d1f5c",
               color: "#f5f0ff", fontSize: 13, fontWeight: 700,
-            }}>{t.name}</button>
+            }}><TempleIcon size={30} />{t.name}</button>
           ))}
         </div>
       </Card>
@@ -121,7 +129,7 @@ export default function ScavengerHuntPlayer({ gameId, round, player, players }) 
   return (
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🏺 {temple.name}</h3>
+        <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif", display: "flex", alignItems: "center", gap: 6 }}><TempleIcon size={20} />{temple.name}</h3>
         <Badge>Round {state.roundIndex}</Badge>
       </div>
       {collectionStrip}
@@ -142,6 +150,7 @@ export default function ScavengerHuntPlayer({ gameId, round, player, players }) 
             {temple.items.map((item) => {
               const taken = !!item.takenBy;
               const isMine = item.takenBy === player.id;
+              const Icon = OFFERING_ICON_BY_TYPE[item.type];
               return (
                 <button
                   key={item.id}
@@ -152,10 +161,12 @@ export default function ScavengerHuntPlayer({ gameId, round, player, players }) 
                     aspectRatio: "1", borderRadius: 10, cursor: (taken || me.takenThisRound) ? "default" : "pointer",
                     background: isMine ? "rgba(255,45,149,0.15)" : taken ? "#1a0a2e" : "#0d0618",
                     border: `2px solid ${isMine ? "#ff2d95" : "#3d1f5c"}`,
-                    color: taken ? "#6b4f99" : "#f5f0ff", fontSize: 9, fontWeight: 700, padding: 2,
+                    color: taken ? "#6b4f99" : "#f5f0ff", fontSize: 8.5, fontWeight: 700, padding: 2,
                     opacity: taken && !isMine ? 0.5 : 1,
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
                   }}
                 >
+                  {Icon && <Icon size={22} />}
                   {item.type}
                 </button>
               );
@@ -169,13 +180,13 @@ export default function ScavengerHuntPlayer({ gameId, round, player, players }) 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6, marginBottom: hasFullSet ? 8 : 0 }}>
             {state.temples.map((t, i) => (
               <Btn key={i} small variant={i === me.currentLocation ? "ghost" : "primary"} onClick={() => chooseNextLocation(gameId, round.round, player.id, i)}>
-                {t.name.replace("Temple of ", "")}
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><TempleIcon size={16} />{t.name.replace("Temple of ", "")}</span>
               </Btn>
             ))}
           </div>
           {hasFullSet && (
             <Btn small onClick={() => chooseNextLocation(gameId, round.round, player.id, "olympus")} style={{ marginTop: 8 }}>
-              🏛 Return to Mount Olympus
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><OlympusIcon size={18} />Return to Mount Olympus</span>
             </Btn>
           )}
         </>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Btn, Card, Badge, ChaosStatusBadge } from "./ui";
+import AutoFitText from "./AutoFitText";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_FINALE, KEY_ROUND } from "../lib/gameState";
 import { computeFinaleOutcome } from "../lib/exileLogic";
@@ -162,9 +163,9 @@ export default function FinaleHost({ gameId, players, round }) {
         <div style={{ display: "grid", gap: 6 }}>
           {exiledPlayers.map((voter) => (
             <div key={voter.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <span style={{ width: 100, fontSize: 12, fontWeight: 700, color: "#f5f0ff", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <AutoFitText style={{ width: 100, fontWeight: 700, color: "#f5f0ff", flexShrink: 0 }} maxFontSize={12}>
                 {voter.display_name}
-              </span>
+              </AutoFitText>
               <select
                 value={votes[voter.id]?.targetId || ""}
                 onChange={(e) => commitVote(voter.id, e.target.value)}

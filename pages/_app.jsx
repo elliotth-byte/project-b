@@ -90,10 +90,43 @@ export default function App({ Component, pageProps }) {
            is the fallback for browsers that don't fully honor
            overflow-wrap on its own. Left off pre/code (if this app ever
            adds any) since breaking mid-token there would be actively
-           wrong, not just unusual. */
+           wrong, not just unusual.
+           white-space: normal matters just as much here as the other
+           two, specifically for button — browsers give <button> (and
+           <input>) a default of white-space: nowrap, which silently
+           overrides everything above: overflow-wrap/word-break only
+           break a word that's too long for the line THEY'RE ALREADY
+           ON, but nowrap means there's never a second line for a long
+           button label to break onto in the first place, so it just
+           keeps going in a straight line — past its own container,
+           then past the page, then gets clipped by overflow-x: hidden.
+           div/p/span/etc. never had this problem (white-space: normal
+           is already their own browser default), which is exactly why
+           this went unnoticed until a button specifically (a season
+           name/subtitle pill, in this case) carried a long enough
+           label to hit it.
+
+           STANDING RULE, beyond just this global CSS: a person's name
+           (real name, display name, or character alias) never gets
+           truncated with an ellipsis anywhere in this app, full stop —
+           not just here at the page-overflow level, but as a matter of
+           what any individual component is allowed to do to a name on
+           purpose. A vote, a roster entry, a nomination — the exact
+           name matters, and "Alex" vs. "Alexandra" cut down to the
+           same "Alex..." is a real ambiguity, not a cosmetic one. Where
+           plain wrapping (this rule) is enough, use it. Where a
+           component specifically needs to stay single-line for layout
+           reasons — a fixed-width name column next to a row of vote
+           marks, for instance — see components/AutoFitText.jsx, which
+           shrinks the font instead of ever cutting the text off, and
+           only wraps as a last resort if even its smallest readable
+           size doesn't fit. textOverflow: "ellipsis" on a name is a
+           bug, not a style choice, if you find yourself about to add
+           one. */
         p, span, div, h1, h2, h3, h4, a, li, label, button {
           overflow-wrap: break-word;
           word-break: break-word;
+          white-space: normal;
         }
         /* touch-action: manipulation is the actual fix for the
            tap-registers-as-zoom problem — it's what tells the browser

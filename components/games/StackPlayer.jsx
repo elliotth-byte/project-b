@@ -154,6 +154,17 @@ export default function StackPlayer({ gameId, round, challenge, player }) {
   const canvasRef = useRef(null);
   const stateRef = useRef(freshState());
   const doneRef = useRef(false);
+  // Guards against the exact bug this was written to fix: on a touch
+  // device, onTouchStart firing drop() doesn't reliably stop the
+  // browser's own synthesized mousedown from ALSO firing moments later
+  // for the same physical tap — calling preventDefault() in
+  // onTouchStart helps but isn't consistent enough across browsers to
+  // rely on alone. Recording when the last touch happened and skipping
+  // onMouseDown if one just did (rather than dropping onMouseDown
+  // entirely) keeps real desktop mouse clicks working exactly as
+  // before, while a single tap on mobile only ever drops once instead
+  // of stacking twice per tap.
+  const lastTouchAtRef = useRef(0);
   const [height, setHeight] = useState(0);
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
@@ -268,7 +279,8 @@ export default function StackPlayer({ gameId, round, challenge, player }) {
       </div>
       <div
         style={{ position: "relative", width: "100%", maxWidth: W, margin: "0 auto", cursor: "pointer" }}
-        onMouseDown={drop} onTouchStart={(e) => { e.preventDefault(); drop(); }}
+        onMouseDown={() => { if (Date.now() - lastTouchAtRef.current < 700) return; drop(); }}
+        onTouchStart={(e) => { e.preventDefault(); lastTouchAtRef.current = Date.now(); drop(); }}
       >
         <canvas
           ref={canvasRef} width={W} height={H}

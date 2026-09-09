@@ -9,11 +9,19 @@ import { powerFor } from "../lib/characterPowers";
 // "You can see two options for the next round's challenge and pick
 // between the two of them." Only meaningful when
 // settings.challengeSelectionMode is "random" (see lib/
-// challengeSelection.js) — the host triggers the draw (two options get
-// stored, see ChallengeHost.jsx), and this is what actually lets
-// Hephaestus pick between them. Shown only while the challenge itself
-// hasn't started yet (round.phase === "challenge" but nothing's active)
-// — the same "setup" window the host's own picker occupies.
+// challengeSelection.js) — the two options get drawn automatically the
+// moment this round's challenge phase begins (see
+// lib/roundEngine.js's autoStartRandomChallenge), and this is what
+// lets Hephaestus pick between them any time before the challenge
+// actually starts. If he doesn't decide within a grace period (the
+// season's own configured challenge duration — see that same
+// function's own reasoning on why it reuses that instead of a fixed
+// number), the game auto-picks one of the two for him rather than
+// stalling the round forever; draw.autoChosen is what tells this
+// component to say so honestly instead of claiming he chose it.
+// Shown only while the challenge itself hasn't started yet
+// (round.phase === "challenge" but nothing's active) — the same
+// "setup" window the host's own picker occupies.
 export default function HephaestusChoice({ gameId, round, player, settings }) {
   const key = round?.phase === "challenge" ? hephaestusDrawKey(round.round) : null;
   const [draw, setDraw] = useState(null);
@@ -33,9 +41,15 @@ export default function HephaestusChoice({ gameId, round, player, settings }) {
     return (
       <Card style={{ marginBottom: 20, textAlign: "center", borderColor: "#f97316" }}>
         <div style={{ fontSize: 22, marginBottom: 4 }}>🔥</div>
-        <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>
-          You chose <strong style={{ color: "#f5f0ff" }}>{chosenGame?.icon} {chosenGame?.label}</strong> for this round's challenge.
-        </p>
+        {draw.autoChosen ? (
+          <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>
+            You didn't decide in time, so the game picked <strong style={{ color: "#f5f0ff" }}>{chosenGame?.icon} {chosenGame?.label}</strong> for this round's challenge.
+          </p>
+        ) : (
+          <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>
+            You chose <strong style={{ color: "#f5f0ff" }}>{chosenGame?.icon} {chosenGame?.label}</strong> for this round's challenge.
+          </p>
+        )}
       </Card>
     );
   }

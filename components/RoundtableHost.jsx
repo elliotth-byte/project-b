@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Btn, Card } from "./traitorsUi";
+import AutoFitText from "./AutoFitText";
 import { supabase } from "../lib/supabaseClient";
 import { storageGet, storageSet, storageUpdate, storageDelete, subscribeGameState } from "../lib/gameStorage";
 import {
@@ -244,12 +245,9 @@ export default function RoundtableHost({ gameId, players, settings }) {
               const draft = drafts[voter.display_name] || { target: "", reason: "" };
               return (
                 <div key={voter.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <span style={{
-                    width: 90, fontSize: 12, fontWeight: 700, color: "#f0e6d3", flexShrink: 0,
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  }}>
+                  <AutoFitText style={{ width: 90, fontWeight: 700, color: "#f0e6d3", flexShrink: 0 }} maxFontSize={12}>
                     {voter.display_name}
-                  </span>
+                  </AutoFitText>
                   <select
                     value={draft.target}
                     onChange={(e) => {

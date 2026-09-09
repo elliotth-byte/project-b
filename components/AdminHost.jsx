@@ -18,6 +18,7 @@ import { formatDurationHours } from "../lib/fatesLogic";
 import { fetchGloballyDisabledChallenges } from "../lib/platformSettings";
 import { subscribeFeedback } from "../lib/feedback";
 import FeedbackInbox from "./FeedbackInbox";
+import DebugLogPanel from "./DebugLogPanel";
 
 // ─── Season Length ───
 // Each preset here sets a flat, predictable per-phase pace: Battle,
@@ -408,7 +409,7 @@ export default function AdminHost({ gameId, players, round }) {
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #3d1f5c" }}>
-        {[{ key: "roster", label: "👥 Roster & Resets" }, { key: "setup", label: "⚙️ Season Setup" }, { key: "feedback", label: "💬 Feedback" }].map((t) => (
+        {[{ key: "roster", label: "👥 Roster & Resets" }, { key: "setup", label: "⚙️ Season Setup" }, { key: "feedback", label: "💬 Feedback" }, { key: "debuglog", label: "🔍 Debug Log" }].map((t) => (
           <button key={t.key} onClick={() => setAdminSubTab(t.key)} style={{
             background: adminSubTab === t.key ? "rgba(255,45,149,0.13)" : "transparent",
             color: adminSubTab === t.key ? "#ff2d95" : "#a68fd6",
@@ -424,6 +425,8 @@ export default function AdminHost({ gameId, players, round }) {
       </div>
 
       {adminSubTab === "feedback" && <FeedbackInbox gameId={gameId} />}
+
+      {adminSubTab === "debuglog" && <DebugLogPanel gameId={gameId} />}
 
       {adminSubTab === "roster" && (
         <>
@@ -487,7 +490,7 @@ export default function AdminHost({ gameId, players, round }) {
                       onChange={(e) => setNames({ ...names, [p.id]: e.target.value })}
                       style={{ flex: 1, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 10px", color: "#f5f0ff", fontSize: 13 }}
                     />
-                    {p.alias && <span style={{ fontSize: 11, color: "#a68fd6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 90 }} title={`Their alias — only you see both: ${p.alias}`}>🏛 {p.alias}</span>}
+                    {p.alias && <span style={{ fontSize: 11, color: "#a68fd6", overflowWrap: "break-word" }} title={`Their alias — only you see both: ${p.alias}`}>🏛 {p.alias}</span>}
                     <Btn small onClick={() => saveName(p)} disabled={saving[p.id] || nameFor(p) === p.display_name}>
                       {saving[p.id] ? "Saving..." : "Save"}
                     </Btn>
@@ -535,9 +538,9 @@ export default function AdminHost({ gameId, players, round }) {
             </p>
             <div style={{ display: "grid", gap: 6 }}>
               {players.filter((p) => p.approved).map((p) => (
-                <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0d0618", borderRadius: 6, padding: "6px 12px", gap: 8 }}>
-                  <span style={{ fontSize: 13, color: "#f5f0ff" }}>{p.display_name}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0d0618", borderRadius: 6, padding: "6px 12px", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 13, color: "#f5f0ff", overflowWrap: "break-word" }}>{p.display_name}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 11, color: p.inactivity_strikes > 0 ? "#ff3860" : "#6b4f99", fontWeight: 600 }}>
                       {p.inactivity_strikes > 0 ? `⚠️ ${p.inactivity_strikes}/3 strikes` : "No strikes"}
                     </span>

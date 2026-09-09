@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Btn, Card, Badge, ChaosStatusBadge } from "./ui";
+import AutoFitText from "./AutoFitText";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_EXILE } from "../lib/gameState";
 import { computeEliminateOutcome, computeSaveOutcome, buildRevealOrder, tallySoFar } from "../lib/exileLogic";
@@ -198,9 +199,9 @@ export default function ExileVoteHost({ gameId, players, round }) {
         <div style={{ display: "grid", gap: 6 }}>
           {alive.map((voter) => (
             <div key={voter.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <span style={{ width: 100, fontSize: 12, fontWeight: 700, color: "#f5f0ff", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <AutoFitText style={{ width: 100, fontWeight: 700, color: "#f5f0ff", flexShrink: 0 }} maxFontSize={12}>
                 {voter.display_name}
-              </span>
+              </AutoFitText>
               <select
                 value={drafts[voter.id] || ""}
                 onChange={(e) => { dirtyRef.current.add(voter.id); setDrafts((d) => ({ ...d, [voter.id]: e.target.value })); commitVote(voter.id, e.target.value); }}

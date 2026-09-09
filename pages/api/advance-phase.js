@@ -65,7 +65,7 @@ export default async function handler(req, res) {
   const postMessage = makeInAppPostMessage(db, gameId);
 
   try {
-    const result = await advancePhase(gameId, { db, client: adminClient, postMessage, force: !!force });
+    const result = await advancePhase(gameId, { db, client: adminClient, postMessage, force: !!force, triggeredBy: userData.user.id });
     return res.status(200).json(result);
   } catch (err) {
     return res.status(500).json({ error: err.message });
