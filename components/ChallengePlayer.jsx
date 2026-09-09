@@ -49,6 +49,7 @@ import PandorasBoxesPlayer from "./games/PandorasBoxesPlayer";
 import MusicalChairsPlayer from "./games/MusicalChairsPlayer";
 import FloorPlayer from "./games/FloorPlayer";
 import BasketballPlayer from "./games/BasketballPlayer";
+import PegasusFlightPlayer from "./games/PegasusFlightPlayer";
 import StackPlayer from "./games/StackPlayer";
 import StockMarketPlayer from "./games/StockMarketPlayer";
 import ArtAuctionPlayer from "./games/ArtAuctionPlayer";
@@ -99,6 +100,7 @@ export const GAME_COMPONENTS = {
   musicalchairs: MusicalChairsPlayer,
   floor: FloorPlayer,
   basketball: BasketballPlayer,
+  pegasusflight: PegasusFlightPlayer,
   stack: StackPlayer,
   stockmarket: StockMarketPlayer,
   artauction: ArtAuctionPlayer,

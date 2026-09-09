@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabaseClient";
 import { signOut, isHost, displayNameFromUser } from "../lib/auth";
 import { checkIsPlatformAdmin } from "../lib/adminModeration";
 import { useSiteTheme } from "../lib/siteTheme";
+import { fetchActiveGames } from "../lib/activeGames";
 
 // ─── Cruel Summer House — the front door ───
 // This used to always show every entry point at once (signup, login,
@@ -41,6 +42,12 @@ export default function Home() {
   // navigation ever links to /admin — a real host who's also a
   // platform admin had no way to find it short of typing the URL.
   const [isAdmin, setIsAdmin] = useState(false);
+  // Independent of the `game` query param above — that only exists
+  // when arriving fresh from a /join/<code> link. This is what makes
+  // "Continue to Game" work when someone reopens the app from a
+  // bookmark or home-screen shortcut instead, which never carries that
+  // param (see lib/activeGames.js's own header comment).
+  const [activeGames, setActiveGames] = useState([]);
   const { theme, logoSrc, logoDimensions } = useSiteTheme();
 
   useEffect(() => {
@@ -52,6 +59,11 @@ export default function Home() {
   useEffect(() => {
     if (!user) { setIsAdmin(false); return; }
     checkIsPlatformAdmin().then(({ isAdmin: ok }) => setIsAdmin(!!ok));
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) { setActiveGames([]); return; }
+    fetchActiveGames(user.id).then(setActiveGames);
   }, [user]);
 
   const pageStyle = {
@@ -103,7 +115,20 @@ export default function Home() {
               Welcome back, {displayNameFromUser(user)}.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {game && <Link href={`/play?game=${game}`} style={{ ...linkBtn, borderColor: theme.accent, color: theme.accent }}>▶️ Continue to Game</Link>}
+              {activeGames.map((g) => (
+                <Link key={g.gameId} href={`/play?game=${g.gameId}`} style={{ ...linkBtn, borderColor: theme.accent, color: theme.accent }}>
+                  ▶️ Continue to {g.name}
+                </Link>
+              ))}
+              {/* Fallback for the moment right after joining, before the
+                  row above has had a chance to load — this one still
+                  depends on the URL's own ?game= param, but only shows
+                  up if that game isn't already covered above, so a
+                  slow load never produces two buttons for the same game. */}
+              {game && !activeGames.some((g) => g.gameId === game) && (
+                <Link href={`/play?game=${game}`} style={{ ...linkBtn, borderColor: theme.accent, color: theme.accent }}>▶️ Continue to Game</Link>
+              )}
+              <Link href="/notifications" style={linkBtn}>🔔 Notifications</Link>
               <Link href="/profile" style={linkBtn}>🪪 My Profile</Link>
               <Link href="/messages" style={linkBtn}>💬 Messages</Link>
               {isHost(user)

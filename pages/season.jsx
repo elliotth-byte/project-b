@@ -8,11 +8,20 @@ import { fetchSeasonRoster } from "../lib/profiles";
 // ─── Season Roster ───
 // The other half of "click a season, see who was in it" — the
 // counterpart to pages/profile.jsx's season history list, which links
-// here. Uses public_season_roster (see sql/add-profiles-v2.sql), a
-// narrow security-definer function specifically for this: games' own
-// RLS (sql/schema.sql) only lets you read a season you actually host or
-// played in, which would make browsing someone else's season history
-// impossible to follow through on otherwise.
+// here. Uses public_season_roster (see
+// sql/fix-season-roster-hides-identity-not-alias.sql for its current,
+// correct behavior), a narrow security-definer function specifically
+// for this: games' own RLS (sql/schema.sql) only lets you read a
+// season you actually host or played in, which would make browsing
+// someone else's season history impossible to follow through on
+// otherwise.
+//
+// While a season is still active, a player who has an alias to
+// protect shows up here BY that alias only — no real name, and no way
+// to click through to their real profile (see the userId === null
+// handling below) — same as every other in-game surface already shows
+// aliases, not real names, during play. The real name only appears
+// once the season's actually ended.
 export default function SeasonPage() {
   const router = useRouter();
   const [user, setUser] = useState(undefined);
@@ -66,14 +75,46 @@ export default function SeasonPage() {
                 </Link>
               )}
               <div style={{ display: "grid", gap: 8 }}>
-                {playerRows.map((p) => (
-                  <Link key={p.userId} href={`/profile?userId=${p.userId}`} style={{ display: "flex", alignItems: "center", gap: 10, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "8px 12px", textDecoration: "none" }}>
-                    <span style={{ color: "#f5f0ff", fontSize: 13, fontWeight: 600, flex: 1 }}>
-                      {p.displayName}{p.character && <span style={{ color: "#6b4f99", fontWeight: 400 }}> — {p.character}</span>}
-                    </span>
-                    <span style={{ color: "#ff2d95", fontSize: 11, fontWeight: 700 }}>{p.placement}</span>
-                  </Link>
-                ))}
+                {playerRows.map((p, i) => {
+                  // p.userId comes back null from public_season_roster
+                  // (see sql/fix-season-roster-pending-alias.sql) whenever
+                  // this specific player's real identity is still meant
+                  // to stay hidden — an active season where aliases are
+                  // in use, whether or not THIS player has actually
+                  // picked theirs yet (displayName is either their alias
+                  // or a "Choosing character..." placeholder in that
+                  // case). There's genuinely no profile to link to
+                  // either way (the API response itself doesn't include
+                  // their id, not just the display text), so this
+                  // renders a plain, non-clickable row instead of a Link
+                  // — clicking through to someone's real profile
+                  // mid-season would undo the entire point of hiding
+                  // this.
+                  //
+                  // Keyed by index when hidden, not by any field in the
+                  // row itself — character_name is unconditionally null
+                  // for EVERY hidden player (that's what makes it
+                  // hidden), and displayName can just as easily collide
+                  // (more than one player showing "Choosing
+                  // character..." at once is the normal case, not an
+                  // edge case), so neither is actually unique here the
+                  // way a real userId is for a revealed row.
+                  const hidden = !p.userId;
+                  const content = (
+                    <>
+                      <span style={{ color: "#f5f0ff", fontSize: 13, fontWeight: 600, flex: 1 }}>
+                        {p.displayName}{p.character && <span style={{ color: "#6b4f99", fontWeight: 400 }}> — {p.character}</span>}
+                      </span>
+                      <span style={{ color: "#ff2d95", fontSize: 11, fontWeight: 700 }}>{p.placement}</span>
+                    </>
+                  );
+                  const rowStyle = { display: "flex", alignItems: "center", gap: 10, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "8px 12px", textDecoration: "none" };
+                  return hidden ? (
+                    <div key={`hidden-${i}`} style={rowStyle}>{content}</div>
+                  ) : (
+                    <Link key={p.userId} href={`/profile?userId=${p.userId}`} style={rowStyle}>{content}</Link>
+                  );
+                })}
               </div>
             </>
           )}
