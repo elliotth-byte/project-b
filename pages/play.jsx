@@ -33,6 +33,9 @@ import ChatPanel from "../components/ChatPanel";
 import PlayerAvatarUpload from "../components/PlayerAvatarUpload";
 import PlayerMemoryWall from "../components/PlayerMemoryWall";
 import FeedbackButton from "../components/FeedbackButton";
+import PlayerPowerModal from "../components/PlayerPowerModal";
+import OnboardingChecklist from "../components/OnboardingChecklist";
+import { markOnboardingProfileViewed, onboardingComplete } from "../lib/onboarding";
 import { GAME_REGISTRY } from "../lib/challengeGames";
 import AphroditePicker from "../components/AphroditePicker";
 import PoseidonTrigger from "../components/PoseidonTrigger";
@@ -102,6 +105,7 @@ export default function PlayPage() {
   const [showMemoryWall, setShowMemoryWall] = useState(false);
   const [gameInfo, setGameInfo] = useState(null);
   const [quitBusy, setQuitBusy] = useState(false);
+  const [showMyProfile, setShowMyProfile] = useState(false);
   const [exileHistory, setExileHistory] = useState([]);
   const [revealAck, setRevealAck] = useState({});
   const [finalWordsResolved, setFinalWordsResolved] = useState(true); // defaults true so the prompt never flashes on screen before the check below completes
@@ -121,7 +125,20 @@ export default function PlayPage() {
   // their own state shape in later phases, not lib/roundEngine.js's.
   const isStereoTypes = gameInfo?.game_type === "stereo_types";
   const theme = themeFor(gameInfo?.game_type);
-  const pageStyle = { minHeight: "100vh", background: theme.pageBg, color: theme.text, fontFamily: theme.font, padding: 24 };
+  // paddingTop uses max() rather than replacing the flat 24 outright —
+  // on a non-notch device env(safe-area-inset-top) is 0, and this
+  // still keeps the original spacing there; on a notched/Dynamic-
+  // Island iPhone it expands to clear the actual status bar. Needed
+  // specifically because of viewport-fit=cover + black-translucent
+  // (see pages/_app.jsx's own comment on why those are set) — that
+  // combination lets page content render visually UNDER the status
+  // bar, but iOS still reserves that same screen region for its own
+  // tap handling and never forwards touches there to the page, so
+  // anything interactive sitting in the plain 24px of padding (the
+  // header's own Home link and, now, the player's own portrait) was
+  // silently untappable on an iPhone specifically — no error, it just
+  // never registered as a click.
+  const pageStyle = { minHeight: "100vh", background: theme.pageBg, color: theme.text, fontFamily: theme.font, padding: 24, paddingTop: "max(24px, env(safe-area-inset-top))" };
   // Only used by the "no gameId at all" fallback screen further down —
   // this is the platform brand's own day/night theme (see
   // lib/siteTheme.js), unrelated to `theme` above (which is per-GAME,
@@ -336,13 +353,13 @@ export default function PlayPage() {
     (async () => {
       const { data: existing } = await supabase
         .from("players")
-        .select("id, display_name, alive, elimination_type, elimination_round, approved, color, equipped_sticker, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, floor_specialty, power_state, inactivity_strikes")
+        .select("id, display_name, alive, elimination_type, elimination_round, approved, color, equipped_sticker, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, floor_specialty, power_state, inactivity_strikes, onboarding_chat_sent, onboarding_dm_sent, onboarding_profile_viewed")
         .eq("game_id", gameId)
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (existing) {
-        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, eliminationRound: existing.elimination_round, approved: existing.approved, color: existing.color, equippedSticker: existing.equipped_sticker, alias: existing.alias, avatarUrl: existing.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(existing.game_prefs || {}) }, battleBanRound: existing.battle_ban_round, torchedPreset: existing.torched_preset, floorSpecialty: existing.floor_specialty, powerState: existing.power_state, inactivityStrikes: existing.inactivity_strikes });
+        setMyPlayer({ id: existing.id, name: existing.display_name, alive: existing.alive, eliminationType: existing.elimination_type, eliminationRound: existing.elimination_round, approved: existing.approved, color: existing.color, equippedSticker: existing.equipped_sticker, alias: existing.alias, avatarUrl: existing.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(existing.game_prefs || {}) }, battleBanRound: existing.battle_ban_round, torchedPreset: existing.torched_preset, floorSpecialty: existing.floor_specialty, powerState: existing.power_state, inactivityStrikes: existing.inactivity_strikes, onboardingChatSent: existing.onboarding_chat_sent, onboardingDmSent: existing.onboarding_dm_sent, onboardingProfileViewed: existing.onboarding_profile_viewed });
         setJoined(true);
         return;
       }
@@ -373,12 +390,12 @@ export default function PlayPage() {
       const { data: created, error } = await supabase
         .from("players")
         .insert({ game_id: gameId, user_id: session.user.id, display_name: displayNameFromUser(user), approved: false })
-        .select("id, display_name, alive, elimination_type, elimination_round, approved, color, equipped_sticker, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, floor_specialty, power_state, inactivity_strikes")
+        .select("id, display_name, alive, elimination_type, elimination_round, approved, color, equipped_sticker, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, floor_specialty, power_state, inactivity_strikes, onboarding_chat_sent, onboarding_dm_sent, onboarding_profile_viewed")
         .single();
       if (error) {
         setJoinError(`Couldn't join this game: ${error.message}${error.code ? ` [code=${error.code}]` : ""}${error.details ? ` — ${error.details}` : ""} (user_id=${session.user.id})`);
       } else {
-        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, eliminationRound: created.elimination_round, approved: created.approved, color: created.color, equippedSticker: created.equipped_sticker, alias: created.alias, avatarUrl: created.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(created.game_prefs || {}) }, battleBanRound: created.battle_ban_round, torchedPreset: created.torched_preset, floorSpecialty: created.floor_specialty, powerState: created.power_state, inactivityStrikes: created.inactivity_strikes });
+        setMyPlayer({ id: created.id, name: created.display_name, alive: created.alive, eliminationType: created.elimination_type, eliminationRound: created.elimination_round, approved: created.approved, color: created.color, equippedSticker: created.equipped_sticker, alias: created.alias, avatarUrl: created.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(created.game_prefs || {}) }, battleBanRound: created.battle_ban_round, torchedPreset: created.torched_preset, floorSpecialty: created.floor_specialty, powerState: created.power_state, inactivityStrikes: created.inactivity_strikes, onboardingChatSent: created.onboarding_chat_sent, onboardingDmSent: created.onboarding_dm_sent, onboardingProfileViewed: created.onboarding_profile_viewed });
         setJoined(true);
         // Fire-and-forget — a host notification failing to send should
         // never block the join itself, which already succeeded. Uses
@@ -413,8 +430,8 @@ export default function PlayPage() {
   useEffect(() => {
     if (!myPlayer?.id) return;
     const load = async () => {
-      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, elimination_round, approved, color, equipped_sticker, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, floor_specialty, power_state, inactivity_strikes").eq("id", myPlayer.id).maybeSingle();
-      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, eliminationRound: data.elimination_round, approved: data.approved, color: data.color, equippedSticker: data.equipped_sticker, alias: data.alias, avatarUrl: data.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(data.game_prefs || {}) }, battleBanRound: data.battle_ban_round, torchedPreset: data.torched_preset, floorSpecialty: data.floor_specialty, powerState: data.power_state, inactivityStrikes: data.inactivity_strikes }));
+      const { data } = await supabase.from("players").select("display_name, alive, elimination_type, elimination_round, approved, color, equipped_sticker, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, floor_specialty, power_state, inactivity_strikes, onboarding_chat_sent, onboarding_dm_sent, onboarding_profile_viewed").eq("id", myPlayer.id).maybeSingle();
+      if (data) setMyPlayer((prev) => prev && ({ ...prev, name: data.display_name, alive: data.alive, eliminationType: data.elimination_type, eliminationRound: data.elimination_round, approved: data.approved, color: data.color, equippedSticker: data.equipped_sticker, alias: data.alias, avatarUrl: data.avatar_url, gamePrefs: { ...DEFAULT_GAME_PREFS, ...(data.game_prefs || {}) }, battleBanRound: data.battle_ban_round, torchedPreset: data.torched_preset, floorSpecialty: data.floor_specialty, powerState: data.power_state, inactivityStrikes: data.inactivity_strikes, onboardingChatSent: data.onboarding_chat_sent, onboardingDmSent: data.onboarding_dm_sent, onboardingProfileViewed: data.onboarding_profile_viewed }));
     };
     const channel = supabase
       .channel(`self-player-${myPlayer.id}`)
@@ -604,9 +621,31 @@ export default function PlayPage() {
         <UpdateBanner />
         {approved && !gameEnded && <ProfilePhotoPrompt userId={user?.id} />}
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", width: "100%", maxWidth: 400, margin: "0 auto 12px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", maxWidth: 400, margin: "0 auto 12px" }}>
         <HomeLink theme={theme} />
-        <span style={{ color: theme.textMuted, fontSize: 13 }}>Playing as {effectivePlayerName || "..."}</span>
+        <button
+          onClick={() => {
+            setShowMyProfile(true);
+            if (myPlayer?.id && !myPlayer.onboardingProfileViewed) {
+              markOnboardingProfileViewed(myPlayer.id);
+              setMyPlayer((p) => p && ({ ...p, onboardingProfileViewed: true }));
+            }
+          }}
+          style={{ background: "none", border: "none", display: "flex", alignItems: "center", gap: 6, cursor: "pointer", padding: 0 }}
+          title="View your mini profile"
+        >
+          {(() => {
+            const myIdentity = identityAllPlayers?.find((p) => p.id === myPlayer?.id);
+            const avatarUrl = myIdentity?.effectiveAvatarUrl || myPlayer?.avatarUrl;
+            const swatch = myPlayer?.color || "#5c4d80";
+            return avatarUrl ? (
+              <img src={avatarUrl} alt="" style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", border: `1.5px solid ${swatch}` }} />
+            ) : (
+              <span style={{ width: 24, height: 24, borderRadius: "50%", background: swatch, display: "inline-block", border: `1.5px solid ${swatch}` }} />
+            );
+          })()}
+          <span style={{ color: theme.textMuted, fontSize: 13 }}>Playing as {effectivePlayerName || "..."}</span>
+        </button>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           {joined && myPlayer && !approved && (
             <button onClick={handleQuit} disabled={quitBusy} style={{
@@ -619,6 +658,25 @@ export default function PlayPage() {
           <button onClick={signOut} style={{ background: "none", border: "none", color: theme.textDim, fontSize: 12, cursor: "pointer" }}>Log out</button>
         </div>
       </div>
+
+      {showMyProfile && myPlayer && (() => {
+        const myIdentity = identityAllPlayers?.find((p) => p.id === myPlayer.id) || { ...myPlayer, display_name: effectivePlayerName };
+        return (
+          <PlayerPowerModal
+            player={myIdentity}
+            allPlayers={identityAllPlayers}
+            settings={settings}
+            isWinner={winnerIds?.has(myPlayer.id)}
+            isNominee={nomineeIds?.has(myPlayer.id)}
+            heldFatesLastRound={latestExileEntry?.chaosHolderId === myPlayer.id}
+            onClose={() => setShowMyProfile(false)}
+          />
+        );
+      })()}
+
+      {!isTraitors && !isStereoTypes && approved && myPlayer?.alive && !gameEnded && !onboardingComplete(myPlayer) && (
+        <OnboardingChecklist player={myPlayer} onOpenProfile={() => setShowMyProfile(true)} />
+      )}
 
       <div style={{ maxWidth: 400, width: "100%", margin: "0 auto" }}>
         {gameInfo && (
@@ -800,7 +858,15 @@ export default function PlayPage() {
                 {round?.phase === PHASES.CHALLENGE && (
                   <>
                     <ChallengeErrorBoundary label="Hephaestus's Choice"><HephaestusChoice gameId={gameId} round={round} player={player} settings={settings} /></ChallengeErrorBoundary>
-                    <ChallengeErrorBoundary label="Battle"><ChallengePlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} settings={settings} challengeHistory={challengeHistory} exileHistory={exileHistory} /></ChallengeErrorBoundary>
+                    {!isTraitors && !isStereoTypes && myPlayer && !onboardingComplete(myPlayer) ? (
+                      <Card style={{ marginBottom: 20, textAlign: "center", borderColor: "#ff2d95" }}>
+                        <div style={{ fontSize: 22, marginBottom: 6 }}>🔒</div>
+                        <p style={{ color: "#f5f0ff", fontSize: 13, fontWeight: 600, margin: "0 0 4px" }}>Finish getting started before you can compete.</p>
+                        <p style={{ color: "#6b4f99", fontSize: 12, margin: 0 }}>Check the checklist on the side of your screen — three quick things, then you're in.</p>
+                      </Card>
+                    ) : (
+                      <ChallengeErrorBoundary label="Battle"><ChallengePlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} settings={settings} challengeHistory={challengeHistory} exileHistory={exileHistory} /></ChallengeErrorBoundary>
+                    )}
                   </>
                 )}
                 {round?.phase === PHASES.FATES && (

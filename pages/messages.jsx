@@ -227,4 +227,5 @@ const pageStyle = {
   color: "#f5f0ff",
   fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
   padding: 24,
+  paddingTop: "max(24px, env(safe-area-inset-top))",
 };

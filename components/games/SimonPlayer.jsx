@@ -18,11 +18,24 @@ const GAP_MS = 200;
 const FLASH_RATIO = FLASH_MS / (FLASH_MS + GAP_MS); // kept constant as the pace speeds up, so flash duration always stays a fixed fraction of the step — see the note in playbackSequence for why that matters
 const MIN_STEP_MS = 220; // playback never gets faster than this, however long the sequence gets — stays comfortably tappable even at its fastest
 
-function playTone(freq, durationMs) {
+// One shared AudioContext, created once at Start (a genuine tap
+// gesture — see startGame) and reused for every tone, rather than a
+// fresh `new AudioContext()` per tone the way this used to work. That
+// was the actual cause of a real "no sound at all" report: iOS Safari
+// requires an AudioContext to be created (or explicitly resumed)
+// within a direct user gesture to ever actually produce sound — a
+// context created later from inside a setTimeout callback (which is
+// exactly how playbackSequence fires its tones) isn't one, so Safari
+// silently left it suspended. The JS never threw, the game looked and
+// ran completely normally, it just never made a sound. One context,
+// unlocked once by the real tap on Start, sidesteps this: resuming an
+// already-unlocked context from a timer callback works fine — it's
+// only creating a brand new one outside a gesture that Safari blocks.
+function playTone(audioCtxRef, freq, durationMs) {
   try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    if (ctx.state === "suspended") ctx.resume();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = "sine";
@@ -33,7 +46,6 @@ function playTone(freq, durationMs) {
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + durationMs / 1000);
-    osc.onended = () => ctx.close();
   } catch (e) {
     // Audio isn't critical to the game — a browser blocking autoplay
     // audio (common before any user gesture) should never break the
@@ -50,11 +62,25 @@ export default function SimonPlayer({ gameId, round, challenge, player }) {
   const [round_, setRound] = useState(0); // completed rounds = score
   const reportedRef = useRef(false);
   const timeoutsRef = useRef([]);
+  const audioCtxRef = useRef(null);
 
   const clearTimeouts = () => { timeoutsRef.current.forEach((t) => window.clearTimeout(t)); timeoutsRef.current = []; };
   useEffect(() => () => clearTimeouts(), []);
+  // Closes the shared AudioContext when this component unmounts (round
+  // ends, player navigates away mid-game) — not left dangling.
+  useEffect(() => () => { audioCtxRef.current?.close?.(); }, []);
 
   const startGame = () => {
+    // Created here specifically because this handler runs directly
+    // inside a real tap on the Start button — see playTone's own
+    // comment on why that's what actually unlocks audio on iOS Safari,
+    // where creating it later (inside a setTimeout) would not.
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx && !audioCtxRef.current) audioCtxRef.current = new AudioCtx();
+    } catch (e) {
+      // no Web Audio support — playTone already no-ops gracefully when audioCtxRef.current is null
+    }
     setSequence([Math.floor(Math.random() * 4)]);
     setPlayerStep(0);
     setRound(0);
@@ -78,7 +104,7 @@ export default function SimonPlayer({ gameId, round, challenge, player }) {
     seq.forEach((padIdx, i) => {
       const t1 = window.setTimeout(() => {
         setActivePad(padIdx);
-        playTone(PADS[padIdx].freq, flashMs);
+        playTone(audioCtxRef, PADS[padIdx].freq, flashMs);
       }, i * stepMs);
       const t2 = window.setTimeout(() => setActivePad(null), i * stepMs + flashMs);
       timeoutsRef.current.push(t1, t2);
@@ -94,17 +120,29 @@ export default function SimonPlayer({ gameId, round, challenge, player }) {
   const tapPad = (padIdx) => {
     if (phase !== "input") return;
     setActivePad(padIdx);
-    playTone(PADS[padIdx].freq, 200);
+    playTone(audioCtxRef, PADS[padIdx].freq, 200);
     window.setTimeout(() => setActivePad(null), 200);
 
     if (padIdx === sequence[playerStep]) {
       const nextStep = playerStep + 1;
       if (nextStep === sequence.length) {
         // Round complete — grow the sequence and play it back again.
+        // phase moves to "betweenRounds" IMMEDIATELY here, not
+        // "playback" (that only happens once `sequence` itself has
+        // actually been grown, in the timeout below) and not left as
+        // "input" for these 500ms either — leaving it as "input" was
+        // the actual bug: tapPad's own guard only blocks a tap when
+        // phase !== "input", so an eager extra tap landing in this gap
+        // (very natural right after successfully finishing a round)
+        // got evaluated against the OLD, already-completed sequence
+        // with playerStep freshly reset to 0 — almost certain to read
+        // as wrong and wrongly end the game, exactly matching a real
+        // report of the game ending mid-round for no visible reason.
         const completedRound = sequence.length;
         setRound(completedRound);
         const grown = [...sequence, Math.floor(Math.random() * 4)];
         setPlayerStep(0);
+        setPhase("betweenRounds");
         window.setTimeout(() => { setSequence(grown); setPhase("playback"); }, 500);
       } else {
         setPlayerStep(nextStep);
@@ -150,7 +188,7 @@ export default function SimonPlayer({ gameId, round, challenge, player }) {
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🔴 Simon</h3>
-        <Badge>{phase === "playback" ? "Watch..." : "Your turn"} · Round {round_ + 1}</Badge>
+        <Badge>{phase === "playback" ? "Watch..." : phase === "betweenRounds" ? "Nice!" : "Your turn"} · Round {round_ + 1}</Badge>
       </div>
       <div style={{
         display: "grid", gridTemplateColumns: "repeat(2, 90px)", gridTemplateRows: "repeat(2, 90px)", gap: 6,
@@ -187,7 +225,7 @@ export default function SimonPlayer({ gameId, round, challenge, player }) {
         })}
       </div>
       <p style={{ color: "#6b4f99", fontSize: 11, marginTop: 10, fontStyle: "italic" }}>
-        {phase === "playback" ? "Memorize the sequence..." : `Tap ${sequence.length - playerStep} more to finish this round.`}
+        {phase === "playback" ? "Memorize the sequence..." : phase === "betweenRounds" ? "Get ready for the next round..." : `Tap ${sequence.length - playerStep} more to finish this round.`}
       </p>
     </Card>
   );

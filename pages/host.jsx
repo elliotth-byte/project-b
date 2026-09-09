@@ -460,7 +460,7 @@ export default function HostPage() {
   }
 
   return (
-    <div style={{ ...pageStyle, alignItems: "flex-start", justifyContent: "center", flexDirection: "column", padding: 24 }}>
+    <div style={{ ...pageStyle, alignItems: "flex-start", justifyContent: "center", flexDirection: "column", padding: 24, paddingTop: "max(24px, env(safe-area-inset-top))" }}>
       <div style={{ maxWidth: 640, width: "100%", margin: "0 auto" }}>
         <UpdateBanner />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>

@@ -12,6 +12,7 @@ import { isPoseidonDmBlockActive, hestiaChatBlockActive } from "../lib/character
 import { subscribeGameState } from "../lib/gameStorage";
 import { KEY_EXILE, KEY_FINALE, PHASES } from "../lib/gameState";
 import { notifyPushForMessage } from "../lib/pushNotifications";
+import { markOnboardingChatSent, markOnboardingDmSent } from "../lib/onboarding";
 
 function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -281,7 +282,7 @@ function GroupChatView({ gameId, player, players, realName, onRead, readOnly = f
       <MessageList messages={rows} containerRef={listRef} />
       <Composer
         placeholder="Message everyone..." readOnly={readOnly}
-        onSend={(t) => { sendGroupMessage(gameId, player.id, player.name, t, realName); notifyPushForMessage(gameId, "group", player.id, player.name, t); }}
+        onSend={(t) => { sendGroupMessage(gameId, player.id, player.name, t, realName); notifyPushForMessage(gameId, "group", player.id, player.name, t); markOnboardingChatSent(player.id); }}
       />
     </div>
   );
@@ -345,7 +346,7 @@ function ThreadView({ gameId, thread, player, players, byId, onBack, onRead, rea
       <Composer
         placeholder={`Message ${label}...`} readOnly={readOnly}
         disabledMessage={poseidonBlocked ? "🌊 Poseidon has turned off DMs for this Fates Ceremony and Exile Vote." : null}
-        onSend={(t) => { sendThreadMessage(thread.id, player.id, t); notifyPushForMessage(gameId, "thread", player.id, player.name, t, thread.id); }}
+        onSend={(t) => { sendThreadMessage(thread.id, player.id, t); notifyPushForMessage(gameId, "thread", player.id, player.name, t, thread.id); markOnboardingDmSent(player.id); }}
       />
     </div>
   );

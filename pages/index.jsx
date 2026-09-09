@@ -75,6 +75,7 @@ export default function Home() {
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
+    paddingTop: "max(24px, env(safe-area-inset-top))",
   };
   const linkBtn = {
     display: "block",

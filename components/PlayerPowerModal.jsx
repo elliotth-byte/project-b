@@ -1,4 +1,5 @@
 import { powerByName, powerFor } from "../lib/characterPowers";
+import { colorFor } from "../lib/playerColors";
 
 // ─── Player Power Modal ───
 // What a portrait tap on PlayerMemoryWall.jsx opens — the answer to
@@ -10,7 +11,17 @@ import { powerByName, powerFor } from "../lib/characterPowers";
 // the glow, settings for character powers, fatesHolderId from the most
 // recently REVEALED round) — nothing new is fetched here, this is
 // purely a focused view of information the wall already knows.
-export default function PlayerPowerModal({ player, settings, isWinner, isNominee, heldFatesLastRound, onClose }) {
+//
+// Also the mini profile a player opens on THEIR OWN portrait, in the
+// header (see pages/play.jsx) — same component, same props shape, just
+// called with `player` set to their own row instead of someone they
+// tapped on the wall. allPlayers is only needed for that self-view
+// case, to resolve a fallback color the same way the wall's own tiles
+// do when there's no avatar photo — omit it (or pass just [player])
+// when calling this for someone else, since colorFor needs the whole
+// roster to assign colors consistently but the wall itself already
+// colors its own tiles independently of this modal.
+export default function PlayerPowerModal({ player, allPlayers, settings, isWinner, isNominee, heldFatesLastRound, onClose }) {
   const power = powerFor(player, settings);
   const meta = power ? powerByName(power) : null;
   // Only worth calling out as "originally so-and-so's" when the power
@@ -19,6 +30,8 @@ export default function PlayerPowerModal({ player, settings, isWinner, isNominee
   // to land on their own alias. When they match, saying "Power of X
   // (God)" right after their own name would just be redundant noise.
   const decoupled = power && player.alias && power !== player.alias;
+  const avatarUrl = player.effectiveAvatarUrl;
+  const fallbackColor = colorFor(allPlayers || [player], player.id);
 
   return (
     <div
@@ -36,9 +49,16 @@ export default function PlayerPowerModal({ player, settings, isWinner, isNominee
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-          <h3 style={{ color: "#f5f0ff", margin: 0, fontSize: 17, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
-            {player.display_name}
-          </h3>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", border: `2px solid ${fallbackColor}` }} />
+            ) : (
+              <div style={{ width: 52, height: 52, borderRadius: "50%", background: fallbackColor, border: `2px solid ${fallbackColor}` }} />
+            )}
+            <h3 style={{ color: "#f5f0ff", margin: 0, fontSize: 17, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
+              {player.display_name}
+            </h3>
+          </div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#a68fd6", fontSize: 20, cursor: "pointer", lineHeight: 1, padding: 0 }}>×</button>
         </div>
 

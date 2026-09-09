@@ -34,7 +34,7 @@ export default function Login() {
   const pageStyle = {
     minHeight: "100vh", background: theme.pageBg, color: theme.text,
     fontFamily: theme.font, display: "flex",
-    alignItems: "center", justifyContent: "center", padding: 24,
+    alignItems: "center", justifyContent: "center", padding: 24, paddingTop: "max(24px, env(safe-area-inset-top))",
   };
   const inputStyle = {
     display: "block", width: "100%", background: theme.inputBg, border: `1px solid ${theme.border}`,
