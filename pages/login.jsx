@@ -29,6 +29,7 @@ export default function Login() {
   const [hostMode, setHostMode] = useState(false);
   const [hostEmail, setHostEmail] = useState("");
   const [hostPassword, setHostPassword] = useState("");
+  const [hostAgreedToTerms, setHostAgreedToTerms] = useState(false);
   const router = useRouter();
   const { theme } = useSiteTheme();
   const pageStyle = {
@@ -83,6 +84,10 @@ export default function Login() {
       setError("Password must be at least 6 characters.");
       return;
     }
+    if (!hostAgreedToTerms) {
+      setError("Please agree to the Terms & Community Guidelines to continue.");
+      return;
+    }
     setLoading(true);
     // Self-serve accounts are always scoped to Stereo Types only — see
     // lib/auth.js's signUpHost/canHostGameType and
@@ -124,6 +129,12 @@ export default function Login() {
             placeholder="Choose a password (6+ characters)"
             style={inputStyle}
           />
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 8, textAlign: "left", fontSize: 12, color: theme.textDim, margin: "4px 0 12px", cursor: "pointer" }}>
+            <input type="checkbox" checked={hostAgreedToTerms} onChange={(e) => setHostAgreedToTerms(e.target.checked)} style={{ marginTop: 2 }} />
+            <span>
+              I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: theme.accent }}>Terms & Community Guidelines</a>, including no tolerance for harassment, threats, or hateful content — and to responding to reports in my own season within 24 hours.
+            </span>
+          </label>
           {error && <p style={{ color: theme.danger, fontSize: 13, margin: "6px 0" }}>{error}</p>}
           <button type="submit" disabled={loading} style={btnStyle}>
             {loading ? "Creating..." : "Create host account"}

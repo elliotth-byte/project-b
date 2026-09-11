@@ -63,9 +63,9 @@ export default function VotingHistorySpreadsheet({ exileHistory, finaleState, pl
 
   return (
     <Card>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, flexWrap: "wrap", gap: 8 }}>
         <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🗳 Voting History</h3>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {isHost && (
             <Btn small variant={showRealNames ? "primary" : "ghost"} onClick={() => setShowRealNames(!showRealNames)}>
               {showRealNames ? "🙈 Hide real names" : "👁 Show real names"}

@@ -3,6 +3,9 @@ import { supabase } from "../lib/supabaseClient";
 import {
   isPushSupported, getExistingSubscription, subscribeToPush, updatePushPrefs, unsubscribeFromPush,
 } from "../lib/pushNotifications";
+import {
+  isNativeApp, getExistingNativeToken, registerNativePush, updateNativePushPrefs, unregisterNativePush,
+} from "../lib/nativePush";
 
 // ─── Notifications ───
 // Extracted out of HelpPanel.jsx so the exact same enable/toggle logic
@@ -12,8 +15,20 @@ import {
 // approved. compact=true trims the copy for the tighter onboarding
 // context; the full version (with the "why aren't the toggles showing
 // up" explanation) is what the Options tab still uses.
+//
+// Branches once, right at the top, on whether this is running inside
+// the wrapped native app (see lib/nativePush.js's isNativeApp) or a
+// regular browser tab — everything BELOW that branch (the actual
+// render, the toggle checkboxes, the enable/disable buttons) stays
+// identical either way, since native_push_tokens and push_subscriptions
+// were deliberately given the same notify_rounds/notify_public_messages/
+// notify_private_messages column names (see
+// sql/add-native-push-tokens.sql) specifically so this component never
+// needs two separate render paths, just two separate places to read
+// from and write to.
 export default function NotificationSettings({ gameId, player, readOnly = false, compact = false }) {
-  const [pushSupported] = useState(() => isPushSupported());
+  const [native] = useState(() => isNativeApp());
+  const [pushSupported] = useState(() => native || isPushSupported());
   const [pushLoading, setPushLoading] = useState(true);
   const [pushSub, setPushSub] = useState(null); // existing subscription row, or null if not subscribed
   const [pushBusy, setPushBusy] = useState(false);
@@ -42,18 +57,18 @@ export default function NotificationSettings({ gameId, player, readOnly = false,
     // rather than shown inaccurately; see the static note in the render
     // below instead.
     if (readOnly || !player || !pushSupported) { setPushLoading(false); return; }
-    getExistingSubscription(player.id).then((sub) => { setPushSub(sub); setPushLoading(false); });
-  }, [player, pushSupported, readOnly]);
+    const fetchExisting = native ? getExistingNativeToken(player.id) : getExistingSubscription(player.id);
+    fetchExisting.then((sub) => { setPushSub(sub); setPushLoading(false); });
+  }, [player, pushSupported, readOnly, native]);
 
   const enablePush = async () => {
     setPushBusy(true);
     setPushMessage("");
-    const res = await subscribeToPush(player.id, gameId, {
-      notifyRounds: true, notifyPublicMessages: false, notifyPrivateMessages: true,
-    });
+    const prefs = { notifyRounds: true, notifyPublicMessages: false, notifyPrivateMessages: true };
+    const res = native ? await registerNativePush(player.id, gameId, prefs) : await subscribeToPush(player.id, gameId, prefs);
     setPushBusy(false);
     if (!res.ok) { setPushMessage(res.error || "Couldn't turn on notifications."); return; }
-    const sub = await getExistingSubscription(player.id);
+    const sub = native ? await getExistingNativeToken(player.id) : await getExistingSubscription(player.id);
     setPushSub(sub);
   };
 
@@ -61,16 +76,19 @@ export default function NotificationSettings({ gameId, player, readOnly = false,
     if (!pushSub) return;
     const newValue = !pushSub[dbColumn];
     setPushSub((s) => ({ ...s, [dbColumn]: newValue }));
-    await updatePushPrefs(player.id, {
+    const prefs = {
       notifyRounds: dbColumn === "notify_rounds" ? newValue : pushSub.notify_rounds,
       notifyPublicMessages: dbColumn === "notify_public_messages" ? newValue : pushSub.notify_public_messages,
       notifyPrivateMessages: dbColumn === "notify_private_messages" ? newValue : pushSub.notify_private_messages,
-    });
+    };
+    if (native) await updateNativePushPrefs(player.id, prefs);
+    else await updatePushPrefs(player.id, prefs);
   };
 
   const disablePush = async () => {
     setPushBusy(true);
-    await unsubscribeFromPush(player.id);
+    if (native) await unregisterNativePush(player.id);
+    else await unsubscribeFromPush(player.id);
     setPushBusy(false);
     setPushSub(null);
   };
@@ -99,7 +117,7 @@ export default function NotificationSettings({ gameId, player, readOnly = false,
     return (
       <div>
         <p style={{ fontSize: 12, color: "#6b4f99", margin: "0 0 10px" }}>
-          Get notified even when the app's closed.{!compact && " On iPhone/iPad, this only works after adding the app to your Home Screen (see below) and opening it from that icon — not from a regular Safari tab."}
+          Get notified even when the app's closed.{!compact && !native && " On iPhone/iPad, this only works after adding the app to your Home Screen (see below) and opening it from that icon — not from a regular Safari tab."}
         </p>
         <button
           onClick={enablePush}

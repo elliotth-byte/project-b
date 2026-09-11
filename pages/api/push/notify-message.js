@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { sendPushToGame, sendPushToPlayers, sendPushToHosts } from "../../../lib/sendPush";
+import { sendNativePushToGame, sendNativePushToPlayers } from "../../../lib/sendNativePush";
 
 // ============================================================
 // Called by the client right after a message successfully sends (see
@@ -77,6 +78,14 @@ export default async function handler(req, res) {
       title, body: preview, url: `/play?game=${gameId}`, tag: "chat-group",
       filterColumn: "notify_public_messages", excludePlayerId: senderId,
     });
+    // Native (wrapped app) delivery alongside Web Push, not instead of
+    // it — see lib/sendNativePush.js's own header comment on why these
+    // always run together rather than picking one based on anything
+    // the request itself says.
+    await sendNativePushToGame(gameId, {
+      title, body: preview, url: `/play?game=${gameId}`, tag: "chat-group",
+      filterColumn: "notify_public_messages", excludePlayerId: senderId,
+    });
     await sendPushToHosts(gameId, {
       title: `${isFinalWords ? "🎤" : "💬"} ${senderName} ${isFinalWords ? "(Final Words)" : groupChatLabel(gameRow?.game_type)}`, body: preview, url: `/host?game=${gameId}`, tag: "chat-group",
       filterColumn: "notify_chat_activity",
@@ -91,6 +100,10 @@ export default async function handler(req, res) {
     const { data: members } = await userClient.from("chat_thread_members").select("player_id").eq("thread_id", threadId);
     const memberIds = (members || []).map((m) => m.player_id);
     await sendPushToPlayers(memberIds, {
+      title: `💬 ${senderName}`, body: preview, url: `/play?game=${gameId}`, tag: `chat-thread-${threadId}`,
+      filterColumn: "notify_private_messages", excludePlayerId: senderId,
+    });
+    await sendNativePushToPlayers(memberIds, {
       title: `💬 ${senderName}`, body: preview, url: `/play?game=${gameId}`, tag: `chat-thread-${threadId}`,
       filterColumn: "notify_private_messages", excludePlayerId: senderId,
     });

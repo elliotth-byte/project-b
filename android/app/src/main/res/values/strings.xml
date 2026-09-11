@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Panopticon</string>
+    <string name="title_activity_main">Panopticon</string>
+    <string name="package_name">com.panopticon.app</string>
+    <string name="custom_url_scheme">com.panopticon.app</string>
+</resources>

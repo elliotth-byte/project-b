@@ -74,9 +74,9 @@ export default function AdminPage() {
     if (!res.ok) setGloballyDisabledState(current); // the write failed (most likely: not actually a platform admin per the DB's own check) -- don't leave the UI showing a change that didn't really save
   };
 
-  const reviewReport = async (reportId) => {
+  const reviewReport = async (reportId, source) => {
     setReviewingBusy(reportId);
-    const res = await markReportReviewed(reportId);
+    const res = await markReportReviewed(reportId, source);
     setReviewingBusy(null);
     if (res.ok) setReports((rs) => rs.filter((r) => r.reportId !== reportId));
   };
@@ -191,6 +191,9 @@ export default function AdminPage() {
             <div style={{ display: "grid", gap: 10 }}>
               {reports.map((r) => (
                 <div key={r.reportId} style={{ background: "#0d0618", border: "1px solid #ff3860", borderRadius: 8, padding: "10px 12px" }}>
+                  <p style={{ fontSize: 10, color: "#6b4f99", margin: "0 0 4px", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    {r.source === "chat" ? "🎮 In-game chat" : "✉️ Profile DM"}
+                  </p>
                   <p style={{ fontSize: 12, color: "#f5f0ff", margin: "0 0 6px" }}>
                     <strong>{r.senderName || "Unknown"}</strong> wrote: "{r.messageBody}"
                   </p>
@@ -198,7 +201,7 @@ export default function AdminPage() {
                     Reported by <strong>{r.reporterName || "Unknown"}</strong> — "{r.reason}"
                   </p>
                   <button
-                    onClick={() => reviewReport(r.reportId)} disabled={reviewingBusy === r.reportId}
+                    onClick={() => reviewReport(r.reportId, r.source)} disabled={reviewingBusy === r.reportId}
                     style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, color: "#a68fd6", fontSize: 11, padding: "5px 10px", cursor: "pointer" }}
                   >
                     {reviewingBusy === r.reportId ? "..." : "Mark reviewed"}

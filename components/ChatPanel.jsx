@@ -4,7 +4,7 @@ import {
   subscribeGroupChat, sendGroupMessage, subscribeGroupChatReads, markGroupChatRead,
   createOrGetThread, fetchMyThreads, fetchExileRoom, subscribeThreadMessages, sendThreadMessage,
   markThreadRead, fetchThreadReads, subscribeThreadReads, fetchLatestMessageTimestamps, subscribeAnyThreadActivity,
-  toggleGroupReaction, subscribeThreadReactions, toggleThreadReaction,
+  toggleGroupReaction, subscribeThreadReactions, toggleThreadReaction, reportChatMessage,
 } from "../lib/chatData";
 
 import { colorFor } from "../lib/playerColors";
@@ -13,9 +13,63 @@ import { subscribeGameState } from "../lib/gameStorage";
 import { KEY_EXILE, KEY_FINALE, PHASES } from "../lib/gameState";
 import { notifyPushForMessage } from "../lib/pushNotifications";
 import { markOnboardingChatSent, markOnboardingDmSent } from "../lib/onboarding";
+import { fetchMyBlockedIds, blockUser } from "../lib/blockedUsers";
+import { formatChatTime } from "../lib/formatChatTime";
 
-function fmtTime(ts) {
-  return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+// ─── Reporting + blocking — shared across group chat and thread chat ───
+// See sql/add-chat-reports-and-blocking.sql for the tables this reads
+// and writes. userIdByPlayerId resolves a message's player-scoped
+// senderId to the real account id blocking/reporting actually need —
+// messages themselves are keyed by player.id (per-season identity),
+// but a block has to work across seasons against the real person, and
+// a report needs the real account so a platform admin reviewing it
+// isn't just looking at a season-scoped id that means nothing outside
+// this one game.
+function useBlockedIds(myUserId) {
+  const [blockedIds, setBlockedIds] = useState(new Set());
+  useEffect(() => {
+    if (!myUserId) return;
+    fetchMyBlockedIds(myUserId).then(setBlockedIds);
+  }, [myUserId]);
+  const addBlocked = (userId) => setBlockedIds((s) => new Set([...s, userId]));
+  return [blockedIds, addBlocked];
+}
+
+// A small, focused modal for the one piece neither Report nor Block
+// can skip: WHY. Reused for both group and thread messages rather than
+// built twice.
+function ReportModal({ target, onClose, onSubmit }) {
+  const [reason, setReason] = useState("");
+  const [sending, setSending] = useState(false);
+  if (!target) return null;
+  const submit = async () => {
+    if (!reason.trim() || sending) return;
+    setSending(true);
+    await onSubmit(target.messageId, reason.trim());
+    setSending(false);
+    onClose();
+  };
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(5,1,15,0.75)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#150a28", border: "1px solid #3d1f5c", borderRadius: 14, padding: 20, maxWidth: 340, width: "100%" }}>
+        <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15 }}>🚩 Report this message</h3>
+        <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 10px" }}>From {target.senderName}. Goes to the app's platform admins, not the game host.</p>
+        <textarea
+          autoFocus value={reason} onChange={(e) => setReason(e.target.value)}
+          placeholder="What's wrong with this message?" rows={3}
+          style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #3d1f5c", background: "#0d0618", color: "#f5f0ff", fontSize: 13, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit" }}
+        />
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
+          <button onClick={onClose} style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, color: "#a68fd6", fontSize: 12, padding: "8px 14px", cursor: "pointer" }}>Cancel</button>
+          <button onClick={submit} disabled={!reason.trim() || sending} style={{
+            padding: "8px 18px", borderRadius: 6, fontWeight: 700, fontSize: 12,
+            background: reason.trim() ? "linear-gradient(135deg, #ff2d95, #b829ff)" : "#3d1f5c",
+            color: reason.trim() ? "#05010f" : "#a68fd6", border: "none", cursor: reason.trim() ? "pointer" : "default",
+          }}>{sending ? "Sending..." : "Report"}</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function UnreadDot() {
@@ -37,7 +91,7 @@ function groupReactions(reactions, myPlayerId) {
   return Object.values(byEmoji);
 }
 
-function MessageBubble({ mine, name, nameColor, avatarUrl, body, time, reactions, myPlayerId, onToggleReaction, readOnly = false, isFinalWords = false }) {
+function MessageBubble({ mine, name, nameColor, avatarUrl, body, time, reactions, myPlayerId, onToggleReaction, readOnly = false, isFinalWords = false, messageId, senderId, onReport, onBlock, isBlocked = false }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [customOpen, setCustomOpen] = useState(false);
   const [customEmoji, setCustomEmoji] = useState("");
@@ -134,6 +188,21 @@ function MessageBubble({ mine, name, nameColor, avatarUrl, body, time, reactions
           </div>
         )}
 
+        {!mine && !readOnly && (onReport || onBlock) && (
+          <div style={{ display: "flex", gap: 10, marginTop: 3, marginLeft: 4 }}>
+            {onReport && (
+              <button onClick={() => onReport(messageId, senderId, name)} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 9, cursor: "pointer", padding: 0 }}>
+                🚩 Report
+              </button>
+            )}
+            {onBlock && !isBlocked && (
+              <button onClick={() => onBlock(senderId, name)} style={{ background: "none", border: "none", color: "#6b4f99", fontSize: 9, cursor: "pointer", padding: 0 }}>
+                🚫 Block
+              </button>
+            )}
+          </div>
+        )}
+
         {grouped.length > 0 && (
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4 }}>
             {grouped.map((g) => (
@@ -154,7 +223,7 @@ function MessageBubble({ mine, name, nameColor, avatarUrl, body, time, reactions
           </div>
         )}
 
-        <div style={{ fontSize: 9, color: "#6b4f99", marginTop: 2 }}>{fmtTime(time)}</div>
+        <div style={{ fontSize: 9, color: "#6b4f99", marginTop: 2 }}>{formatChatTime(time)}</div>
       </div>
     </div>
   );
@@ -220,6 +289,9 @@ function Composer({ onSend, placeholder, readOnly = false, disabledMessage = nul
 function GroupChatView({ gameId, player, players, realName, onRead, readOnly = false, round, settings }) {
   const [messages, setMessages] = useState([]);
   const listRef = useRef(null);
+  const myUserId = players?.find((p) => p.id === player.id)?.user_id;
+  const [blockedIds, addBlocked] = useBlockedIds(myUserId);
+  const [reportTarget, setReportTarget] = useState(null);
   // Hestia's character power (see lib/characterPowers.js) — only ever
   // subscribes when the round is actually in a deliberation phase, same
   // scoping ChatPanel.jsx's Poseidon block already uses; there's no
@@ -265,25 +337,46 @@ function GroupChatView({ gameId, player, players, realName, onRead, readOnly = f
     );
   }
 
-  const rows = messages.map((m) => ({
-    id: m.id,
-    node: (
-      <MessageBubble
-        mine={m.senderId === player.id} name={m.senderName} nameColor={colorFor(players, m.senderId)}
-        avatarUrl={(players || []).find((p) => p.id === m.senderId)?.effectiveAvatarUrl} body={m.body} time={m.createdAt}
-        reactions={m.reactions} myPlayerId={player.id} readOnly={readOnly} isFinalWords={m.isFinalWords}
-        onToggleReaction={(emoji) => toggleGroupReaction(gameId, m.id, player.id, emoji)}
-      />
-    ),
-  }));
+  const blockUserHandler = async (senderPlayerId, name) => {
+    const targetUserId = players?.find((p) => p.id === senderPlayerId)?.user_id;
+    if (!targetUserId || !myUserId) return;
+    if (!window.confirm(`Block ${name}? You won't see their messages anymore, and they won't be able to start new DMs with you.`)) return;
+    const res = await blockUser(myUserId, targetUserId);
+    if (res.ok) addBlocked(targetUserId);
+  };
+
+  const rows = messages
+    .filter((m) => {
+      const senderUserId = (players || []).find((p) => p.id === m.senderId)?.user_id;
+      return !senderUserId || !blockedIds.has(senderUserId);
+    })
+    .map((m) => ({
+      id: m.id,
+      node: (
+        <MessageBubble
+          mine={m.senderId === player.id} name={m.senderName} nameColor={colorFor(players, m.senderId)}
+          avatarUrl={(players || []).find((p) => p.id === m.senderId)?.effectiveAvatarUrl} body={m.body} time={m.createdAt}
+          reactions={m.reactions} myPlayerId={player.id} readOnly={readOnly} isFinalWords={m.isFinalWords}
+          onToggleReaction={(emoji) => toggleGroupReaction(gameId, m.id, player.id, emoji)}
+          messageId={m.id} senderId={m.senderId}
+          onReport={(messageId, senderId, name) => setReportTarget({ messageId, senderId, senderName: name })}
+          onBlock={blockUserHandler}
+        />
+      ),
+    }));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "60vh" }}>
       <MessageList messages={rows} containerRef={listRef} />
       <Composer
         placeholder="Message everyone..." readOnly={readOnly}
-        onSend={(t) => { sendGroupMessage(gameId, player.id, player.name, t, realName); notifyPushForMessage(gameId, "group", player.id, player.name, t); markOnboardingChatSent(player.id); }}
+        onSend={async (t) => {
+          const res = await sendGroupMessage(gameId, player.id, player.name, t, realName);
+          if (res.ok) { notifyPushForMessage(gameId, "group", player.id, player.name, t); markOnboardingChatSent(player.id); }
+          return res;
+        }}
       />
+      <ReportModal target={reportTarget} onClose={() => setReportTarget(null)} onSubmit={(messageId, reason) => reportChatMessage(messageId, myUserId, reason)} />
     </div>
   );
 }
@@ -299,6 +392,9 @@ function ThreadView({ gameId, thread, player, players, byId, onBack, onRead, rea
   const [reactions, setReactions] = useState([]);
   const listRef = useRef(null);
   const label = threadLabel(thread, player, byId);
+  const myUserId = players?.find((p) => p.id === player.id)?.user_id;
+  const [blockedIds, addBlocked] = useBlockedIds(myUserId);
+  const [reportTarget, setReportTarget] = useState(null);
   // Poseidon's character power (see lib/characterPowers.js) — round and
   // settings are only ever passed in from MessagesView's regular-DM call
   // sites below, deliberately NOT from ExileRoomView's — the Exile Room
@@ -323,18 +419,34 @@ function ThreadView({ gameId, thread, player, players, byId, onBack, onRead, rea
 
   useEffect(() => { onRead?.(thread.id); }, [thread.id, messages.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const rows = messages.map((m) => ({
-    id: m.id,
-    node: (
-      <MessageBubble
-        mine={m.sender_id === player.id} name={byId[m.sender_id] || "?"} nameColor={colorFor(players, m.sender_id)}
-        avatarUrl={(players || []).find((p) => p.id === m.sender_id)?.effectiveAvatarUrl} body={m.body} time={m.created_at}
-        reactions={reactions.filter((r) => r.message_id === m.id).map((r) => ({ playerId: r.player_id, emoji: r.emoji }))}
-        myPlayerId={player.id} readOnly={readOnly}
-        onToggleReaction={(emoji) => toggleThreadReaction(thread.id, m.id, player.id, emoji)}
-      />
-    ),
-  }));
+  const blockUserHandler = async (senderPlayerId, name) => {
+    const targetUserId = players?.find((p) => p.id === senderPlayerId)?.user_id;
+    if (!targetUserId || !myUserId) return;
+    if (!window.confirm(`Block ${name}? You won't see their messages anymore, and they won't be able to start new DMs with you.`)) return;
+    const res = await blockUser(myUserId, targetUserId);
+    if (res.ok) addBlocked(targetUserId);
+  };
+
+  const rows = messages
+    .filter((m) => {
+      const senderUserId = (players || []).find((p) => p.id === m.sender_id)?.user_id;
+      return !senderUserId || !blockedIds.has(senderUserId);
+    })
+    .map((m) => ({
+      id: m.id,
+      node: (
+        <MessageBubble
+          mine={m.sender_id === player.id} name={byId[m.sender_id] || "?"} nameColor={colorFor(players, m.sender_id)}
+          avatarUrl={(players || []).find((p) => p.id === m.sender_id)?.effectiveAvatarUrl} body={m.body} time={m.created_at}
+          reactions={reactions.filter((r) => r.message_id === m.id).map((r) => ({ playerId: r.player_id, emoji: r.emoji }))}
+          myPlayerId={player.id} readOnly={readOnly}
+          onToggleReaction={(emoji) => toggleThreadReaction(thread.id, m.id, player.id, emoji)}
+          messageId={m.id} senderId={m.sender_id}
+          onReport={(messageId, senderId, name) => setReportTarget({ messageId, senderId, senderName: name })}
+          onBlock={blockUserHandler}
+        />
+      ),
+    }));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "60vh" }}>
@@ -346,8 +458,13 @@ function ThreadView({ gameId, thread, player, players, byId, onBack, onRead, rea
       <Composer
         placeholder={`Message ${label}...`} readOnly={readOnly}
         disabledMessage={poseidonBlocked ? "🌊 Poseidon has turned off DMs for this Fates Ceremony and Exile Vote." : null}
-        onSend={(t) => { sendThreadMessage(thread.id, player.id, t); notifyPushForMessage(gameId, "thread", player.id, player.name, t, thread.id); markOnboardingDmSent(player.id); }}
+        onSend={async (t) => {
+          const res = await sendThreadMessage(thread.id, player.id, t);
+          if (res.ok) { notifyPushForMessage(gameId, "thread", player.id, player.name, t, thread.id); markOnboardingDmSent(player.id); }
+          return res;
+        }}
       />
+      <ReportModal target={reportTarget} onClose={() => setReportTarget(null)} onSubmit={(messageId, reason) => reportChatMessage(messageId, myUserId, reason)} />
     </div>
   );
 }

@@ -76,6 +76,7 @@ export default function MessagesPage() {
     const res = await sendMessage(openThread.threadId, user.id, draft);
     setSending(false);
     if (res.ok) setDraft("");
+    else alert(res.error || "Couldn't send that message.");
   };
 
   const submitReport = async (messageId) => {

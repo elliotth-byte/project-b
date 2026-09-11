@@ -1,6 +1,7 @@
 import { Card } from "./ui";
 import { RULES_SECTIONS, battleList } from "../lib/rulesContent";
 import RulesAccordion from "./RulesAccordion";
+import PracticeMode from "./PracticeMode";
 
 // ─── Player help ───
 // The full rules, in-app (see lib/rulesContent.js — kept as data
@@ -13,7 +14,7 @@ import RulesAccordion from "./RulesAccordion";
 // Torched hiding-spot preset, leaving the game — live on the separate
 // Options tab now (see OptionsPanel.jsx); this tab is purely
 // informational.
-export default function HelpPanel({ player, onReplayTour, readOnly = false }) {
+export default function HelpPanel({ gameId, player, onReplayTour, readOnly = false }) {
   // The one section (see lib/rulesContent.js's own comment on it) that
   // needs real markup instead of a plain paragraph — attached here via
   // renderBody rather than in the data file itself, so rulesContent.js
@@ -44,6 +45,8 @@ export default function HelpPanel({ player, onReplayTour, readOnly = false }) {
         </div>
         <RulesAccordion sections={sections} />
       </Card>
+
+      {!readOnly && <PracticeMode gameId={gameId} player={player} />}
 
       {player && (
         <Card style={player.inactivityStrikes > 0 ? { borderColor: "rgba(255,56,96,0.4)" } : {}}>
@@ -106,6 +109,10 @@ export default function HelpPanel({ player, onReplayTour, readOnly = false }) {
 
       <p style={{ fontSize: 10, color: "#3d1f5c", textAlign: "center", margin: 0 }}>
         Version {process.env.NEXT_PUBLIC_APP_VERSION || "dev"} — include this if you're reporting a problem, in case you're on an older version than expected.
+      </p>
+
+      <p style={{ fontSize: 10, color: "#3d1f5c", textAlign: "center", margin: 0 }}>
+        <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: "#6b4f99" }}>Terms & Community Guidelines</a>
       </p>
     </div>
   );

@@ -3,10 +3,7 @@ import { Card, Btn } from "./ui";
 import { subscribeGroupChat, sendGroupMessage, fetchAllThreads, fetchThreadMessages, subscribeAnyThreadActivity, fetchLatestMessageTimestamps } from "../lib/chatData";
 import { colorFor } from "../lib/playerColors";
 import { usePostAsName } from "../lib/hostVoice";
-
-function fmtTime(ts) {
-  return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
+import { formatChatTime } from "../lib/formatChatTime";
 
 // ─── Host: Chat ───
 // Group chat the host can post into like anyone else. DMs are read-only
@@ -100,7 +97,7 @@ export default function ChatHostPanel({ gameId, players, groupChatLabel = "💬 
                 <span style={{ color: m.senderId === "host" ? "#ff2d95" : colorFor(players, m.senderId), fontWeight: 700 }}>
                   {m.senderRealName && m.senderRealName !== m.senderName ? `${m.senderRealName} (${m.senderName})` : m.senderRealName || m.senderName}
                 </span>
-                <span style={{ color: "#6b4f99", fontSize: 10, marginLeft: 6 }}>{fmtTime(m.createdAt)}</span>
+                <span style={{ color: "#6b4f99", fontSize: 10, marginLeft: 6 }}>{formatChatTime(m.createdAt)}</span>
                 <div style={{ color: "#a68fd6" }}>{m.body}</div>
               </div>
             ))}
@@ -136,7 +133,7 @@ export default function ChatHostPanel({ gameId, players, groupChatLabel = "💬 
             {threadMessages.map((m) => (
               <div key={m.id} style={{ marginBottom: 8, fontSize: 12 }}>
                 <span style={{ color: colorFor(players, m.sender_id), fontWeight: 700 }}>{byId[m.sender_id] || "?"}</span>
-                <span style={{ color: "#6b4f99", fontSize: 10, marginLeft: 6 }}>{fmtTime(m.created_at)}</span>
+                <span style={{ color: "#6b4f99", fontSize: 10, marginLeft: 6 }}>{formatChatTime(m.created_at)}</span>
                 <div style={{ color: "#a68fd6" }}>{m.body}</div>
               </div>
             ))}
@@ -168,7 +165,7 @@ export default function ChatHostPanel({ gameId, players, groupChatLabel = "💬 
               >
                 <span>
                   {t.is_exile_room ? "🔥 Exile Room" : t.name || (t.memberIds || []).map((id) => byId[id] || "?").join(" ↔ ")}
-                  {t.is_group && !t.is_exile_room && <span style={{ color: "#6b4f99", fontSize: 10 }}> · group ({(t.memberIds || []).length})</span>}
+                  {t.is_group && !t.is_exile_room && <span style={{ color: "#6b4f99", fontSize: 10 }}> · group ({(t.memberIds || []).length}) · started by {byId[t.created_by] || "?"}</span>}
                 </span>
                 <span style={{ color: "#6b4f99", fontSize: 16 }}>›</span>
               </button>

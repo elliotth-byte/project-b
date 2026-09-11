@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { sendPushToGame, sendPushToPlayers } from "../../../lib/sendPush";
+import { sendNativePushToGame } from "../../../lib/sendNativePush";
 
 // ============================================================
 // Player-facing counterpart to notify-host-event.js — same shape (auth
@@ -44,6 +45,7 @@ export default async function handler(req, res) {
     await sendPushToPlayers(playerIds, { title, body, url: `/play?game=${gameId}`, tag: tag || "round-change", filterColumn: "notify_rounds" });
   } else {
     await sendPushToGame(gameId, { title, body, url: `/play?game=${gameId}`, tag: tag || "round-change", filterColumn: "notify_rounds" });
+    await sendNativePushToGame(gameId, { title, body, url: `/play?game=${gameId}`, tag: tag || "round-change", filterColumn: "notify_rounds" });
   }
 
   return res.status(200).json({ ok: true });

@@ -8,6 +8,7 @@ import { useSiteTheme } from "../lib/siteTheme";
 export default function Signup() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -36,6 +37,10 @@ export default function Signup() {
     }
     if (password.length < 6) {
       setError("Password must be at least 6 characters.");
+      return;
+    }
+    if (!agreedToTerms) {
+      setError("Please agree to the Terms & Community Guidelines to continue.");
       return;
     }
     setLoading(true);
@@ -70,6 +75,12 @@ export default function Signup() {
           placeholder="Choose a password (6+ characters)"
           style={inputStyle}
         />
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 8, textAlign: "left", fontSize: 12, color: theme.textDim, margin: "4px 0 12px", cursor: "pointer" }}>
+          <input type="checkbox" checked={agreedToTerms} onChange={(e) => setAgreedToTerms(e.target.checked)} style={{ marginTop: 2 }} />
+          <span>
+            I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: theme.accent }}>Terms & Community Guidelines</a>, including no tolerance for harassment, threats, or hateful content.
+          </span>
+        </label>
         {error && <p style={{ color: theme.danger, fontSize: 13, margin: "6px 0" }}>{error}</p>}
         <button type="submit" disabled={loading} style={btnStyle}>
           {loading ? "Creating..." : "Create account"}
