@@ -373,7 +373,7 @@ export default function ChallengePlayer({ gameId, player, players, round, settin
                 99vw/538px post-scale — comfortably fits without triggering
                 horizontal overflow on typical phone widths. */}
             <div style={{ width: "78vw", maxWidth: 420, transform: "scale(1.28)", transformOrigin: "center top", marginTop: 20 }}>
-              <GameComponent key={attemptKey} gameId={gameId} round={round} challenge={challenge} player={player} players={players} challengeHistory={challengeHistory} exileHistory={exileHistory} />
+              <GameComponent key={attemptKey} gameId={gameId} round={round} challenge={challenge} player={player} players={players} challengeHistory={challengeHistory} exileHistory={exileHistory} settings={settings} />
               <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 10 }}>
                 <Btn small variant="ghost" onClick={() => setMinimized(true)}>↙ Minimize</Btn>
                 <Btn small variant="ghost" onClick={forfeitDigital} disabled={forfeiting}>

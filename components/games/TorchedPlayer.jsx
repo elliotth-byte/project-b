@@ -3,21 +3,49 @@ import { Card, Badge } from "../ui";
 import GameResultCard from "./GameResultCard";
 import { reportScore } from "../../lib/challengeScores";
 import {
-  subscribeTorched, placeMarker, startShootingPhase, fireShot, isValidPlacement, placementValue,
+  subscribeTorched, placeMarker, startShootingPhase, submitShotForRound, isValidPlacement, placementValue,
+  TORCHED_TARGET_ROUNDS_ESTIMATE, TORCHED_MIN_ROUND_SEC, TORCHED_MAX_ROUND_SEC,
 } from "../../lib/games/torchedData";
 
-export default function TorchedPlayer({ gameId, round, challenge, player, players }) {
+// Mirrors resolveRound's own clamp exactly (see that function's own
+// comment) — this is purely for the player-facing countdown display,
+// never used to decide anything about whether a round is actually
+// over; that's entirely server-side, this just has to render the same
+// number so the countdown the player sees matches reality.
+function perRoundMs(challengeDurationSec) {
+  const totalSec = challengeDurationSec || 900;
+  return Math.max(TORCHED_MIN_ROUND_SEC, Math.min(TORCHED_MAX_ROUND_SEC, totalSec / TORCHED_TARGET_ROUNDS_ESTIMATE)) * 1000;
+}
+
+function formatCountdown(ms) {
+  if (ms <= 0) return "0:00";
+  const totalSec = Math.ceil(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+export default function TorchedPlayer({ gameId, round, challenge, player, players, settings }) {
   const [state, setState] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [placeRow, setPlaceRow] = useState(null);
   const [placeCol, setPlaceCol] = useState(null);
   const [orientation, setOrientation] = useState("horizontal");
+  const [now, setNow] = useState(Date.now());
   const reportedRef = useRef(new Set());
 
   useEffect(() => {
     const unsubscribe = subscribeTorched(gameId, round.round, (v) => { setState(v); setLoaded(true); });
     return unsubscribe;
   }, [gameId, round.round]);
+
+  // Only actually needed while shooting (for the countdown) — cheap
+  // enough as a 1s interval either way, and simpler than mounting/
+  // unmounting the timer based on phase.
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const byName = (id) => players?.find((p) => p.id === id)?.display_name || "?";
 
@@ -41,7 +69,7 @@ export default function TorchedPlayer({ gameId, round, challenge, player, player
   useEffect(() => {
     if (!state || iAmEliminated || gameOver) return;
     reportScore(gameId, round.round, player.id, player.name, placementValue(state, player.id), { final: false });
-  }, [state?.eliminationOrder?.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state?.roundNum]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!challenge?.active) return null;
   if (state === null && !loaded) {
@@ -55,8 +83,9 @@ export default function TorchedPlayer({ gameId, round, challenge, player, player
   const cells = Array.from({ length: gridSize }, (_, r) => Array.from({ length: gridSize }, (_, c) => [r, c]));
 
   // Fine-grained hit/miss lookups for rendering the board — every past
-  // shot shows for everyone regardless of whose turn it is, since the
-  // shot log itself is public; only UN-hit live markers stay hidden.
+  // (resolved) shot shows for everyone, since the shot log itself is
+  // public; only UN-hit live markers, and any of THIS round's still-
+  // pending calls, stay hidden.
   const shotAt = (r, c) => state.shotsLog.find((s) => s.at[0] === r && s.at[1] === c);
   const myMarkerHas = (r, c) => myMarker?.cells?.some(([mr, mc]) => mr === r && mc === c);
 
@@ -65,7 +94,7 @@ export default function TorchedPlayer({ gameId, round, challenge, player, player
       <GameResultCard
         icon={iWon ? "🏆" : "🔥"}
         title={iWon ? "Last Marker Standing!" : iAmEliminated ? "Torched" : "Game Over"}
-        valueLabel={iWon ? "You won" : iAmEliminated ? `Eliminated on turn ${state.shotsLog.find((s) => s.hitPlayerId === player.id)?.turnNum ?? "?"}` : `${byName(state.winnerId)} wins`}
+        valueLabel={iWon ? "You won" : iAmEliminated ? `Eliminated in round ${state.eliminatedInRound?.[player.id] ?? "?"}` : `${byName(state.winnerId)} wins`}
       />
     );
   }
@@ -75,7 +104,7 @@ export default function TorchedPlayer({ gameId, round, challenge, player, player
   }
 
   // ─── Placement phase ───
-  if (!state.turnOrder) {
+  if (!state.shooting) {
     if (iHavePlaced) {
       return (
         <Card style={{ marginBottom: 20, textAlign: "center" }}>
@@ -151,16 +180,42 @@ export default function TorchedPlayer({ gameId, round, challenge, player, player
     );
   }
 
-  // ─── Shooting phase ───
-  const activeId = state.turnOrder[state.currentTurnIndex];
-  const myTurn = activeId === player.id;
+  // ─── Shooting phase — simultaneous, timed rounds ───
+  const iHaveSubmitted = !!state.pendingShots?.[player.id];
+  const aliveCount = Object.values(state.markers).filter((m) => m.alive).length;
+  const submittedCount = Object.keys(state.pendingShots || {}).length;
+  const windowMs = perRoundMs(settings?.challengeDurationSec);
+  const elapsed = state.roundStartedAt ? now - state.roundStartedAt : 0;
+  const remainingMs = windowMs - elapsed;
+
+  if (iHaveSubmitted) {
+    return (
+      <Card style={{ marginBottom: 20, textAlign: "center" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🔥 Torched — Round {state.roundNum}</h3>
+          <Badge>{formatCountdown(remainingMs)}</Badge>
+        </div>
+        <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>
+          Your call is locked in for this round. Waiting on {Math.max(0, aliveCount - submittedCount)} more player{Math.max(0, aliveCount - submittedCount) === 1 ? "" : "s"} (or the round's timer) before it resolves.
+        </p>
+      </Card>
+    );
+  }
+
+  const fire = (r, c) => {
+    if (shotAt(r, c)) return; // already called in an earlier round
+    submitShotForRound(gameId, round.round, player.id, r, c);
+  };
 
   return (
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-        <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🔥 Torched</h3>
-        <Badge>{myTurn ? "Your turn" : `${byName(activeId)}'s turn`}</Badge>
+        <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🔥 Torched — Round {state.roundNum}</h3>
+        <Badge>{formatCountdown(remainingMs)}</Badge>
       </div>
+      <p style={{ fontSize: 11, color: "#a68fd6", margin: "0 0 8px" }}>
+        Everyone alive calls one cell this round, at the same time — {submittedCount} of {aliveCount} in so far.
+      </p>
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridSize}, 1fr)`, gap: 3, maxWidth: 320, margin: "0 auto 10px" }}>
         {cells.flat().map(([r, c]) => {
           const shot = shotAt(r, c);
@@ -182,11 +237,11 @@ export default function TorchedPlayer({ gameId, round, challenge, player, player
             bg = "radial-gradient(circle at 50% 40%, rgba(0,255,157,0.3), rgba(0,255,157,0.1))";
             border = "#00ff9d";
           }
-          const canFire = myTurn && !shot;
+          const canFire = !shot;
           return (
             <button
               key={`${r}-${c}`}
-              onClick={() => canFire && fireShot(gameId, round.round, player.id, r, c)}
+              onClick={() => canFire && fire(r, c)}
               disabled={!canFire}
               style={{ aspectRatio: "1", borderRadius: 3, padding: 0, background: bg, border: `1px solid ${border}`, boxShadow, cursor: canFire ? "pointer" : "default" }}
             />
@@ -194,7 +249,7 @@ export default function TorchedPlayer({ gameId, round, challenge, player, player
         })}
       </div>
       <p style={{ fontSize: 11, color: "#6b4f99", margin: 0 }}>
-        🟢 your marker · 🟣 a miss · 🔴 a hit — {Object.values(state.markers).filter((m) => m.alive).length} markers still standing
+        🟢 your marker · 🟣 a miss · 🔴 a hit — {aliveCount} markers still standing
       </p>
     </Card>
   );

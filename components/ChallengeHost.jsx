@@ -645,20 +645,28 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
       {challenge?.gameType === "torched" && challenge.active && torchedState && !torchedState.winnerId && (() => {
         // Live board for the host — same shot log every player already
         // sees (see components/games/TorchedPlayer.jsx's own comment:
-        // "every past shot shows for everyone regardless of whose turn
-        // it is, since the shot log itself is public"), rendered the
-        // same visual way that component already does. Deliberately
-        // does NOT reveal any marker's position before it's actually
-        // been hit — the host gets the same "fog of war" every player
-        // has, not a spoiler view. What the host gets that a player
-        // doesn't: seeing every cell at once regardless of elimination
-        // status, and the turn/alive-eliminated summary below the grid.
+        // shots are resolved and public once a round finishes, whoever
+        // called them), rendered the same visual way that component
+        // does. Deliberately does NOT reveal any marker's position
+        // before it's actually been hit — the host gets the same "fog
+        // of war" every player has, not a spoiler view. What the host
+        // gets that a player doesn't: seeing every cell at once
+        // regardless of elimination status, and the alive/eliminated
+        // summary below the grid.
+        //
+        // Shooting is simultaneous now, in timed rounds, not turn-based
+        // — see lib/games/torchedData.js's own header comment for the
+        // full mechanic — so there's no "whose turn" to show anymore;
+        // this shows the round number and how many of the still-alive
+        // players have already submitted their call for it instead,
+        // which is the actual thing worth knowing about a round in
+        // progress.
         const gridSize = torchedState.gridSize;
         const cells = Array.from({ length: gridSize }, (_, r) => Array.from({ length: gridSize }, (_, c) => [r, c]));
         const shotAt = (r, c) => torchedState.shotsLog.find((s) => s.at[0] === r && s.at[1] === c);
-        const activeId = torchedState.turnOrder?.[torchedState.currentTurnIndex];
         const alivePlayers = Object.entries(torchedState.markers).filter(([, m]) => m.alive).map(([id]) => id);
         const eliminatedPlayers = Object.entries(torchedState.markers).filter(([, m]) => !m.alive).map(([id]) => id);
+        const submittedCount = Object.keys(torchedState.pendingShots || {}).length;
         const byName = (id) => players.find((p) => p.id === id)?.display_name || "?";
 
         return (
@@ -667,9 +675,9 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
               <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5 }}>
                 🔥 Torched — live board
               </div>
-              {torchedState.turnOrder && <Badge>{byName(activeId)}'s turn</Badge>}
+              {torchedState.shooting && <Badge>Round {torchedState.roundNum} — {submittedCount}/{alivePlayers.length} in</Badge>}
             </div>
-            {!torchedState.turnOrder ? (
+            {!torchedState.shooting ? (
               <p style={{ fontSize: 12, color: "#f5f0ff", margin: "0 0 8px" }}>
                 {torchedState.placedIds.length} of {challenge.participantIds.length} players have placed their marker — grid isn't visible until shooting starts.
               </p>
