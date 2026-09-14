@@ -11,7 +11,6 @@ export default function ChainsPlayer({ gameId, round, challenge, player, players
   const [loaded, setLoaded] = useState(false);
   const [draft, setDraft] = useState([]); // [{opponentId, symbol}] — purely local until locked in, see chainsData.js
   const [pickingFor, setPickingFor] = useState(null); // opponentId currently choosing a symbol for
-  const reportedRef = useRef(new Set());
 
   useEffect(() => {
     const unsubscribe = subscribeChains(gameId, round.round, (v) => { setState(v); setLoaded(true); });
@@ -23,14 +22,24 @@ export default function ChainsPlayer({ gameId, round, challenge, player, players
   const iHaveLockedIn = !!state?.chains?.[player.id];
   const myResult = state?.results?.[player.id];
 
-  // Only one meaningful report: once everyone's revealed, or the whole
-  // challenge's timer runs out. There's no partial/live score to report
-  // along the way — results genuinely don't exist until the reveal.
+  // Two separate report points now, not one — see chainsData.js's own
+  // placementValue comment for why an interim report at lock-in time
+  // matters: without it, a player who's fully done their own part but
+  // is just waiting on a straggler would report NOTHING at all if the
+  // challenge's timer runs out first, identical to a player who never
+  // even started. Two separate refs since these can genuinely both
+  // fire for the same player at different times (lock in, then reveal
+  // later) — a single ref would wrongly block the second report.
+  const reportedInterimRef = useRef(false);
+  const reportedFinalRef = useRef(false);
   useEffect(() => {
-    if (!state || reportedRef.current.has(player.id)) return;
-    if (state.revealed) {
-      reportedRef.current.add(player.id);
+    if (!state) return;
+    if (state.revealed && !reportedFinalRef.current) {
+      reportedFinalRef.current = true;
       reportScore(gameId, round.round, player.id, player.name, placementValue(state, player.id), { final: true });
+    } else if (!state.revealed && state.chains?.[player.id] && !reportedInterimRef.current) {
+      reportedInterimRef.current = true;
+      reportScore(gameId, round.round, player.id, player.name, placementValue(state, player.id), { final: false });
     }
   }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
 

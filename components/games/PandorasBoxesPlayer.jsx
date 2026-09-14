@@ -15,7 +15,6 @@ export default function PandorasBoxesPlayer({ gameId, round, challenge, player, 
   // lingers into a submission.
   const [round2Draft, setRound2Draft] = useState({});
   const [pickingBoxId, setPickingBoxId] = useState(null);
-  const reportedRef = useRef(false);
 
   useEffect(() => {
     const unsubscribe = subscribePandorasBoxes(gameId, round.round, (v) => { setState(v); setLoaded(true); });
@@ -24,11 +23,25 @@ export default function PandorasBoxesPlayer({ gameId, round, challenge, player, 
 
   const byName = (id) => players?.find((p) => p.id === id)?.display_name || "?";
 
+  // Interim reports (not final) can genuinely change value more than
+  // once here — round1Gifts locked in, then later round2Gifts too —
+  // unlike Chains' single locked-in-or-not state, so this deliberately
+  // does NOT guard the interim branch with a "reported once" ref the
+  // way the final branch still needs. reportScore itself safely
+  // overwrites on every call until locked (see its own comment), so
+  // just reporting again on every state change that isn't yet revealed
+  // is the correct, simplest way to keep the interim value current —
+  // see pandorasBoxesData.js's own placementValue comment for why this
+  // matters at all (a player fully done waiting on a straggler
+  // shouldn't report nothing if the challenge's own timer runs out).
+  const reportedFinalRef = useRef(false);
   useEffect(() => {
-    if (!state || reportedRef.current) return;
-    if (state.phase === "revealed") {
-      reportedRef.current = true;
+    if (!state) return;
+    if (state.phase === "revealed" && !reportedFinalRef.current) {
+      reportedFinalRef.current = true;
       reportScore(gameId, round.round, player.id, player.name, placementValue(state, player.id), { final: true });
+    } else if (state.phase !== "revealed" && (state.round1Gifts?.[player.id] || state.round2Gifts?.[player.id])) {
+      reportScore(gameId, round.round, player.id, player.name, placementValue(state, player.id), { final: false });
     }
   }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
 

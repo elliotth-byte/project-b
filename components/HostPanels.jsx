@@ -16,6 +16,7 @@ import ChatHostPanel from "./ChatHostPanel";
 import AdminHost from "./AdminHost";
 import HistoryTab from "./HistoryTab";
 import RoundTimerBanner from "./RoundTimerBanner";
+import ApplyChallengeTimerButton from "./ApplyChallengeTimerButton";
 import HostAnnouncementBox from "./HostAnnouncementBox";
 import { postSystemAnnouncement } from "../lib/announcements";
 import PlayerViewer from "./PlayerViewer";
@@ -156,6 +157,7 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
           ) : (
             <>
               <RoundTimerBanner round={round} />
+              <ApplyChallengeTimerButton gameId={gameId} round={round} />
               <div style={{ marginBottom: 12 }}>
                 <button
                   onClick={() => setShowMemoryWall(!showMemoryWall)}

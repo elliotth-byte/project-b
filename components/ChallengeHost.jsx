@@ -13,7 +13,7 @@ import { initPlinkoBracket, subscribePlinkoBracket } from "../lib/games/plinkoBr
 import { initPit } from "../lib/games/pitData";
 import { initMasquerade } from "../lib/games/masqueradeData";
 import { initCloseToTwenty } from "../lib/games/closeToTwentyData";
-import { initTorched } from "../lib/games/torchedData";
+import { initTorched, subscribeTorched } from "../lib/games/torchedData";
 import { initChains, subscribeChains } from "../lib/games/chainsData";
 import { initPandorasBoxes } from "../lib/games/pandorasBoxesData";
 import { initMusicalChairs } from "../lib/games/musicalChairsData";
@@ -59,6 +59,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   const [busy, setBusy] = useState(false);
   const [plinkoBracket, setPlinkoBracket] = useState(null);
   const [chainsState, setChainsState] = useState(null);
+  const [torchedState, setTorchedState] = useState(null);
   const [scavengerState, setScavengerState] = useState(null);
   const [resettingId, setResettingId] = useState(null);
   const [challengeHistory, setChallengeHistory] = useState([]);
@@ -120,6 +121,12 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   useEffect(() => {
     if (!round?.round) return;
     const unsubscribe = subscribeChains(gameId, round.round, setChainsState);
+    return unsubscribe;
+  }, [gameId, round?.round]);
+
+  useEffect(() => {
+    if (!round?.round) return;
+    const unsubscribe = subscribeTorched(gameId, round.round, setTorchedState);
     return unsubscribe;
   }, [gameId, round?.round]);
 
@@ -244,16 +251,28 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     const freshReentry = await getReentry(gameId);
     const reentryEligibleIds = freshReentry.filter((r) => r.status === REENTRY_STATUS.PENDING).map((r) => r.playerId);
     const now = Date.now();
-    // Masquerade, Torched, and Chains all always run to their natural
-    // conclusion (last player standing for the first two; everyone
-    // locked in for Chains — see lib/games/masqueradeData.js,
-    // lib/games/torchedData.js, lib/games/chainsData.js) rather than
-    // being cut off by a fixed duration partway through, regardless of
-    // the season's infiniteTime setting — a turn-based elimination game
-    // or a lock-in-gated reveal forced to stop mid-way (possibly even
-    // before it's really begun) has no clean resolution the way a
-    // scored game does.
-    const endsAt = (settings?.infiniteTime || gameType === "masquerade" || gameType === "torched" || gameType === "chains" || gameType === "pandorasboxes") ? null : now + (settings?.challengeDurationSec || 900) * 1000;
+    // torched and masquerade both now run for the season's own
+    // configured challengeDurationSec like any other challenge — see
+    // lib/roundEngine.js's own matching endsAt computation and its
+    // comments (autoTimeoutTorched, autoTimeoutMasquerade) for why an
+    // unbounded per-turn wait inside a now-bounded battle would defeat
+    // the whole point of giving it a duration at all. chains and
+    // pandorasboxes now run for the real duration too, now that both
+    // report real interim progress (see their own placementValue
+    // comments) instead of reporting nothing at all until the very end
+    // — settings.infiniteTime remains the one deliberate, host-
+    // controlled way to still get an unbounded battle for any game
+    // type.
+    //
+    // This mirrors lib/roundEngine.js's own endsAt computation
+    // exactly, on purpose — this file's normal-start path and that
+    // file's automatic-start path both need to agree, and they'd
+    // already drifted out of sync once (this file kept the old
+    // masquerade/torched/chains/pandorasboxes exclusion well after
+    // roundEngine.js had already been fixed, which is exactly the kind
+    // of duplicated-logic bug worth flagging here as a reminder to
+    // check both files together if this ever needs changing again).
+    const endsAt = settings?.infiniteTime ? null : now + (settings?.challengeDurationSec || 900) * 1000;
     const configOverrides = MAZE_TYPES.includes(gameType) ? { size: mazeSize } : undefined;
     await storageSet(gameId, KEY_CHALLENGE, {
       round: round.round, active: true, startedAt: now, endsAt,
@@ -501,12 +520,6 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
 
         {settings?.infiniteTime ? (
           <p style={{ color: "#ff2d95", fontSize: 12, margin: "0 0 12px" }}>∞ Infinite time is on — this battle runs until you end it. (Change this in Admin → Round Lengths.)</p>
-        ) : gameType === "masquerade" ? (
-          <p style={{ color: "#ff2d95", fontSize: 12, margin: "0 0 12px" }}>∞ Murder at the Masquerade always runs until there's a last player standing — no duration to set.</p>
-        ) : gameType === "torched" ? (
-          <p style={{ color: "#ff2d95", fontSize: 12, margin: "0 0 12px" }}>∞ Torched always runs until there's a last marker standing — no duration to set.</p>
-        ) : gameType === "chains" ? (
-          <p style={{ color: "#ff2d95", fontSize: 12, margin: "0 0 12px" }}>∞ Chains always runs until every player has locked in — no duration to set.</p>
         ) : (
           <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px" }}>
             Duration: {Math.round((settings?.challengeDurationSec || 900) / 60)} min <span style={{ color: "#6b4f99", fontStyle: "italic" }}>(set in Admin → Round Lengths)</span>
@@ -621,14 +634,74 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
           <p style={{ fontSize: 12, color: "#f5f0ff", margin: 0 }}>
             {chainsState.participantIds.map((id) => {
               const locked = !!chainsState.chains?.[id];
-              return `${locked ? "✓" : "⋯"} ${players.find((p) => p.id === id)?.display_name || "?"}`;
-            }).join("  ·  ")}
+              return `${locked ? "✓" : "⋯"} ${players.find((p) => p.id === id)?.display_name || "?"}`;            }).join("  ·  ")}
           </p>
           <p style={{ fontSize: 10, color: "#6b4f99", margin: "6px 0 0", fontStyle: "italic" }}>
             Only who's locked in — what they actually picked stays hidden until everyone's in.
           </p>
         </div>
       )}
+
+      {challenge?.gameType === "torched" && challenge.active && torchedState && !torchedState.winnerId && (() => {
+        // Live board for the host — same shot log every player already
+        // sees (see components/games/TorchedPlayer.jsx's own comment:
+        // "every past shot shows for everyone regardless of whose turn
+        // it is, since the shot log itself is public"), rendered the
+        // same visual way that component already does. Deliberately
+        // does NOT reveal any marker's position before it's actually
+        // been hit — the host gets the same "fog of war" every player
+        // has, not a spoiler view. What the host gets that a player
+        // doesn't: seeing every cell at once regardless of elimination
+        // status, and the turn/alive-eliminated summary below the grid.
+        const gridSize = torchedState.gridSize;
+        const cells = Array.from({ length: gridSize }, (_, r) => Array.from({ length: gridSize }, (_, c) => [r, c]));
+        const shotAt = (r, c) => torchedState.shotsLog.find((s) => s.at[0] === r && s.at[1] === c);
+        const activeId = torchedState.turnOrder?.[torchedState.currentTurnIndex];
+        const alivePlayers = Object.entries(torchedState.markers).filter(([, m]) => m.alive).map(([id]) => id);
+        const eliminatedPlayers = Object.entries(torchedState.markers).filter(([, m]) => !m.alive).map(([id]) => id);
+        const byName = (id) => players.find((p) => p.id === id)?.display_name || "?";
+
+        return (
+          <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                🔥 Torched — live board
+              </div>
+              {torchedState.turnOrder && <Badge>{byName(activeId)}'s turn</Badge>}
+            </div>
+            {!torchedState.turnOrder ? (
+              <p style={{ fontSize: 12, color: "#f5f0ff", margin: "0 0 8px" }}>
+                {torchedState.placedIds.length} of {challenge.participantIds.length} players have placed their marker — grid isn't visible until shooting starts.
+              </p>
+            ) : (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridSize}, 1fr)`, gap: 3, maxWidth: 280, margin: "0 auto 10px" }}>
+                  {cells.flat().map(([r, c]) => {
+                    const shot = shotAt(r, c);
+                    let bg = "#150a28";
+                    let border = "#3d1f5c";
+                    let boxShadow = "none";
+                    if (shot?.hitPlayerId) {
+                      bg = "radial-gradient(circle at 50% 40%, #fff3c4, #ff9f4d 40%, #ff3860 75%)";
+                      border = "#ff3860";
+                      boxShadow = "0 0 8px rgba(255,56,96,0.7)";
+                    } else if (shot) {
+                      bg = "radial-gradient(circle at 50% 40%, rgba(107,79,153,0.55), rgba(107,79,153,0.2))";
+                      border = "#6b4f99";
+                    }
+                    return <div key={`${r}-${c}`} style={{ aspectRatio: "1", borderRadius: 3, background: bg, border: `1px solid ${border}`, boxShadow }} />;
+                  })}
+                </div>
+                <p style={{ fontSize: 10, color: "#6b4f99", margin: "0 0 8px", textAlign: "center" }}>🟣 a miss · 🔴 a hit — marker positions stay hidden until hit, same as every player sees</p>
+              </>
+            )}
+            <p style={{ fontSize: 11, color: "#f5f0ff", margin: 0 }}>
+              <strong style={{ color: "#00ff9d" }}>Alive:</strong> {alivePlayers.map(byName).join(", ") || "—"}
+              {eliminatedPlayers.length > 0 && <><br /><strong style={{ color: "#ff3860" }}>Eliminated:</strong> {eliminatedPlayers.map(byName).join(", ")}</>}
+            </p>
+          </div>
+        );
+      })()}
 
       {challenge?.gameType === "scavengerhunt" && challenge.active && scavengerState && !scavengerState.gameOver && (
         <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
