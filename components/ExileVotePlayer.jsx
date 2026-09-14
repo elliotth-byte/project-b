@@ -60,6 +60,7 @@ function NominationsRecap({ nominatorOrder, nominations, nominationReasons, byId
 export default function ExileVotePlayer({ gameId, player, round, players, readOnly = false, settings }) {
   const [exile, setExile] = useState(null);
   const [choice, setChoice] = useState("");
+  const [secondChoice, setSecondChoice] = useState("");
   const [reason, setReason] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [existing, setExisting] = useState(null);
@@ -70,6 +71,7 @@ export default function ExileVotePlayer({ gameId, player, round, players, readOn
   const byId = {};
   (players || []).forEach((p) => (byId[p.id] = p.display_name));
   const aphroditeBlockedId = aphroditeBlocksTargeting(players, settings, player?.id);
+  const isApollo = powerFor(player, settings) === "Apollo";
 
   useEffect(() => {
     const unsubscribe = subscribeGameState(gameId, KEY_EXILE, setExile);
@@ -128,9 +130,17 @@ export default function ExileVotePlayer({ gameId, player, round, players, readOn
     if (!choice || !reason.trim()) return;
     if (aphroditeBlocksTargeting(players, settings, player?.id) === choice) return; // same defense-in-depth pattern as the disabledIds check below
     const targetName = exile.nominees.find((n) => n.playerId === choice)?.name || "";
+    // Apollo's power (see lib/characterPowers.js's own expandVoteRows) —
+    // secondChoice is entirely optional ("MAY cast a second vote"), and
+    // can legitimately be the SAME nominee as choice (stacking both
+    // votes on one target) or a different one.
+    const secondTargetName = isApollo && secondChoice ? (exile.nominees.find((n) => n.playerId === secondChoice)?.name || "") : null;
     const res = await storageUpdate(gameId, votesKey, (fresh) => {
       const existingMap = fresh || {};
-      existingMap[player.id] = { targetId: choice, targetName, voterName: player.name, reason: reason.trim(), time: new Date().toLocaleTimeString() };
+      existingMap[player.id] = {
+        targetId: choice, targetName, voterName: player.name, reason: reason.trim(), time: new Date().toLocaleTimeString(),
+        ...(isApollo && secondChoice ? { secondTargetId: secondChoice, secondTargetName } : {}),
+      };
       return existingMap;
     });
     if (res.ok) {
@@ -139,7 +149,7 @@ export default function ExileVotePlayer({ gameId, player, round, players, readOn
     }
   };
 
-  const changeVote = () => { setSubmitted(false); setExisting(null); setChoice(existing?.targetId || ""); setReason(existing?.reason || ""); };
+  const changeVote = () => { setSubmitted(false); setExisting(null); setChoice(existing?.targetId || ""); setSecondChoice(existing?.secondTargetId || ""); setReason(existing?.reason || ""); };
 
   const nominationsRecap = (
     <NominationsRecap nominatorOrder={exile.fatesNominatorOrder} nominations={exile.fatesNominations} nominationReasons={exile.fatesNominationReasons} byId={byId} />
@@ -162,6 +172,9 @@ export default function ExileVotePlayer({ gameId, player, round, players, readOn
         <div style={{ fontSize: 12, letterSpacing: 4, textTransform: "uppercase", color: "#00ff9d", marginBottom: 6 }}>Vote Cast</div>
         <p style={{ color: "#f5f0ff", fontSize: 15, margin: "0 0 10px" }}>
           You voted to {verb} <strong style={{ color: "#ff3860" }}>{existing?.targetName}</strong>
+          {existing?.secondTargetId && (
+            <> and <strong style={{ color: "#ff3860" }}>{existing.secondTargetName}</strong> <span style={{ color: "#a68fd6", fontSize: 12, fontWeight: 400 }}>(Apollo's second vote)</span></>
+          )}
         </p>
         {existing?.reason && (
           <p style={{ color: "#a68fd6", fontSize: 12, fontStyle: "italic", margin: "0 0 14px", padding: "8px 12px", background: "#0d0618", borderRadius: 8 }}>
@@ -237,6 +250,28 @@ export default function ExileVotePlayer({ gameId, player, round, players, readOn
           disabledIds={aphroditeBlockedId ? [aphroditeBlockedId] : []}
         />
       </Card>
+      {isApollo && (
+        <Card style={{ marginBottom: 14, borderColor: "#f97316" }}>
+          <div style={{ textAlign: "center", marginBottom: 10 }}>
+            <div style={{ fontSize: 18, marginBottom: 2 }}>🏹</div>
+            <p style={{ color: "#f5f0ff", fontSize: 13, fontWeight: 700, margin: "0 0 2px" }}>Power of Amplification <span style={{ color: "#a68fd6", fontWeight: 400, fontSize: 11 }}>(Apollo)</span></p>
+            <p style={{ color: "#a68fd6", fontSize: 11.5, margin: 0 }}>Optional — cast a second vote, for this same nominee or a different one.</p>
+          </div>
+          <MemoryWall
+            candidates={exile.nominees.filter((n) => n.playerId !== player?.id)}
+            players={players}
+            selectedId={secondChoice}
+            onSelect={(id) => setSecondChoice(id === secondChoice ? "" : id)}
+            hideNameLabels={settings?.avatarMode === "collection" && settings?.avatarCollectionId === "default-gods"}
+            disabledIds={aphroditeBlockedId ? [aphroditeBlockedId] : []}
+          />
+          {secondChoice && (
+            <button onClick={() => setSecondChoice("")} style={{ display: "block", margin: "10px auto 0", background: "none", border: "none", color: "#6b4f99", fontSize: 11, cursor: "pointer", textDecoration: "underline" }}>
+              Clear second vote
+            </button>
+          )}
+        </Card>
+      )}
       <Card style={{ marginBottom: 18 }}>
         <label style={{ display: "block", fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
           Why? (required — shown when votes are revealed)

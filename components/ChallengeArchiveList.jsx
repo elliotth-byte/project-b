@@ -26,7 +26,7 @@ export default function ChallengeArchiveList({ gameId, archive, compact = false 
       {expanded && (
         <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
           {sorted.map((r) => (
-            <div key={r.id} style={{ background: "#0a1020", border: "1px solid #253550", borderRadius: 8, padding: 10 }}>
+            <div key={r.id} style={{ background: "#0a1020", border: "1px solid #253550", borderRadius: 8, padding: 10, minWidth: 0 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: "#f0e6d3" }}>
                   {r.challengeName}{r.round ? ` · Round ${r.round}` : ""}

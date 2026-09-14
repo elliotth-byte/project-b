@@ -62,7 +62,7 @@ export default function VotingHistorySpreadsheet({ exileHistory, finaleState, pl
   };
 
   return (
-    <Card>
+    <Card style={{ minWidth: 0 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, flexWrap: "wrap", gap: 8 }}>
         <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🗳 Voting History</h3>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

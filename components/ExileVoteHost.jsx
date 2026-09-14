@@ -4,7 +4,7 @@ import AutoFitText from "./AutoFitText";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_EXILE } from "../lib/gameState";
 import { computeEliminateOutcome, computeSaveOutcome, buildRevealOrder, tallySoFar } from "../lib/exileLogic";
-import { filterCancelledVote } from "../lib/characterPowers";
+import { filterCancelledVote, expandVoteRows } from "../lib/characterPowers";
 import { exileContext, subscribeChaosSecret } from "../lib/chaosSecrets";
 import { exileDrawContext, chaosPicksKey } from "../lib/chaosDraw";
 import CopyMessage from "./CopyMessage";
@@ -71,9 +71,13 @@ export default function ExileVoteHost({ gameId, players, round }) {
   const chaosHolder = players.find((p) => p.id === exile.chaosHolderId);
   const nullifiedId = chaosSecret?.nomineeId || null;
   const voteRows = filterCancelledVote(
-    Object.entries(votes).map(([voterId, v]) => ({ voterId, targetId: v.targetId, reason: v.reason })),
+    expandVoteRows(votes), // see lib/characterPowers.js's own comment — Apollo's second vote becomes a second row here, same as the player-facing and roundEngine.js paths
     exile.artemisCancelledVoterId
   );
+  // Distinct from voteRows.length below — a voter count needs to count
+  // PEOPLE, and Apollo casting both of his votes is still only one
+  // person having voted, even though it's now two rows once expanded.
+  const votedVoterIds = new Set(Object.keys(votes || {}));
   const nomineeIds = exile.nominees.map((n) => n.playerId);
   const byId = {};
   exile.nominees.forEach((n) => (byId[n.playerId] = n.name));
@@ -193,7 +197,7 @@ export default function ExileVoteHost({ gameId, players, round }) {
 
       <div style={{ marginTop: 12, marginBottom: 12 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>
-          Votes: {voteRows.length}/{alive.length} in
+          Votes: {votedVoterIds.size}/{alive.length} in
         </div>
         <div style={{ fontSize: 10, color: "#6b4f99", marginBottom: 8 }}>🃏 next to a name shows their Favor of the Fates draw status — green = won it, red = picked but didn't win, gray = hasn't picked yet.</div>
         <div style={{ display: "grid", gap: 6 }}>

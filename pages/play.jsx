@@ -870,10 +870,14 @@ export default function PlayPage() {
                   </>
                 )}
                 {round?.phase === PHASES.FATES && (
-                  <ChallengeErrorBoundary label="Fates Ceremony"><FatesPlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} settings={settings} /></ChallengeErrorBoundary>
+                  <>
+                    <ChallengeErrorBoundary label="Hephaestus's Choice"><HephaestusChoice gameId={gameId} round={round} player={player} settings={settings} /></ChallengeErrorBoundary>
+                    <ChallengeErrorBoundary label="Fates Ceremony"><FatesPlayer gameId={gameId} player={player} players={identityAllPlayers} round={round} settings={settings} /></ChallengeErrorBoundary>
+                  </>
                 )}
                 {round?.phase === PHASES.EXILE && !exiled && (
                   <ChallengeErrorBoundary label="Exile Vote">
+                    <ChallengeErrorBoundary label="Hephaestus's Choice"><HephaestusChoice gameId={gameId} round={round} player={player} settings={settings} /></ChallengeErrorBoundary>
                     <ChaosPowerPlayer gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
                     <AthenaTrigger gameId={gameId} round={round} player={player} settings={settings} />
                     <HermesReveal gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />

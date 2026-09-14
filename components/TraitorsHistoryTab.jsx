@@ -69,7 +69,7 @@ export default function HistoryTab({ gameId, players, tr, challengeArchive = [] 
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <Card>
+      <Card style={{ minWidth: 0 }}>
         <h3 style={{ color: "#f0e6d3", margin: "0 0 4px", fontSize: 14, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>Game Matrix</h3>
         <p style={{ color: "#706050", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
           Players × Rounds — the same spreadsheet format from the original artifact. Scroll horizontally for all rounds.
@@ -166,7 +166,7 @@ export default function HistoryTab({ gameId, players, tr, challengeArchive = [] 
         )}
       </Card>
 
-      <Card>
+      <Card style={{ minWidth: 0 }}>
         <h3 style={{ color: "#f0e6d3", margin: "0 0 14px", fontSize: 14, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>Elimination Order</h3>
         {eliminations.length === 0 ? (
           <p style={{ color: "#706050", fontSize: 13, fontStyle: "italic" }}>No eliminations yet.</p>
