@@ -4,6 +4,7 @@ import { storageSet, storageUpdate, subscribeGameState } from "../lib/gameStorag
 import { KEY_CHALLENGE, KEY_ROUND, KEY_CHALLENGE_HISTORY, KEY_EXILE_HISTORY } from "../lib/gameState";
 import { placementsComplete } from "../lib/challengeLogic";
 import { GAME_REGISTRY, gameConfigWithDefaults } from "../lib/challengeGames";
+import { supabase } from "../lib/supabaseClient";
 import { subscribeScores, scoresToPlacements, resetPlayerAttempt, overridePlayerScore } from "../lib/challengeScores";
 import { subscribeReentry, getReentry } from "../lib/reentryData";
 import { REENTRY_STATUS } from "../lib/reentryLogic";
@@ -279,6 +280,31 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
       participantIds, reentryEligibleIds, reentryDecisions: {}, reentryAttemptIds: [], placements: [], finalized: false,
       gameType, gameConfig: gameConfigWithDefaults(gameType, configOverrides),
     });
+    // Same battle-start notification as lib/roundEngine.js's own
+    // autoStartRandomChallenge now sends (see that function's own
+    // comment on why this was genuinely missing before) — this is the
+    // manual, host-triggered path, so it's a client-side call to the
+    // existing push API route rather than the direct in-process
+    // notifyRoundChange helper that file uses (that helper runs
+    // server-side and isn't reachable from here). Best-effort and
+    // fire-and-forget — a notification failing here should never block
+    // the host from actually starting the challenge, which already
+    // succeeded via the storageSet above.
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (token) {
+        await fetch("/api/push/notify-round-change", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            gameId, title: `⚔️ ${GAME_REGISTRY[gameType]?.label || gameType} Has Started`, body: "The Battle is live — go compete!",
+          }),
+        });
+      }
+    } catch (e) {
+      console.error("Battle-start push notify failed:", e);
+    }
     if (gameType === "plinko") {
       await initPlinkoBracket(gameId, round.round, participants, now);
     }

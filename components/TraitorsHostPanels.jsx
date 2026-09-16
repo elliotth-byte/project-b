@@ -18,6 +18,9 @@ import MissionsHost from "./MissionsHost";
 import ScheduledPostsList from "./ScheduledPostsList";
 import ChallengeErrorBoundary from "./ChallengeErrorBoundary";
 import TraitorRolesHost from "./TraitorRolesHost";
+import TraitorsMasqueradeGate from "./TraitorsMasqueradeGate";
+import TraitorsToday from "./TraitorsToday";
+import TraitorsWorkDayGate from "./TraitorsWorkDayGate";
 import MurderVoteHost from "./MurderVoteHost";
 import AdminHost from "./TraitorsAdminHost";
 import HistoryTab from "./TraitorsHistoryTab";
@@ -37,6 +40,7 @@ import CoffinHost from "./CoffinHost";
 import IcebreakerHost from "./IcebreakerHost";
 
 const BASE_TABS = [
+  { key: "today", label: "📅 Today" },
   { key: "traitor", label: "🎭 Traitor Roles" },
   { key: "votes", label: "⚖️ Roundtable" },
   { key: "missions", label: "🎯 Missions" },
@@ -154,16 +158,28 @@ export default function HostPanels({ gameId, players, adminExtra }) {
         ))}
       </div>
 
+      {tab === "today" && (
+        <TraitorsToday
+          gameId={gameId} aliveMapped={aliveMapped} allMapped={allMapped} participantProps={participantProps}
+          approvedPlayers={approvedPlayers} tr={tr} settings={settings}
+        />
+      )}
+
       {tab === "traitor" && (
         <div style={{ display: "grid", gap: 16 }}>
+          <ChallengeErrorBoundary label="Masquerade Pre-Elimination"><TraitorsMasqueradeGate gameId={gameId} alive={aliveMapped} allPlayers={allMapped} /></ChallengeErrorBoundary>
           <ChallengeErrorBoundary label="Traitor Roles"><TraitorRolesHost gameId={gameId} players={approvedPlayers} /></ChallengeErrorBoundary>
-          <ChallengeErrorBoundary label="Murder Vote"><MurderVoteHost gameId={gameId} players={approvedPlayers} tr={tr} /></ChallengeErrorBoundary>
+          <TraitorsWorkDayGate gameId={gameId}>
+            <ChallengeErrorBoundary label="Murder Vote"><MurderVoteHost gameId={gameId} players={approvedPlayers} tr={tr} /></ChallengeErrorBoundary>
+          </TraitorsWorkDayGate>
         </div>
       )}
 
       {tab === "votes" && (
         <div style={{ display: "grid", gap: 16 }}>
-          <ChallengeErrorBoundary label="Roundtable"><RoundtableHost gameId={gameId} players={approvedPlayers} settings={settings} /></ChallengeErrorBoundary>
+          <TraitorsWorkDayGate gameId={gameId}>
+            <ChallengeErrorBoundary label="Roundtable"><RoundtableHost gameId={gameId} players={approvedPlayers} settings={settings} /></ChallengeErrorBoundary>
+          </TraitorsWorkDayGate>
         </div>
       )}
 
@@ -188,6 +204,7 @@ export default function HostPanels({ gameId, players, adminExtra }) {
               picker option. globallyDisabled === null (not loaded yet)
               intentionally renders everything, same as ChallengeHost's
               own "don't risk gating on a still-loading list" reasoning. */}
+          <TraitorsWorkDayGate gameId={gameId}>
           {!globallyDisabled?.includes(STORAGE_KEY_WORDS) && (
             <ChallengeErrorBoundary label="Word Scramble"><WordHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
           )}
@@ -221,6 +238,7 @@ export default function HostPanels({ gameId, players, adminExtra }) {
           {!globallyDisabled?.includes(STORAGE_KEY_ICEBREAKER) && (
             <ChallengeErrorBoundary label="Icebreaker"><IcebreakerHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
           )}
+          </TraitorsWorkDayGate>
         </div>
       )}
 

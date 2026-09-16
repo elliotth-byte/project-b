@@ -23,6 +23,8 @@ import { STORAGE_KEY_PANDORA } from "../lib/pandoraData";
 import { STORAGE_KEY_ROUND_INFO, VOTES_KEY_PREFIX, STORAGE_KEY_VOTE_HISTORY } from "../lib/roundtableData";
 import { STORAGE_KEY_CHALLENGE_HISTORY } from "../lib/challengeHistory";
 import { STORAGE_KEY_TRAITOR_ROLES } from "../lib/traitorData";
+import TraitorsScheduleBuilder from "./TraitorsScheduleBuilder";
+import TraitorsWorkDayToggle from "./TraitorsWorkDayToggle";
 
 // All 12 "mission"/"challenge" keys — this is the one place that list
 // needs to be kept in sync when a new mini-game gets added.
@@ -232,6 +234,8 @@ export default function AdminHost({ gameId, players }) {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
+      <TraitorsScheduleBuilder gameId={gameId} />
+      <TraitorsWorkDayToggle gameId={gameId} />
       <Card style={{ borderColor: unreadFeedbackCount > 0 ? "#c9a84c" : undefined }}>
         <div
           onClick={() => setShowFeedback((v) => !v)}

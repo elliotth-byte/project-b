@@ -113,6 +113,8 @@ export default function HelpPanel({ gameId, player, onReplayTour, readOnly = fal
 
       <p style={{ fontSize: 10, color: "#3d1f5c", textAlign: "center", margin: 0 }}>
         <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: "#6b4f99" }}>Terms & Community Guidelines</a>
+        {" · "}
+        <a href="/patch-notes" target="_blank" rel="noopener noreferrer" style={{ color: "#6b4f99" }}>What's New</a>
       </p>
     </div>
   );

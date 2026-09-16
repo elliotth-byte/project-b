@@ -215,6 +215,11 @@ export default function ExileVoteHost({ gameId, players, round }) {
                 {exile.nominees.map((n) => <option key={n.playerId} value={n.playerId}>{n.name}</option>)}
               </select>
               {votes[voter.id]?.reason && <span style={{ fontSize: 10, color: "#6b4f99" }} title={votes[voter.id].reason}>💬</span>}
+              {votes[voter.id]?.secondTargetId && (
+                <span style={{ fontSize: 10, color: "#f97316", whiteSpace: "nowrap" }} title="Apollo's second vote (Power of Amplification)">
+                  🏹 +{byId[votes[voter.id].secondTargetId] || "?"}
+                </span>
+              )}
               <ChaosStatusBadge holderId={exile.chaosHolderId} playerId={voter.id} drawPicks={drawPicks} />
             </div>
           ))}

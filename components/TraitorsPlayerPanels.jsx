@@ -9,6 +9,7 @@ import {
   STORAGE_KEY_MAZE3D, STORAGE_KEY_COFFIN, STORAGE_KEY_ICEBREAKER,
 } from "../lib/traitorsMiniGames";
 import ChallengeErrorBoundary from "./ChallengeErrorBoundary";
+import TraitorsWorkDayGate from "./TraitorsWorkDayGate";
 import WordPlayer from "./WordPlayer";
 import RoundtableVoter from "./RoundtableVoter";
 import CasinoPlayer from "./CasinoPlayer";
@@ -97,7 +98,7 @@ export default function PlayerPanels({ gameId, player, players, settings }) {
       </div>
 
       {tab === "challenge" && (
-        <>
+        <TraitorsWorkDayGate gameId={gameId}>
           {!globallyDisabled?.includes(STORAGE_KEY_WORDS) && (
             <ChallengeErrorBoundary label="Word Scramble"><WordPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
           )}
@@ -131,16 +132,16 @@ export default function PlayerPanels({ gameId, player, players, settings }) {
           {!globallyDisabled?.includes(STORAGE_KEY_ICEBREAKER) && (
             <ChallengeErrorBoundary label="Icebreaker"><IcebreakerPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
           )}
-        </>
+        </TraitorsWorkDayGate>
       )}
 
       {tab === "vote" && (
-        <>
+        <TraitorsWorkDayGate gameId={gameId}>
           {["traitor-red", "traitor-black"].includes(myRole) && (
             <ChallengeErrorBoundary label="Murder Vote"><MurderVotePlayer gameId={gameId} playerName={player.name} myRole={myRole} /></ChallengeErrorBoundary>
           )}
           <ChallengeErrorBoundary label="Roundtable"><RoundtableVoter gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
-        </>
+        </TraitorsWorkDayGate>
       )}
 
       {tab === "confessional" && (

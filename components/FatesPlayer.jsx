@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, Badge, Btn } from "./ui";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_FATES, KEY_CHALLENGE } from "../lib/gameState";
 import { isValidNomination, takenNomineeIds, isNominatorsTurn, preferenceSlotsFor } from "../lib/fatesLogic";
 import { aphroditeBlocksTargeting, findAresImmunePlayerId } from "../lib/characterPowers";
+import { requestAdvance } from "../lib/advanceNow";
 import MemoryWall from "./MemoryWall";
 
 // Shared live-status list — who's nominating, who's already submitted
@@ -45,6 +46,7 @@ export default function FatesPlayer({ gameId, player, players, round, readOnly =
   const [challenge, setChallenge] = useState(null);
   const [choice, setChoice] = useState("");
   const [reason, setReason] = useState("");
+  const [resolveTimedOut, setResolveTimedOut] = useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeGameState(gameId, KEY_FATES, setFates);
@@ -55,6 +57,48 @@ export default function FatesPlayer({ gameId, player, players, round, readOnly =
     const unsubscribe = subscribeGameState(gameId, KEY_CHALLENGE, setChallenge);
     return unsubscribe;
   }, [gameId, round?.round]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The moment it becomes this player's turn, if they'd already
+  // pre-ranked preferences (see FatesPreferenceForm above), the server
+  // is SUPPOSED to auto-resolve their nomination from that ranking
+  // (lib/roundEngine.js's resolveFatesPreferences) rather than making
+  // them submit again live — but that resolution only actually runs
+  // as part of the shared background poll (see lib/useRoundWatcher.js),
+  // which ticks every 10 seconds. Without this, a player whose turn
+  // just arrived could see the live manual-pick form for up to that
+  // entire 10 seconds before their own pre-ranked choice would have
+  // gone through on its own — long enough that submitting manually
+  // anyway is the obviously reasonable thing to do, which is exactly
+  // what a real report of "I ranked my top 3 and STILL had to submit a
+  // nominee" describes. requestAdvance(gameId) with no force flag
+  // triggers the exact same resolution immediately, from any
+  // authenticated player, not just the host — this just asks for it
+  // the instant it's actually needed instead of waiting on someone
+  // else's poll tick to eventually get around to it. Guarded to fire
+  // only once per mount (not on every fates update) since it only
+  // ever needs to happen the one time turn changes hands.
+  const preferenceAdvanceRequestedRef = useRef(false);
+  useEffect(() => {
+    if (readOnly || !fates || !player?.id || preferenceAdvanceRequestedRef.current) return;
+    const myEntry = fates.nominatorOrder?.find((n) => n.playerId === player.id);
+    if (!myEntry) return;
+    const alreadyNominated = !!fates.nominations?.[player.id];
+    if (alreadyNominated) return;
+    const myTurn = isNominatorsTurn(fates.nominatorOrder, fates.nominations, player.id);
+    const myPreferences = fates.preferences?.[player.id] || [];
+    if (myTurn && myPreferences.length > 0) {
+      preferenceAdvanceRequestedRef.current = true;
+      requestAdvance(gameId); // fire-and-forget — the live subscription above already re-renders once this resolves, nothing here needs to react to the response directly
+      // Safety net for the honest "nothing left to auto-resolve" case
+      // (see the "Resolving..." message's own comment below) — 5
+      // seconds is comfortably more than a single requestAdvance
+      // round-trip normally takes, while still short enough that a
+      // player whose preferences genuinely can't resolve isn't left
+      // staring at a status message for long before getting the real
+      // manual-pick form.
+      setTimeout(() => setResolveTimedOut(true), 5000);
+    }
+  }, [fates, player?.id, readOnly, gameId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (round?.phase !== "fates" || !fates) return null;
 
@@ -141,6 +185,34 @@ export default function FatesPlayer({ gameId, player, players, round, readOnly =
         fates={fates} myEntry={myEntry} mySlots={mySlots} myPreferences={myPreferences}
         winnerId={winnerId} aphroditeBlockedId={aphroditeBlockedId} aresImmuneId={aresImmuneId}
       />
+    );
+  }
+
+  // It's their turn, and they'd already ranked preferences — the
+  // useEffect above just asked the server to resolve it immediately
+  // rather than waiting on the next background poll. This brief window
+  // (normally well under a second) shows a status message instead of
+  // the live manual-pick form below, specifically so a fast-clicking
+  // player never sees (and re-does) a pick their own pre-ranked choice
+  // was already about to make for them.
+  //
+  // Falls through to the manual form after a short timeout regardless
+  // of myPreferences.length — deliberately not gated on the
+  // resolution actually succeeding, because it might genuinely never
+  // succeed: if every one of their ranked choices has since been taken
+  // by an earlier nominator, lib/roundEngine.js's own
+  // resolveFatesPreferences correctly gives up and leaves this
+  // player's nomination unset rather than picking something they
+  // never ranked. Without this timeout, that honest "nothing left to
+  // auto-resolve" case would otherwise leave this message showing
+  // forever with no way for the player to ever actually nominate.
+  if (myTurn && myPreferences.length > 0 && !resolveTimedOut) {
+    return (
+      <Card style={{ marginBottom: 20, textAlign: "center" }}>
+        <p style={{ color: "#a68fd6", fontSize: 13, fontStyle: "italic", margin: 0 }}>
+          Resolving your nomination from your pre-ranked choices...
+        </p>
+      </Card>
     );
   }
 
