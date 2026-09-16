@@ -4,6 +4,8 @@ import { storageSet, storageUpdate, subscribeGameState } from "../lib/gameStorag
 import { KEY_CHALLENGE, KEY_ROUND, KEY_CHALLENGE_HISTORY, KEY_EXILE_HISTORY } from "../lib/gameState";
 import { placementsComplete } from "../lib/challengeLogic";
 import { GAME_REGISTRY, gameConfigWithDefaults } from "../lib/challengeGames";
+import { presetIncompleteGameTypes } from "../lib/presetReadiness";
+import { bigScreenOnlyGameTypesToExclude } from "../lib/bigScreenOnlyGames";
 import { supabase } from "../lib/supabaseClient";
 import { subscribeScores, scoresToPlacements, resetPlayerAttempt, overridePlayerScore } from "../lib/challengeScores";
 import { subscribeReentry, getReentry } from "../lib/reentryData";
@@ -13,6 +15,7 @@ import { DEFAULT_PARTICIPATION, computeParticipants } from "../lib/challengePart
 import { initPlinkoBracket, subscribePlinkoBracket } from "../lib/games/plinkoBracketData";
 import { initPit } from "../lib/games/pitData";
 import { initMasquerade } from "../lib/games/masqueradeData";
+import { initWordScrambleTv } from "../lib/games/wordScrambleTvData";
 import { initCloseToTwenty } from "../lib/games/closeToTwentyData";
 import { initTorched, subscribeTorched } from "../lib/games/torchedData";
 import { initChains, subscribeChains } from "../lib/games/chainsData";
@@ -45,6 +48,7 @@ const MAZE_TYPES = ["maze2d", "mazeinvisible", "mazetrivia", "labyrinth"]; // al
 // removed outright, since any past challenge that already used it needs
 // to keep displaying correctly in history.
 export default function ChallengeHost({ gameId, players, round, settings }) {
+  const extraDisabledTypes = [...presetIncompleteGameTypes(players), ...bigScreenOnlyGameTypesToExclude(settings)];
   const [challenge, setChallenge] = useState(null);
   const [scores, setScores] = useState({});
   const [reentry, setReentry] = useState([]);
@@ -179,7 +183,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   // shown as a choice.
   useEffect(() => {
     if (globallyDisabled === null) return;
-    const disabledTypes = [...(settings?.disabledChallenges || []), ...globallyDisabled];
+    const disabledTypes = [...(settings?.disabledChallenges || []), ...globallyDisabled, ...extraDisabledTypes];
     const stockMarketBlocked = gameType === "stockmarket" && !canRunStockMarketChallenge(Date.now(), settings?.challengeDurationSec || 900);
     const triviaBlocked = gameType === "seasontrivia" && !hasEnoughTriviaHistory(challengeHistory, exileHistory);
     const timelineBlocked = gameType === "timeline" && !hasEnoughTimelineHistory(challengeHistory, exileHistory);
@@ -192,7 +196,7 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   }, [globallyDisabled, settings?.disabledChallenges, settings?.challengeDurationSec, gameType, challengeHistory, exileHistory]);
   useEffect(() => {
     if (settings?.challengeSelectionMode !== "random" || hephaestusPlayer || !round?.round || challenge?.active || randomPickState || globallyDisabled === null) return;
-    const disabledTypes = [...(settings?.disabledChallenges || []), ...globallyDisabled];
+    const disabledTypes = [...(settings?.disabledChallenges || []), ...globallyDisabled, ...extraDisabledTypes];
     storageUpdate(gameId, randomPickKey(round.round), (fresh) => (fresh ? fresh : { gameType: pickRandomChallenge(challengeHistory, disabledTypes, Date.now(), settings?.challengeDurationSec, exileHistory) }));
   }, [settings?.challengeSelectionMode, settings?.disabledChallenges, hephaestusPlayer, round?.round, challenge?.active, randomPickState, globallyDisabled, gameId, challengeHistory, exileHistory]);
 
@@ -313,6 +317,9 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     }
     if (gameType === "masquerade") {
       await initMasquerade(gameId, round.round, participants, now);
+    }
+    if (gameType === "wordscrambletv") {
+      await initWordScrambleTv(gameId, round.round, participants, now);
     }
     if (gameType === "closeto20") {
       await initCloseToTwenty(gameId, round.round, participants, now);
@@ -468,6 +475,21 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
               // yet for either to be a fair (or even possible) battle.
               if (key === "seasontrivia" && !hasEnoughTriviaHistory(challengeHistory, exileHistory)) return false;
               if (key === "timeline" && !hasEnoughTimelineHistory(challengeHistory, exileHistory)) return false;
+              // extraDisabledTypes covers two genuinely different
+              // reasons a game type might need filtering here, merged
+              // into one list since both just mean "don't offer this
+              // right now": Torched and The Floor both have a preset a
+              // player sets ahead of time from their own Options tab
+              // (torched_preset, floor_specialty — see
+              // lib/presetReadiness.js and components/OptionsPanel.jsx)
+              // — offering one before everyone's actually set theirs
+              // just forces whoever hasn't into a live, on-the-spot
+              // setup the whole rest of the room is sitting around
+              // waiting on. Separately, some game types (see
+              // lib/bigScreenOnlyGames.js) only work at all with a
+              // shared TV display — those stay filtered out unless
+              // settings.bigScreenMode is actually on for this season.
+              if (extraDisabledTypes.includes(key)) return false;
               return true;
             }).map(([key, g]) => (
               <button key={key} onClick={() => pickGameType(key)} style={{

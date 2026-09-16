@@ -35,6 +35,7 @@ import PlayerMemoryWall from "../components/PlayerMemoryWall";
 import FeedbackButton from "../components/FeedbackButton";
 import PlayerPowerModal from "../components/PlayerPowerModal";
 import OnboardingChecklist from "../components/OnboardingChecklist";
+import PresetChecklist from "../components/PresetChecklist";
 import { markOnboardingProfileViewed, onboardingComplete } from "../lib/onboarding";
 import { GAME_REGISTRY } from "../lib/challengeGames";
 import AphroditePicker from "../components/AphroditePicker";
@@ -48,6 +49,7 @@ import JuryPreferencePanel from "../components/JuryPreferencePanel";
 import OnboardingPreferences from "../components/OnboardingPreferences";
 import { powerFor } from "../lib/characterPowers";
 import RoundRevealGate from "../components/RoundRevealGate";
+import BigScreenRevealPrompt from "../components/BigScreenRevealPrompt";
 import HomeLink from "../components/HomeLink";
 import LogoutButton from "../components/LogoutButton";
 import ChallengeErrorBoundary from "../components/ChallengeErrorBoundary";
@@ -678,6 +680,10 @@ export default function PlayPage() {
         <OnboardingChecklist player={myPlayer} onOpenProfile={() => setShowMyProfile(true)} />
       )}
 
+      {!isTraitors && !isStereoTypes && approved && myPlayer?.alive && !gameEnded && (
+        <PresetChecklist player={myPlayer} round={round} onOpenOptions={() => setTab("options")} />
+      )}
+
       <div style={{ maxWidth: 400, width: "100%", margin: "0 auto" }}>
         {gameInfo && (
           <div style={{ textAlign: "center", marginBottom: 14 }}>
@@ -782,7 +788,11 @@ export default function PlayPage() {
 
         {pendingReveal && (
           <ChallengeErrorBoundary label="Round Reveal">
-            <RoundRevealGate gameId={gameId} player={player} players={identityAllPlayers} entry={latestExileEntry} />
+            {settings?.bigScreenMode ? (
+              <BigScreenRevealPrompt gameId={gameId} player={player} entry={latestExileEntry} />
+            ) : (
+              <RoundRevealGate gameId={gameId} player={player} players={identityAllPlayers} entry={latestExileEntry} />
+            )}
           </ChallengeErrorBoundary>
         )}
 

@@ -696,6 +696,12 @@ export default function AdminHost({ gameId, players, round }) {
                 suddenly show up mid-season for a game already underway; you can safely leave it off for an existing season and only turn
                 it on for a fresh one. DMs are readable by you, same as confessionals — players see a note saying so.
               </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#a68fd6", cursor: "pointer" }}>
+                <input type="checkbox" checked={settings.bigScreenMode} onChange={(e) => saveSettings({ bigScreenMode: e.target.checked })} />
+                📺 Big Screen Mode — everyone's playing together in the same room, Jackbox-style, with ceremonies and battle visuals
+                shown on a shared TV instead of individual phones. Opens a new "📺 Big Screen" button here in the console for the TV
+                itself. Set this once at season creation — there's no clean way to switch a season over partway through.
+              </label>
               <label style={{
                 display: "flex", alignItems: "center", gap: 6, fontSize: 12.5,
                 color: seasonStarted ? "#3d1f5c" : "#a68fd6", cursor: seasonStarted ? "not-allowed" : "pointer",
