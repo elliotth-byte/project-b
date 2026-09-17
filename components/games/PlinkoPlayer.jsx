@@ -70,6 +70,23 @@ export default function PlinkoPlayer({ gameId, round, challenge, player, players
     setLastResult(null);
   }, [duelKey]);
 
+  // Covers the exact refresh-mid-duel scenario the guard above defends
+  // against: if this player already has a score recorded for the
+  // CURRENT duel (duelScores keyed by playerId, reset to {} only when a
+  // new duel actually starts — see plinkoBracketData.js), their local
+  // drop count needs to reflect that immediately rather than starting
+  // this component fresh at 3 drops again, which would let them see
+  // (and attempt) a drop UI that can no longer actually count for
+  // anything once the guard above refuses the write.
+  useEffect(() => {
+    if (!bracket?.current?.includes(player.id)) return;
+    const existing = bracket.duelScores[player.id];
+    if (existing != null) {
+      setDropsLeft(0);
+      setMyDuelTotal(existing);
+    }
+  }, [duelKey, bracket?.duelScores, player.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const byName = (id) => players?.find((p) => p.id === id)?.display_name || "?";
 
   const iAmDueling = bracket?.current?.includes(player.id);
@@ -215,7 +232,19 @@ export default function PlinkoPlayer({ gameId, round, challenge, player, players
           const next = s + won;
           const remaining = dropsLeft - 1;
           if (remaining <= 0) {
-            storageUpdate(gameId, `pb:plinko-bracket:${round.round}`, (fresh) => (fresh ? { ...fresh, duelScores: { ...fresh.duelScores, [player.id]: next } } : fresh));
+            // Guarded against overwriting an already-submitted score for
+            // this player in THIS duel — without this, refreshing the
+            // page mid-duel resets dropsLeft/myDuelTotal (both pure
+            // local React state) back to a fresh 3 drops, and a low
+            // score already written here could simply be overwritten by
+            // trying again as many times as it takes to land a better
+            // one. Keyed off duelScores already having an entry, not
+            // off local state, since local state is exactly what a
+            // refresh resets.
+            storageUpdate(gameId, `pb:plinko-bracket:${round.round}`, (fresh) => {
+              if (!fresh || fresh.duelScores[player.id] != null) return fresh;
+              return { ...fresh, duelScores: { ...fresh.duelScores, [player.id]: next } };
+            });
           }
           return next;
         });

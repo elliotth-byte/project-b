@@ -74,9 +74,18 @@ export default async function handler(req, res) {
     // components/ChatPanel.jsx's own MessageBubble already shows for
     // the exact same flag.
     const title = isFinalWords ? `🎤 ${senderName}'s Final Words` : `💬 ${senderName}`;
+    // aliveOnly: true — an eliminated/exiled player shouldn't keep
+    // getting pinged for every single group chat message the way
+    // someone still actively in the game does; this is what the
+    // reported bug actually was (sendPushToGame's own query had no
+    // filter against players.alive at all, so everyone with the
+    // preference on got notified regardless of whether they were still
+    // in the game). Scoped to group chat specifically — see
+    // lib/sendPush.js's own comment on why this isn't the default for
+    // every caller of that function.
     await sendPushToGame(gameId, {
       title, body: preview, url: `/play?game=${gameId}`, tag: "chat-group",
-      filterColumn: "notify_public_messages", excludePlayerId: senderId,
+      filterColumn: "notify_public_messages", excludePlayerId: senderId, aliveOnly: true,
     });
     // Native (wrapped app) delivery alongside Web Push, not instead of
     // it — see lib/sendNativePush.js's own header comment on why these
@@ -84,7 +93,7 @@ export default async function handler(req, res) {
     // the request itself says.
     await sendNativePushToGame(gameId, {
       title, body: preview, url: `/play?game=${gameId}`, tag: "chat-group",
-      filterColumn: "notify_public_messages", excludePlayerId: senderId,
+      filterColumn: "notify_public_messages", excludePlayerId: senderId, aliveOnly: true,
     });
     await sendPushToHosts(gameId, {
       title: `${isFinalWords ? "🎤" : "💬"} ${senderName} ${isFinalWords ? "(Final Words)" : groupChatLabel(gameRow?.game_type)}`, body: preview, url: `/host?game=${gameId}`, tag: "chat-group",
