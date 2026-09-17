@@ -6,6 +6,9 @@ import { subscribeRound, subscribeSettings, KEY_EXILE_HISTORY, KEY_CHALLENGE } f
 import { subscribeGameState } from "../lib/gameStorage";
 import ExileRevealTV from "../components/bigscreen/ExileRevealTV";
 import WordScrambleTvDisplay from "../components/bigscreen/WordScrambleTvDisplay";
+import SimonTvDisplay from "../components/bigscreen/SimonTvDisplay";
+import MusicalChairsTvDisplay from "../components/bigscreen/MusicalChairsTvDisplay";
+import ArtAuctionTvDisplay from "../components/bigscreen/ArtAuctionTvDisplay";
 
 // ============================================================
 // Battle TV components — each one keyed by gameType, rendered only
@@ -19,6 +22,14 @@ import WordScrambleTvDisplay from "../components/bigscreen/WordScrambleTvDisplay
 // ============================================================
 const BATTLE_TV_COMPONENTS = {
   wordscrambletv: WordScrambleTvDisplay,
+  simontv: SimonTvDisplay,
+  musicalchairstv: MusicalChairsTvDisplay,
+  // Not a Big-Screen-exclusive game type like the three above — see
+  // components/bigscreen/ArtAuctionTvDisplay.jsx's own header comment.
+  // The regular artauction game type already works fully normally
+  // without Big Screen Mode; this just gives it a real TV view when
+  // one's available, on top of what it already does.
+  artauction: ArtAuctionTvDisplay,
 };
 
 // ============================================================
@@ -185,7 +196,7 @@ export default function DisplayPage() {
       </div>
 
       {BattleComponent ? (
-        <BattleComponent gameId={gameId} round={round} players={players} />
+        <BattleComponent gameId={gameId} round={round} players={players} settings={settings} />
       ) : exileRevealActive ? (
         <ExileRevealTV gameId={gameId} players={players} entry={latestExileEntry} />
       ) : (

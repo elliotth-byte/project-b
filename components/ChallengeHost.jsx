@@ -16,6 +16,8 @@ import { initPlinkoBracket, subscribePlinkoBracket } from "../lib/games/plinkoBr
 import { initPit } from "../lib/games/pitData";
 import { initMasquerade } from "../lib/games/masqueradeData";
 import { initWordScrambleTv } from "../lib/games/wordScrambleTvData";
+import { initSimonTv } from "../lib/games/simonTvData";
+import { initMusicalChairsTv } from "../lib/games/musicalChairsTvData";
 import { initCloseToTwenty } from "../lib/games/closeToTwentyData";
 import { initTorched, subscribeTorched } from "../lib/games/torchedData";
 import { initChains, subscribeChains } from "../lib/games/chainsData";
@@ -320,6 +322,12 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     }
     if (gameType === "wordscrambletv") {
       await initWordScrambleTv(gameId, round.round, participants, now);
+    }
+    if (gameType === "simontv") {
+      await initSimonTv(gameId, round.round, participants, now);
+    }
+    if (gameType === "musicalchairstv") {
+      await initMusicalChairsTv(gameId, round.round, participants, now);
     }
     if (gameType === "closeto20") {
       await initCloseToTwenty(gameId, round.round, participants, now);
