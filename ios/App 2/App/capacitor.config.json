@@ -1,0 +1,17 @@
+{
+	"appId": "com.panopticon.app",
+	"appName": "Panopticon",
+	"webDir": "public",
+	"server": {
+		"url": "https://project-b-pink.vercel.app",
+		"cleartext": false
+	},
+	"ios": {
+		"contentInset": "never",
+		"backgroundColor": "#05010f"
+	},
+	"android": {
+		"backgroundColor": "#05010f"
+	},
+	"packageClassList": []
+}

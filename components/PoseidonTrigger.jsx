@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Card, Btn } from "./ui";
 import { supabase } from "../lib/supabaseClient";
+import { sendGroupMessage } from "../lib/chatData";
 
 // ─── Poseidon's character power (see lib/characterPowers.js) ───
 // "Once per game, choose a Fates Ceremony and Exile Vote that must
@@ -12,7 +13,7 @@ import { supabase } from "../lib/supabaseClient";
 // AND Exile phases get DMs blocked (see ChatPanel.jsx's
 // isPoseidonDmBlockActive), regardless of which of the two is actually
 // active the moment this gets triggered.
-export default function PoseidonTrigger({ player, round }) {
+export default function PoseidonTrigger({ player, round, gameId }) {
   const [confirming, setConfirming] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -39,6 +40,10 @@ export default function PoseidonTrigger({ player, round }) {
     setSaving(false);
     if (dbError) { setError("Couldn't save: " + dbError.message); return; }
     setConfirming(false);
+    // Same first-person, player-attributed announcement pattern
+    // AresTarget.jsx and AphroditePicker.jsx already use for their own
+    // powers.
+    await sendGroupMessage(gameId, player.id, player.name, `🌊 I've turned off DMs for this round's Fates Ceremony and Exile Vote.`, player.name);
   };
 
   return (

@@ -18,6 +18,8 @@ import { initMasquerade } from "../lib/games/masqueradeData";
 import { initWordScrambleTv } from "../lib/games/wordScrambleTvData";
 import { initSimonTv } from "../lib/games/simonTvData";
 import { initMusicalChairsTv } from "../lib/games/musicalChairsTvData";
+import { initEyesInTheSystem } from "../lib/games/eyesInTheSystemData";
+import { initEyesInTheSystemTv } from "../lib/games/eyesInTheSystemTvData";
 import { initCloseToTwenty } from "../lib/games/closeToTwentyData";
 import { initTorched, subscribeTorched } from "../lib/games/torchedData";
 import { initChains, subscribeChains } from "../lib/games/chainsData";
@@ -328,6 +330,12 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     }
     if (gameType === "musicalchairstv") {
       await initMusicalChairsTv(gameId, round.round, participants, now);
+    }
+    if (gameType === "eyesinthesystem") {
+      await initEyesInTheSystem(gameId, round.round, participants, now);
+    }
+    if (gameType === "eyesinthesystemtv") {
+      await initEyesInTheSystemTv(gameId, round.round, participants, now);
     }
     if (gameType === "closeto20") {
       await initCloseToTwenty(gameId, round.round, participants, now);

@@ -853,7 +853,7 @@ export default function PlayPage() {
                   <AphroditePicker gameId={gameId} player={player} players={identityAllPlayers} settings={settings} />
                 )}
                 {round && powerFor(player, settings) === "Poseidon" && (
-                  <PoseidonTrigger player={player} round={round} />
+                  <PoseidonTrigger player={player} round={round} gameId={gameId} />
                 )}
                 {round && powerFor(player, settings) === "Ares" && (
                   <AresTarget gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />

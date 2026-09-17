@@ -14,6 +14,8 @@ import WordScramblePlayer from "./games/WordScramblePlayer";
 import WordScrambleTvPlayer from "./games/WordScrambleTvPlayer";
 import SimonTvPlayer from "./games/SimonTvPlayer";
 import MusicalChairsTvPlayer from "./games/MusicalChairsTvPlayer";
+import EyesInTheSystemPlayer from "./games/EyesInTheSystemPlayer";
+import EyesInTheSystemTvPlayer from "./games/EyesInTheSystemTvPlayer";
 import Maze2DPlayer from "./games/Maze2DPlayer";
 import MazeInvisiblePlayer from "./games/MazeInvisiblePlayer";
 import MazeTriviaPlayer from "./games/MazeTriviaPlayer";
@@ -68,6 +70,8 @@ export const GAME_COMPONENTS = {
   wordscrambletv: WordScrambleTvPlayer,
   simontv: SimonTvPlayer,
   musicalchairstv: MusicalChairsTvPlayer,
+  eyesinthesystem: EyesInTheSystemPlayer,
+  eyesinthesystemtv: EyesInTheSystemTvPlayer,
   maze2d: Maze2DPlayer,
   mazeinvisible: MazeInvisiblePlayer,
   mazetrivia: MazeTriviaPlayer,

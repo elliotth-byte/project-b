@@ -3,6 +3,7 @@ import { Card, Btn } from "./ui";
 import { subscribeGameState, storageUpdate } from "../lib/gameStorage";
 import { KEY_EXILE, KEY_FINALE } from "../lib/gameState";
 import { powerFor } from "../lib/characterPowers";
+import { sendGroupMessage } from "../lib/chatData";
 
 // ─── Hestia's character power (see lib/characterPowers.js) ───
 // "At the start of each voting deliberation period, you may exile one
@@ -47,9 +48,14 @@ export default function HestiaTrigger({ round, player, players, gameId, settings
 
   const exileFromChat = async () => {
     if (!selected) return;
-    if (!confirm(`Exile ${targets.find((p) => p.id === selected)?.display_name || "this player"} from the main chat for this deliberation? They'll be back once it ends.`)) return;
+    const targetName = targets.find((p) => p.id === selected)?.display_name || "this player";
+    if (!confirm(`Exile ${targetName} from the main chat for this deliberation? They'll be back once it ends.`)) return;
     setSaving(true);
     await storageUpdate(gameId, key, (fresh) => (fresh && !fresh.hestiaExiledPlayerId ? { ...fresh, hestiaExiledPlayerId: selected } : fresh));
+    // Same first-person, player-attributed announcement pattern
+    // AresTarget.jsx and AphroditePicker.jsx already use for their own
+    // powers.
+    await sendGroupMessage(gameId, player.id, player.name, `🔥 I've exiled ${targetName} from the main chat for this deliberation.`, player.name);
     setSaving(false);
   };
 

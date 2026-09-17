@@ -8,6 +8,7 @@ import ExileRevealTV from "../components/bigscreen/ExileRevealTV";
 import WordScrambleTvDisplay from "../components/bigscreen/WordScrambleTvDisplay";
 import SimonTvDisplay from "../components/bigscreen/SimonTvDisplay";
 import MusicalChairsTvDisplay from "../components/bigscreen/MusicalChairsTvDisplay";
+import EyesInTheSystemTvDisplay from "../components/bigscreen/EyesInTheSystemTvDisplay";
 import ArtAuctionTvDisplay from "../components/bigscreen/ArtAuctionTvDisplay";
 
 // ============================================================
@@ -24,6 +25,7 @@ const BATTLE_TV_COMPONENTS = {
   wordscrambletv: WordScrambleTvDisplay,
   simontv: SimonTvDisplay,
   musicalchairstv: MusicalChairsTvDisplay,
+  eyesinthesystemtv: EyesInTheSystemTvDisplay,
   // Not a Big-Screen-exclusive game type like the three above — see
   // components/bigscreen/ArtAuctionTvDisplay.jsx's own header comment.
   // The regular artauction game type already works fully normally

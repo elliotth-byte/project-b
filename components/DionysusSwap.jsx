@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabaseClient";
 import { subscribeGameState, storageUpdate } from "../lib/gameStorage";
 import { KEY_EXILE } from "../lib/gameState";
 import { powerFor, computeDionysusSwap } from "../lib/characterPowers";
+import { sendGroupMessage } from "../lib/chatData";
 
 // ─── Dionysus's character power (see lib/characterPowers.js) ───
 // "At the end of each round, swap power cards with any player of your
@@ -37,7 +38,11 @@ export default function DionysusSwap({ gameId, round, player, players, settings 
     );
   }
 
-  const others = (players || []).filter((p) => p.id !== player.id && p.approved);
+  // Alive-only — swapping cards with an already-eliminated player would
+  // effectively delete Dionysus's own power from the game entirely
+  // (nobody alive would hold it anymore, since a dead player can never
+  // act on it), which isn't a real swap in any meaningful sense.
+  const others = (players || []).filter((p) => p.id !== player.id && p.approved && p.alive);
 
   const swap = async () => {
     if (!selected) return;
@@ -53,6 +58,11 @@ export default function DionysusSwap({ gameId, round, player, players, settings 
     // silently clobbering it. storageUpdate re-reads fresh and applies
     // the change atomically instead.
     await storageUpdate(gameId, KEY_EXILE, (fresh) => (fresh && !fresh.dionysusSwapped ? { ...fresh, dionysusSwapped: true } : fresh));
+    // Same first-person, player-attributed announcement pattern
+    // AresTarget.jsx and AphroditePicker.jsx already use for their own
+    // powers — not a system message, this reads as the player
+    // themselves telling the room what they just did.
+    await sendGroupMessage(gameId, player.id, player.name, `🍇 I've swapped power cards with ${targetPlayer?.display_name || "someone"}.`, player.name);
     setSaving(false);
   };
 

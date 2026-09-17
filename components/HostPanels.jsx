@@ -121,21 +121,6 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
         </p>
       </div>
 
-      {settings?.bigScreenMode && (
-        <div style={{ marginBottom: 16 }}>
-          <a
-            href={`/display?game=${gameId}`} target="_blank" rel="noopener noreferrer"
-            style={{
-              display: "inline-block", background: "rgba(255,45,149,0.13)", border: "1px solid #ff2d95",
-              borderRadius: 8, color: "#ff2d95", fontSize: 12, fontWeight: 700, padding: "8px 16px",
-              textDecoration: "none",
-            }}
-          >
-            📺 Open Big Screen Display
-          </a>
-        </div>
-      )}
-
       <div style={{ display: "flex", gap: 2, marginBottom: 16, borderBottom: "1px solid #3d1f5c", overflowX: "auto" }}>
         {TABS.map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)} style={{
