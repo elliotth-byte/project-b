@@ -9,7 +9,14 @@ import WordScrambleTvDisplay from "../components/bigscreen/WordScrambleTvDisplay
 import SimonTvDisplay from "../components/bigscreen/SimonTvDisplay";
 import MusicalChairsTvDisplay from "../components/bigscreen/MusicalChairsTvDisplay";
 import EyesInTheSystemTvDisplay from "../components/bigscreen/EyesInTheSystemTvDisplay";
+import BalloonoTvDisplay from "../components/bigscreen/BalloonoTvDisplay";
+import LaurelThiefTvDisplay from "../components/bigscreen/LaurelThiefTvDisplay";
+import WagerTriviaTvDisplay from "../components/bigscreen/WagerTriviaTvDisplay";
+import TartarusTreadmillTvDisplay from "../components/bigscreen/TartarusTreadmillTvDisplay";
+import SpyfallTvDisplay from "../components/bigscreen/SpyfallTvDisplay";
 import ArtAuctionTvDisplay from "../components/bigscreen/ArtAuctionTvDisplay";
+import AcrophobiaTvDisplay from "../components/bigscreen/AcrophobiaTvDisplay";
+import MiniGolfTvDisplay from "../components/bigscreen/MiniGolfTvDisplay";
 
 // ============================================================
 // Battle TV components — each one keyed by gameType, rendered only
@@ -26,6 +33,13 @@ const BATTLE_TV_COMPONENTS = {
   simontv: SimonTvDisplay,
   musicalchairstv: MusicalChairsTvDisplay,
   eyesinthesystemtv: EyesInTheSystemTvDisplay,
+  balloono: BalloonoTvDisplay,
+  laurelthieftv: LaurelThiefTvDisplay,
+  wagertriviatv: WagerTriviaTvDisplay,
+  tartarustreadmill: TartarusTreadmillTvDisplay,
+  spyfall: SpyfallTvDisplay,
+  acrophobia: AcrophobiaTvDisplay,
+  minigolf: MiniGolfTvDisplay,
   // Not a Big-Screen-exclusive game type like the three above — see
   // components/bigscreen/ArtAuctionTvDisplay.jsx's own header comment.
   // The regular artauction game type already works fully normally

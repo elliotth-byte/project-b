@@ -24,6 +24,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState(null);
   const [history, setHistory] = useState(null);
   const [achievements, setAchievements] = useState(null);
+  const [expandedAchievementKey, setExpandedAchievementKey] = useState(null);
   const [nameDraft, setNameDraft] = useState("");
   const [savingName, setSavingName] = useState(false);
   const [nameError, setNameError] = useState("");
@@ -372,19 +373,26 @@ export default function ProfilePage() {
               <div key={category} style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 11, color: "#6b4f99", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>{category}</div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: 8 }}>
-                  {items.map((a) => (
-                    <div
-                      key={a.key}
-                      title={a.description}
-                      style={{
-                        background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8,
-                        padding: "10px 6px", textAlign: "center",
-                      }}
-                    >
-                      <div style={{ fontSize: 22, marginBottom: 4 }}>{a.icon}</div>
-                      <div style={{ fontSize: 10.5, fontWeight: 700, color: "#f5f0ff", lineHeight: 1.3 }}>{a.name}</div>
-                    </div>
-                  ))}
+                  {items.map((a) => {
+                    const isExpanded = expandedAchievementKey === a.key;
+                    return (
+                      <div
+                        key={a.key}
+                        onClick={() => setExpandedAchievementKey(isExpanded ? null : a.key)}
+                        style={{
+                          background: "#0d0618", border: `1px solid ${isExpanded ? "#ff2d95" : "#3d1f5c"}`, borderRadius: 8,
+                          padding: "10px 6px", textAlign: "center", cursor: "pointer",
+                          gridColumn: isExpanded ? "1 / -1" : undefined,
+                        }}
+                      >
+                        <div style={{ fontSize: 22, marginBottom: 4 }}>{a.icon}</div>
+                        <div style={{ fontSize: 10.5, fontWeight: 700, color: "#f5f0ff", lineHeight: 1.3 }}>{a.name}</div>
+                        {isExpanded && (
+                          <div style={{ fontSize: 11, color: "#a68fd6", lineHeight: 1.4, marginTop: 8, textAlign: "left" }}>{a.description}</div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))

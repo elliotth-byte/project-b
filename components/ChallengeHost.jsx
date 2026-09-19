@@ -20,11 +20,18 @@ import { initSimonTv } from "../lib/games/simonTvData";
 import { initMusicalChairsTv } from "../lib/games/musicalChairsTvData";
 import { initEyesInTheSystem } from "../lib/games/eyesInTheSystemData";
 import { initEyesInTheSystemTv } from "../lib/games/eyesInTheSystemTvData";
+import { initBalloono } from "../lib/games/balloonoData";
+import { initLaurelThief } from "../lib/games/laurelThiefData";
+import { initWagerTrivia } from "../lib/games/wagerTriviaTvData";
+import { initTartarusTreadmill } from "../lib/games/tartarusTreadmillData";
+import { initSpyfall } from "../lib/games/spyfallData";
+import { initAcrophobia } from "../lib/games/acrophobiaData";
+import { initMiniGolf } from "../lib/games/miniGolfData";
 import { initCloseToTwenty } from "../lib/games/closeToTwentyData";
 import { initTorched, subscribeTorched } from "../lib/games/torchedData";
 import { initChains, subscribeChains } from "../lib/games/chainsData";
 import { initPandorasBoxes } from "../lib/games/pandorasBoxesData";
-import { initMusicalChairs } from "../lib/games/musicalChairsData";
+import { initMusicalChairs, subscribeMusicalChairs } from "../lib/games/musicalChairsData";
 import { initFloor } from "../lib/games/floorData";
 import { initArtAuction } from "../lib/games/artAuctionData";
 import { initMysteryButton } from "../lib/games/mysteryButtonData";
@@ -70,6 +77,8 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
   const [chainsState, setChainsState] = useState(null);
   const [torchedState, setTorchedState] = useState(null);
   const [scavengerState, setScavengerState] = useState(null);
+  const [musicalChairsState, setMusicalChairsState] = useState(null);
+  const [hostNow, setHostNow] = useState(Date.now());
   const [resettingId, setResettingId] = useState(null);
   const [challengeHistory, setChallengeHistory] = useState([]);
   const [exileHistory, setExileHistory] = useState([]);
@@ -144,6 +153,20 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     const unsubscribe = subscribeScavengerHunt(gameId, round.round, setScavengerState);
     return unsubscribe;
   }, [gameId, round?.round]);
+
+  useEffect(() => {
+    if (!round?.round) return;
+    const unsubscribe = subscribeMusicalChairs(gameId, round.round, setMusicalChairsState);
+    return unsubscribe;
+  }, [gameId, round?.round]);
+
+  // Only the "when do chairs open next" countdown below actually needs
+  // a live clock — see its own comment on why the host (unlike every
+  // player's own screen) gets to see this at all.
+  useEffect(() => {
+    const id = setInterval(() => setHostNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = subscribeGameState(gameId, KEY_CHALLENGE_HISTORY, (v) => setChallengeHistory(v || []));
@@ -336,6 +359,27 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     }
     if (gameType === "eyesinthesystemtv") {
       await initEyesInTheSystemTv(gameId, round.round, participants, now);
+    }
+    if (gameType === "balloono") {
+      await initBalloono(gameId, round.round, participants, now);
+    }
+    if (gameType === "laurelthief" || gameType === "laurelthieftv") {
+      await initLaurelThief(gameId, round.round, participants, now);
+    }
+    if (gameType === "wagertriviatv") {
+      await initWagerTrivia(gameId, round.round, participants, now);
+    }
+    if (gameType === "tartarustreadmill") {
+      await initTartarusTreadmill(gameId, round.round, participants, now);
+    }
+    if (gameType === "spyfall") {
+      await initSpyfall(gameId, round.round, participants, now);
+    }
+    if (gameType === "acrophobia") {
+      await initAcrophobia(gameId, round.round, participants, now);
+    }
+    if (gameType === "minigolf") {
+      await initMiniGolf(gameId, round.round, participants, now);
     }
     if (gameType === "closeto20") {
       await initCloseToTwenty(gameId, round.round, participants, now);
@@ -796,6 +840,37 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
           </div>
         </div>
       )}
+
+      {challenge?.gameType === "musicalchairs" && challenge.active && musicalChairsState && musicalChairsState.gamePhase === "playing" && (() => {
+        const alive = musicalChairsState.remainingPlayerIds.length;
+        const byName = (id) => players.find((pl) => pl.id === id)?.display_name || "?";
+        const secLeft = (deadline) => Math.max(0, Math.ceil((deadline - hostNow) / 1000));
+        return (
+          <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+              🎵 Musical Chairs — Round {musicalChairsState.roundIndex + 1} of {musicalChairsState.totalRounds} · {alive} still standing
+            </div>
+            {/* This countdown is deliberately hidden on every player's
+                own screen (see components/games/MusicalChairsPlayer.jsx's
+                own "deliberately no countdown shown" comment) — not
+                knowing when the music stops is the entire game. The
+                host isn't playing, though, and needs to actually know
+                what's happening to run the Battle, so it shows here. */}
+            {musicalChairsState.roundPhase === "music" ? (
+              <p style={{ fontSize: 13, color: "#f5f0ff", margin: 0 }}>
+                🎼 Music playing — chairs open in <strong style={{ color: "#ffd700" }}>{secLeft(musicalChairsState.musicEndsAt)}s</strong> (players can't see this countdown)
+              </p>
+            ) : (
+              <p style={{ fontSize: 13, color: "#f5f0ff", margin: 0 }}>
+                🪑 Chairs are open ({musicalChairsState.chairCount} available, {Object.keys(musicalChairsState.claims || {}).length} claimed) — window closes in <strong style={{ color: "#00ff9d" }}>{secLeft(musicalChairsState.seatsEndsAt)}s</strong>
+              </p>
+            )}
+            <p style={{ fontSize: 11, color: "#6b4f99", margin: "6px 0 0" }}>
+              Still standing: {musicalChairsState.remainingPlayerIds.map(byName).join(", ") || "—"}
+            </p>
+          </div>
+        );
+      })()}
 
       {isDigital ? (
         <div style={{ display: "grid", gap: 10, marginBottom: 12 }}>

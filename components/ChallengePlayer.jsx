@@ -16,6 +16,14 @@ import SimonTvPlayer from "./games/SimonTvPlayer";
 import MusicalChairsTvPlayer from "./games/MusicalChairsTvPlayer";
 import EyesInTheSystemPlayer from "./games/EyesInTheSystemPlayer";
 import EyesInTheSystemTvPlayer from "./games/EyesInTheSystemTvPlayer";
+import BalloonoTvPlayer from "./games/BalloonoTvPlayer";
+import LaurelThiefPlayer from "./games/LaurelThiefPlayer";
+import LaurelThiefTvPlayer from "./games/LaurelThiefTvPlayer";
+import WagerTriviaTvPlayer from "./games/WagerTriviaTvPlayer";
+import TartarusTreadmillTvPlayer from "./games/TartarusTreadmillTvPlayer";
+import SpyfallPlayer from "./games/SpyfallPlayer";
+import AcrophobiaTvPlayer from "./games/AcrophobiaTvPlayer";
+import MiniGolfTvPlayer from "./games/MiniGolfTvPlayer";
 import Maze2DPlayer from "./games/Maze2DPlayer";
 import MazeInvisiblePlayer from "./games/MazeInvisiblePlayer";
 import MazeTriviaPlayer from "./games/MazeTriviaPlayer";
@@ -72,6 +80,14 @@ export const GAME_COMPONENTS = {
   musicalchairstv: MusicalChairsTvPlayer,
   eyesinthesystem: EyesInTheSystemPlayer,
   eyesinthesystemtv: EyesInTheSystemTvPlayer,
+  balloono: BalloonoTvPlayer,
+  laurelthief: LaurelThiefPlayer,
+  laurelthieftv: LaurelThiefTvPlayer,
+  wagertriviatv: WagerTriviaTvPlayer,
+  tartarustreadmill: TartarusTreadmillTvPlayer,
+  spyfall: SpyfallPlayer,
+  acrophobia: AcrophobiaTvPlayer,
+  minigolf: MiniGolfTvPlayer,
   maze2d: Maze2DPlayer,
   mazeinvisible: MazeInvisiblePlayer,
   mazetrivia: MazeTriviaPlayer,

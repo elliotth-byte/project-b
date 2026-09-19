@@ -54,7 +54,19 @@ export default function EyesInTheSystemPlayer({ gameId, round, challenge, player
     return <GameResultCard icon="👁" title="Eyes in the System" valueLabel={`${myEntry.correctCount} of ${EYES_ROUNDS_PER_GAME} correct`} />;
   }
 
-  const currentRound = state.rounds[roundIndex];
+  const currentRound = state.rounds?.[roundIndex];
+  // Defensive guard against a real, possible race: roundIndex (React
+  // state, only updated via the effect above once state.results
+  // actually changes) can briefly be stale or out of bounds relative
+  // to state.rounds on the render right after a subscription update
+  // lands but before that effect has re-run — without this, that
+  // render would crash trying to read .zones/.targetColor/.correctZone
+  // off undefined, which is exactly the kind of failure that shows up
+  // to a player as "the game just isn't loading" rather than a visible
+  // error. Falls back to the same loading card the initial state===null
+  // case already uses, rather than crashing — the very next render
+  // (once the effect catches up) recovers on its own.
+  if (!currentRound) return <Card style={{ marginBottom: 20, textAlign: "center" }}><p style={{ color: "#6b4f99", fontStyle: "italic" }}>Loading...</p></Card>;
 
   const answer = async (zoneKey) => {
     if (feedback) return;

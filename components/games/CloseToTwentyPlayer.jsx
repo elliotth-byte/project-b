@@ -66,12 +66,50 @@ export default function CloseToTwentyPlayer({ gameId, round, challenge, player, 
   if (state.revealed) {
     const myBank = state.banks[player.id] || 0;
     const iAmBusted = state.busted.includes(player.id);
+    // Once revealed, every participant's own bank is shown, not just
+    // this player's own — a competitive, simultaneous-reveal game
+    // showing only "how did I do" and never "how did I do relative to
+    // everyone else" leaves the actual result of the game a mystery
+    // even after it's supposedly over. Sorted by the real win
+    // condition: closest to TARGET without busting first, then the
+    // rest of the non-busted players descending, busted players last
+    // (their own relative order among themselves doesn't matter, they
+    // all lost the same way).
+    const ranked = [...state.participantIds].sort((a, b) => {
+      const aBusted = state.busted.includes(a), bBusted = state.busted.includes(b);
+      if (aBusted !== bBusted) return aBusted ? 1 : -1;
+      return (state.banks[b] || 0) - (state.banks[a] || 0);
+    });
     return (
-      <GameResultCard
-        icon="🐷"
-        title={iAmBusted ? "Busted!" : "Piggy Bank Final"}
-        valueLabel={iAmBusted ? `Went over 20 (${myBank})` : `${myBank}/${TARGET}`}
-      />
+      <Card style={{ marginBottom: 20, textAlign: "center" }}>
+        <div style={{ fontSize: 28, marginBottom: 6 }}>🐷</div>
+        <h3 style={{ color: "#f5f0ff", margin: "0 0 4px", fontSize: 15 }}>{iAmBusted ? "Busted!" : "Piggy Bank Final"}</h3>
+        <p style={{ color: iAmBusted ? "#ff3860" : "#00ff9d", fontSize: 13, margin: "0 0 14px", fontWeight: 700 }}>
+          You: {iAmBusted ? `Went over ${TARGET} (${myBank})` : `${myBank}/${TARGET}`}
+        </p>
+        <div style={{ display: "grid", gap: 4, textAlign: "left" }}>
+          {ranked.map((id, i) => {
+            const busted = state.busted.includes(id);
+            const amt = state.banks[id] || 0;
+            const isMe = id === player.id;
+            return (
+              <div key={id} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "6px 10px", borderRadius: 6,
+                background: isMe ? "rgba(255,45,149,0.12)" : "#0d0618",
+                border: `1px solid ${isMe ? "#ff2d95" : "#3d1f5c"}`,
+              }}>
+                <span style={{ fontSize: 13, color: "#f5f0ff" }}>
+                  {!busted && i === 0 && "👑 "}{byName(id)}{isMe ? " (you)" : ""}
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: busted ? "#ff3860" : "#f5f0ff" }}>
+                  {busted ? `${amt} (bust)` : amt}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
     );
   }
 
