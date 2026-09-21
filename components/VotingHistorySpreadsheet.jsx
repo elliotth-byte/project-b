@@ -115,7 +115,7 @@ export default function VotingHistorySpreadsheet({ exileHistory, finaleState, pl
                     style={{
                       padding: "6px 10px", whiteSpace: "nowrap",
                       color: cell ? "#f5f0ff" : "#6b4f99",
-                      background: cell?.nominated ? "rgba(74,144,217,0.16)" : cell?.immune ? "rgba(0,255,157,0.1)" : undefined,
+                      background: cell?.nominated ? "rgba(74,144,217,0.16)" : cell?.immune ? "rgba(0,255,157,0.1)" : "rgba(107,79,153,0.08)",
                     }}
                   >
                     {cell ? (

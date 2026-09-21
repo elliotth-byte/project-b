@@ -250,11 +250,15 @@ export default function ExileVoteHost({ gameId, players, round }) {
         <Card style={{ borderColor: exile.tieBreakChoiceId ? "rgba(0,255,157,0.5)" : "rgba(255,56,96,0.5)", marginBottom: 12 }}>
           {exile.tieBreakChoiceId ? (
             <p style={{ color: "#00ff9d", fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>
-              ✓ Tie broken — {byId[exile.tieBreakChoiceId] || "?"} chosen. Ready to continue below.
+              ✓ Tie broken — {byId[exile.tieBreakChoiceId] || "?"} chosen.{exile.noHolderTieBreakAnnounced ? " (No Favor of the Fates holder this round — broken by challenge score, falling back to random if still tied.)" : " Ready to continue below."}
+            </p>
+          ) : exile.chaosHolderId ? (
+            <p style={{ color: "#ff3860", fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>
+              🃏 It's tied — waiting on {chaosHolder?.display_name || "the Favor of the Fates holder"} to break it from their own screen.
             </p>
           ) : (
             <p style={{ color: "#ff3860", fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>
-              🃏 It's tied — waiting on {chaosHolder?.display_name || "the Favor of the Fates holder"} to break it from their own screen.
+              🃏 It's tied, and no Favor of the Fates holder this round — breaking the tie by lowest challenge score... (still tied on that too, and it'll be broken at random).
             </p>
           )}
           <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 8px", fontStyle: "italic" }}>Host fallback, if needed:</p>

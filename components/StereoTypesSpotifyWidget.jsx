@@ -59,7 +59,7 @@ export default function StereoTypesSpotifyWidget({ gameId, onStateChange }) {
     function initPlayer() {
       if (cancelled || playerRef.current) return;
       const player = new window.Spotify.Player({
-        name: "Stereo Types Boombox",
+        name: "Panopticon Boombox",
         getOAuthToken: (cb) => {
           getAccessToken().then((token) => {
             if (token) cb(token);
@@ -266,7 +266,7 @@ export default function StereoTypesSpotifyWidget({ gameId, onStateChange }) {
       <Card style={{ borderColor: "#f4c430" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <p style={{ color: "#c9b98a", fontSize: 13, margin: 0, flex: 1, minWidth: 200 }}>
-            Connect Spotify to play music through your own account and light up the skyline. Needs Spotify Premium — this is the "boombox" everyone in the room hears; players can optionally connect their own Spotify too (their own screen has that option) to also get audio on their own device, but they'll always see the room react either way.
+            Connect Spotify to play music through your own account and drive the Big Screen's reactive "now playing" visual. Needs Spotify Premium — this is the "boombox" everyone in the room hears; players can optionally connect their own Spotify too (their own screen has that option) to also get audio on their own device, but they'll always see the Big Screen react either way.
           </p>
           <Btn small onClick={() => beginAuth(gameId)}>Connect Spotify</Btn>
         </div>

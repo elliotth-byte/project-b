@@ -15,6 +15,12 @@ export default function MusicalChairsPlayer({ gameId, round, challenge, player, 
   const [, forceTick] = useState(0);
   const [soundOn, setSoundOn] = useState(false);
   const reportedRef = useRef(false);
+  // A per-mounted-instance token for lib/games/musicalChairsAudio.js —
+  // see that module's own comment: without this, multiple simultaneous
+  // instances of this component (e.g. ChallengeTestLab's Multiplayer
+  // Test mode) would fight over one shared AudioContext.
+  const audioTokenRef = useRef(null);
+  if (!audioTokenRef.current) audioTokenRef.current = `mc-${player?.id || "solo"}-${Math.random().toString(36).slice(2)}`;
 
   useEffect(() => {
     const unsubscribe = subscribeMusicalChairs(gameId, round.round, (v) => { setState(v); setLoaded(true); });
@@ -33,8 +39,9 @@ export default function MusicalChairsPlayer({ gameId, round, challenge, player, 
   // leaves a loop playing in the background.
   useEffect(() => {
     const shouldPlay = soundOn && state?.gamePhase === "playing" && state?.roundPhase === "music" && state?.remainingPlayerIds?.includes(player.id);
-    if (shouldPlay) startMusic(); else stopMusic();
-    return () => stopMusic();
+    const token = audioTokenRef.current;
+    if (shouldPlay) startMusic(token); else stopMusic(token);
+    return () => stopMusic(token);
   }, [soundOn, state?.gamePhase, state?.roundPhase, state?.remainingPlayerIds, player.id]);
 
   // The actual phase-change clock — see musicalChairsData.js's own

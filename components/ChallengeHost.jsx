@@ -35,7 +35,14 @@ import { initMusicalChairs, subscribeMusicalChairs } from "../lib/games/musicalC
 import { initFloor } from "../lib/games/floorData";
 import { initArtAuction } from "../lib/games/artAuctionData";
 import { initMysteryButton } from "../lib/games/mysteryButtonData";
+import { initGoldenFleece } from "../lib/games/goldenFleeceData";
+import { initRiverStyx } from "../lib/games/riverStyxData";
+import { initWineDarkSea } from "../lib/games/wineDarkSeaData";
 import { initScavengerHunt, subscribeScavengerHunt, OFFERING_TYPES as SCAVENGER_OFFERING_TYPES } from "../lib/games/scavengerHuntData";
+import { initMajorityRules } from "../lib/games/majorityRulesData";
+import { initMajorityRulesTv } from "../lib/games/majorityRulesTvData";
+import { initTriggerHappyTv } from "../lib/games/triggerHappyTvData";
+import { initGodsAndGambits } from "../lib/games/godsAndGambitsData";
 import { pickRandomChallenge, hephaestusDrawKey, randomPickKey } from "../lib/challengeSelection";
 import { canRunStockMarketChallenge } from "../lib/games/stockMarketData";
 import { hasEnoughHistoryForSelection as hasEnoughTriviaHistory } from "../lib/games/seasonTriviaData";
@@ -410,8 +417,29 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     if (gameType === "mysterybutton") {
       await initMysteryButton(gameId, round.round, participants, now, settings?.challengeDurationSec);
     }
+    if (gameType === "goldenfleece") {
+      await initGoldenFleece(gameId, round.round, participants, now);
+    }
+    if (gameType === "riverstyx") {
+      await initRiverStyx(gameId, round.round, participants, now);
+    }
+    if (gameType === "winedarksea") {
+      await initWineDarkSea(gameId, round.round, participants, now);
+    }
     if (gameType === "scavengerhunt") {
       await initScavengerHunt(gameId, round.round, participants, now);
+    }
+    if (gameType === "majorityrules") {
+      await initMajorityRules(gameId, round.round, participants, now);
+    }
+    if (gameType === "majorityrulestv") {
+      await initMajorityRulesTv(gameId, round.round, participants, now);
+    }
+    if (gameType === "triggerhappytv") {
+      await initTriggerHappyTv(gameId, round.round, participants, now);
+    }
+    if (gameType === "godsandgambits") {
+      await initGodsAndGambits(gameId, round.round, participants, now);
     }
     await storageUpdate(gameId, KEY_ROUND, (fresh) => ({ ...(fresh || {}), phaseStartedAt: now, phaseEndsAt: endsAt }));
     setBusy(false);
@@ -860,14 +888,29 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
               <p style={{ fontSize: 13, color: "#f5f0ff", margin: 0 }}>
                 🎼 Music playing — chairs open in <strong style={{ color: "#ffd700" }}>{secLeft(musicalChairsState.musicEndsAt)}s</strong> (players can't see this countdown)
               </p>
-            ) : (
-              <p style={{ fontSize: 13, color: "#f5f0ff", margin: 0 }}>
-                🪑 Chairs are open ({musicalChairsState.chairCount} available, {Object.keys(musicalChairsState.claims || {}).length} claimed) — window closes in <strong style={{ color: "#00ff9d" }}>{secLeft(musicalChairsState.seatsEndsAt)}s</strong>
+            ) : (() => {
+              const claims = musicalChairsState.claims || {};
+              const claimedIds = Object.keys(claims).sort((a, b) => claims[a].chairIndex - claims[b].chairIndex);
+              const unclaimedIds = musicalChairsState.remainingPlayerIds.filter((id) => !claims[id]);
+              return (
+                <>
+                  <p style={{ fontSize: 13, color: "#f5f0ff", margin: 0 }}>
+                    🪑 Chairs are open ({musicalChairsState.chairCount} available, {claimedIds.length} claimed) — window closes in <strong style={{ color: "#00ff9d" }}>{secLeft(musicalChairsState.seatsEndsAt)}s</strong>
+                  </p>
+                  <p style={{ fontSize: 12, color: "#00ff9d", margin: "6px 0 0" }}>
+                    Claimed: {claimedIds.length > 0 ? claimedIds.map(byName).join(", ") : "no one yet"}
+                  </p>
+                  <p style={{ fontSize: 12, color: "#ff3860", margin: "4px 0 0" }}>
+                    Still without a chair: {unclaimedIds.map(byName).join(", ") || "—"}
+                  </p>
+                </>
+              );
+            })()}
+            {musicalChairsState.roundPhase === "music" && (
+              <p style={{ fontSize: 11, color: "#6b4f99", margin: "6px 0 0" }}>
+                Still standing: {musicalChairsState.remainingPlayerIds.map(byName).join(", ") || "—"}
               </p>
             )}
-            <p style={{ fontSize: 11, color: "#6b4f99", margin: "6px 0 0" }}>
-              Still standing: {musicalChairsState.remainingPlayerIds.map(byName).join(", ") || "—"}
-            </p>
           </div>
         );
       })()}
