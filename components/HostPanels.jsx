@@ -22,8 +22,6 @@ import { postSystemAnnouncement } from "../lib/announcements";
 import PlayerViewer from "./PlayerViewer";
 import ChallengeTestLab from "./ChallengeTestLab";
 import PlayerMemoryWall from "./PlayerMemoryWall";
-import StereoTypesSpotifyWidget from "./StereoTypesSpotifyWidget";
-import { isSpotifyConfigured } from "../lib/spotify/auth";
 
 const BASE_TABS = [
   { key: "round", label: "🎲 Current Round" },
@@ -276,22 +274,6 @@ export default function HostPanels({ gameId, players, gameName, adminExtra }) {
       {tab === "admin" && (
         <div style={{ display: "grid", gap: 16 }}>
           {adminExtra}
-          {/* Same underlying Spotify boombox capability Stereo Types has
-              always had (StereoTypesSpotifyWidget.jsx, reused as-is here,
-              not forked) — now offered as a generic season-level control
-              for Project B too, since it's really "control what's playing
-              on the shared now-playing broadcast," not something specific
-              to Stereo Types' own gameplay. Silently absent when Spotify
-              isn't configured for this deployment at all (isSpotifyConfigured
-              checks NEXT_PUBLIC_SPOTIFY_CLIENT_ID) rather than showing a
-              dead "Connect Spotify" control that could never work. The Big
-              Screen display (pages/display.jsx) reads the exact same
-              broadcast this writes, regardless of game type. */}
-          {isSpotifyConfigured() && (
-            <ChallengeErrorBoundary label="Boombox">
-              <StereoTypesSpotifyWidget gameId={gameId} />
-            </ChallengeErrorBoundary>
-          )}
           <ChallengeErrorBoundary label="Admin"><AdminHost gameId={gameId} players={players} round={round} /></ChallengeErrorBoundary>
         </div>
       )}

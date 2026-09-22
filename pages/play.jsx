@@ -55,7 +55,7 @@ import LogoutButton from "../components/LogoutButton";
 import ChallengeErrorBoundary from "../components/ChallengeErrorBoundary";
 import RoundTimerBanner from "../components/RoundTimerBanner";
 import { Card } from "../components/ui";
-import { subscribeRound, subscribeSettings, getRound, PHASES, KEY_EXILE_HISTORY, KEY_CHALLENGE, KEY_EXILE, KEY_CHALLENGE_HISTORY } from "../lib/gameState";
+import { subscribeRound, subscribeSettings, PHASES, KEY_EXILE_HISTORY, KEY_CHALLENGE, KEY_EXILE, KEY_CHALLENGE_HISTORY } from "../lib/gameState";
 import { subscribeGameState } from "../lib/gameStorage";
 import { subscribeScores } from "../lib/challengeScores";
 import { subscribeCloseToTwenty } from "../lib/games/closeToTwentyData";
@@ -389,27 +389,9 @@ export default function PlayPage() {
         return;
       }
 
-      // The onboarding checklist (see lib/onboarding.js / components/
-      // OnboardingChecklist.jsx) is meant to walk a brand-new player
-      // through the app when they first join a season that hasn't
-      // started yet — never to gate someone who's joining a game
-      // that's already in progress (a latecomer, a replacement, an
-      // approval that happens after Round 1 already started). A game
-      // that hasn't called startSeason() yet still has no round at all,
-      // or a round stuck in PHASES.LOBBY — anything past that means the
-      // season is already underway, so this new player is marked as
-      // already done with all three checklist items right at insert
-      // time, the same way sql/add-onboarding-checklist.sql originally
-      // grandfathered everyone who existed before this feature shipped.
-      const existingRound = await getRound(gameId);
-      const gameAlreadyStarted = !!existingRound && existingRound.phase !== PHASES.LOBBY;
-
       const { data: created, error } = await supabase
         .from("players")
-        .insert({
-          game_id: gameId, user_id: session.user.id, display_name: displayNameFromUser(user), approved: false,
-          ...(gameAlreadyStarted ? { onboarding_chat_sent: true, onboarding_dm_sent: true, onboarding_profile_viewed: true } : {}),
-        })
+        .insert({ game_id: gameId, user_id: session.user.id, display_name: displayNameFromUser(user), approved: false })
         .select("id, display_name, alive, elimination_type, elimination_round, approved, color, equipped_sticker, alias, avatar_url, game_prefs, battle_ban_round, torched_preset, floor_specialty, power_state, inactivity_strikes, onboarding_chat_sent, onboarding_dm_sent, onboarding_profile_viewed")
         .single();
       if (error) {

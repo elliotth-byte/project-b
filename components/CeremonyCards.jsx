@@ -57,56 +57,6 @@ export function ChallengePlacementsList({ placements, gameType, rankDirection })
   );
 }
 
-// Majority Rules' per-question reveal (see lib/roundEngine.js's own
-// comment on where entry.majorityRulesReveal gets attached, and
-// lib/games/majorityRulesData.js for the state shape it's built from).
-// Nobody sees any of this — the majority side, or anyone else's picks —
-// while the battle's actually live, so this is the ONLY place any of it
-// ever surfaces. Rendered here rather than as a whole separate card so
-// it shows up automatically anywhere ChallengeResultsCard/
-// RoundCeremonyCard already do, for host and player alike, with no
-// changes needed at either call site.
-function MajorityRulesReveal({ reveal }) {
-  if (!reveal?.questions?.length) return null;
-  return (
-    <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-      <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5 }}>
-        🗳️ The reveal — how the room actually voted
-      </div>
-      {reveal.questions.map((q, i) => (
-        <div key={q.id || i} style={{ background: "#0d0618", borderRadius: 8, padding: "8px 10px" }}>
-          <p style={{ fontSize: 12, color: "#f5f0ff", margin: "0 0 6px" }}>{q.text}</p>
-          <div style={{ display: "flex", gap: 14, fontSize: 11, marginBottom: 6, flexWrap: "wrap" }}>
-            <span style={{ color: q.majoritySide === "A" ? "#ff2d95" : "#a68fd6", fontWeight: q.majoritySide === "A" ? 700 : 500 }}>
-              {q.majoritySide === "A" ? "👑 " : ""}A: {q.playerAName} ({q.tallyA})
-            </span>
-            <span style={{ color: q.majoritySide === "B" ? "#ff2d95" : "#a68fd6", fontWeight: q.majoritySide === "B" ? 700 : 500 }}>
-              {q.majoritySide === "B" ? "👑 " : ""}B: {q.playerBName} ({q.tallyB})
-            </span>
-            {!q.majoritySide && <span style={{ color: "#6b4f99", fontStyle: "italic" }}>Tied — no majority</span>}
-          </div>
-          <div style={{ display: "grid", gap: 2 }}>
-            {(reveal.participantIds || []).map((pid) => {
-              const name = reveal.participantNames?.[pid] || "?";
-              const ans = reveal.answers?.[pid]?.[i];
-              if (!ans) {
-                return <span key={pid} style={{ fontSize: 11, color: "#6b4f99" }}>— {name} never locked in</span>;
-              }
-              const pickedName = ans === "A" ? q.playerAName : q.playerBName;
-              const matched = !!q.majoritySide && ans === q.majoritySide;
-              return (
-                <span key={pid} style={{ fontSize: 11, color: "#f5f0ff" }}>
-                  {matched ? "✅" : "❌"} {name} → {pickedName}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function ChallengeResultsCard({ entry: c }) {
   const registryEntry = c.gameType && GAME_REGISTRY[c.gameType];
   const rankDirection = registryEntry?.rank === "time-asc" ? "time-asc" : "score-desc";
@@ -119,7 +69,6 @@ export function ChallengeResultsCard({ entry: c }) {
         {c.finalFour && <Badge color="#ff3860">Final Four</Badge>}
       </div>
       <ChallengePlacementsList placements={c.placements} gameType={c.gameType} rankDirection={rankDirection} />
-      <MajorityRulesReveal reveal={c.majorityRulesReveal} />
     </Card>
   );
 }
@@ -163,7 +112,6 @@ export function RoundCeremonyCard({ entry: e, challenge, rows, byId, showComment
             ⚔️ Battle{registryEntry && ` — ${registryEntry.icon} ${registryEntry.label}`}
           </div>
           <ChallengePlacementsList placements={challenge.placements} gameType={challenge.gameType} rankDirection={rankDirection} />
-          <MajorityRulesReveal reveal={challenge.majorityRulesReveal} />
         </Card>
       )}
 

@@ -5,7 +5,6 @@ import { KEY_EXILE_HISTORY, KEY_FINALE, KEY_CHALLENGE_HISTORY, KEY_EXILE, KEY_FA
 import { buildVotingRows } from "../lib/votingSpreadsheet";
 import AnnouncementsFeed from "./AnnouncementsFeed";
 import VotingHistorySpreadsheet from "./VotingHistorySpreadsheet";
-import VotingHistoryModal from "./VotingHistoryModal";
 import { LiveNominationsRecap, ChallengeResultsCard, RoundCeremonyCard, FinaleCard, IdentityRevealCard } from "./CeremonyCards";
 import { subscribeFinaleQa } from "../lib/finaleQaData";
 import { fetchProfilePhotos } from "../lib/profiles";
@@ -50,7 +49,6 @@ export default function CeremonyPlayer({ gameId, players, round, settings }) {
   const [liveFates, setLiveFates] = useState(null);
   const [showComments, setShowComments] = useState(false);
   const [showVotingSheet, setShowVotingSheet] = useState(false);
-  const [votingSheetFullScreen, setVotingSheetFullScreen] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
 
   useEffect(() => {
@@ -170,27 +168,11 @@ export default function CeremonyPlayer({ gameId, players, round, settings }) {
         >
           🗳 {showVotingSheet ? "Hide" : "Show"} voting sheet
         </button>
-        <button
-          onClick={() => setVotingSheetFullScreen(true)}
-          style={{
-            background: "transparent", border: "1px solid #3d1f5c", borderRadius: 8, padding: "6px 12px",
-            color: "#a68fd6", fontSize: 12, cursor: "pointer",
-            fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
-          }}
-        >
-          ⛶ View Full Voting History
-        </button>
       </div>
 
       {showVotingSheet && (
         <VotingHistorySpreadsheet exileHistory={exileHistory} finaleState={finale} players={players} challengeHistory={challengeHistory} />
       )}
-
-      <VotingHistoryModal
-        open={votingSheetFullScreen}
-        onClose={() => setVotingSheetFullScreen(false)}
-        exileHistory={exileHistory} finaleState={finale} players={players} challengeHistory={challengeHistory}
-      />
 
       {pages.length > 1 && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>

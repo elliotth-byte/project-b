@@ -1,0 +1,1085 @@
+import { useState, useEffect } from "react";
+import { Btn, Card, Badge } from "./ui";
+import { storageSet, storageUpdate, subscribeGameState } from "../lib/gameStorage";
+import { KEY_CHALLENGE, KEY_ROUND, KEY_CHALLENGE_HISTORY, KEY_EXILE_HISTORY } from "../lib/gameState";
+import { placementsComplete } from "../lib/challengeLogic";
+import { GAME_REGISTRY, gameConfigWithDefaults } from "../lib/challengeGames";
+import { presetIncompleteGameTypes } from "../lib/presetReadiness";
+import { bigScreenOnlyGameTypesToExclude } from "../lib/bigScreenOnlyGames";
+import { supabase } from "../lib/supabaseClient";
+import { subscribeScores, scoresToPlacements, resetPlayerAttempt, overridePlayerScore } from "../lib/challengeScores";
+import { subscribeReentry, getReentry } from "../lib/reentryData";
+import { REENTRY_STATUS } from "../lib/reentryLogic";
+import { formatDurationHours } from "../lib/fatesLogic";
+import { DEFAULT_PARTICIPATION, computeParticipants } from "../lib/challengeParticipants";
+import { initPlinkoBracket, subscribePlinkoBracket } from "../lib/games/plinkoBracketData";
+import { initPit } from "../lib/games/pitData";
+import { initMasquerade } from "../lib/games/masqueradeData";
+import { initWordScrambleTv } from "../lib/games/wordScrambleTvData";
+import { initSimonTv } from "../lib/games/simonTvData";
+import { initMusicalChairsTv } from "../lib/games/musicalChairsTvData";
+import { initEyesInTheSystem } from "../lib/games/eyesInTheSystemData";
+import { initEyesInTheSystemTv } from "../lib/games/eyesInTheSystemTvData";
+import { initBalloono } from "../lib/games/balloonoData";
+import { initLaurelThief } from "../lib/games/laurelThiefData";
+import { initWagerTrivia } from "../lib/games/wagerTriviaTvData";
+import { initTartarusTreadmill } from "../lib/games/tartarusTreadmillData";
+import { initSpyfall } from "../lib/games/spyfallData";
+import { initAcrophobia } from "../lib/games/acrophobiaData";
+import { initMiniGolf } from "../lib/games/miniGolfData";
+import { initCloseToTwenty } from "../lib/games/closeToTwentyData";
+import { initTorched, subscribeTorched } from "../lib/games/torchedData";
+import { initChains, subscribeChains } from "../lib/games/chainsData";
+import { initPandorasBoxes } from "../lib/games/pandorasBoxesData";
+import { initMusicalChairs, subscribeMusicalChairs } from "../lib/games/musicalChairsData";
+import { initFloor } from "../lib/games/floorData";
+import { initArtAuction } from "../lib/games/artAuctionData";
+import { initMysteryButton } from "../lib/games/mysteryButtonData";
+import { initGoldenFleece } from "../lib/games/goldenFleeceData";
+import { initRiverStyx } from "../lib/games/riverStyxData";
+import { initWineDarkSea } from "../lib/games/wineDarkSeaData";
+import { initScavengerHunt, subscribeScavengerHunt, OFFERING_TYPES as SCAVENGER_OFFERING_TYPES } from "../lib/games/scavengerHuntData";
+import { initMajorityRules } from "../lib/games/majorityRulesData";
+import { initMajorityRulesTv } from "../lib/games/majorityRulesTvData";
+import { initTriggerHappyTv } from "../lib/games/triggerHappyTvData";
+import { initGodsAndGambits } from "../lib/games/godsAndGambitsData";
+import { initDivinersDice } from "../lib/games/divinersDiceData";
+import { initSplitFriction } from "../lib/games/splitFrictionData";
+import { initCrowns } from "../lib/games/crownsData";
+import { initPoseidonsPool } from "../lib/games/poseidonsPoolData";
+import { pickRandomChallenge, hephaestusDrawKey, randomPickKey } from "../lib/challengeSelection";
+import { canRunStockMarketChallenge } from "../lib/games/stockMarketData";
+import { hasEnoughHistoryForSelection as hasEnoughTriviaHistory } from "../lib/games/seasonTriviaData";
+import { hasEnoughHistoryForSelection as hasEnoughTimelineHistory } from "../lib/games/timelineData";
+import { fetchGloballyDisabledChallenges } from "../lib/platformSettings";
+import { powerFor } from "../lib/characterPowers";
+import ParticipantPicker from "./ParticipantPicker";
+import CopyMessage from "./CopyMessage";
+import { requestAdvance } from "../lib/advanceNow";
+
+const MAZE_TYPES = ["maze2d", "mazeinvisible", "mazetrivia", "labyrinth"]; // all four share the same host-configurable size control
+
+// ─── Challenge: Host Control ───
+// Setup (pick a game + who's competing + duration) -> players play on
+// their own screens and the round engine (lib/roundEngine.js) derives
+// placements from their scores automatically once the timer's up.
+// "Manual / In-Person" (the host running something offline and entering
+// results by hand) is no longer offered as a selectable option here —
+// see the game picker below — but the underlying mechanism for it
+// (isDigital, further down) is deliberately left in place rather than
+// removed outright, since any past challenge that already used it needs
+// to keep displaying correctly in history.
+export default function ChallengeHost({ gameId, players, round, settings }) {
+  const extraDisabledTypes = [...presetIncompleteGameTypes(players), ...bigScreenOnlyGameTypesToExclude(settings)];
+  const [challenge, setChallenge] = useState(null);
+  const [scores, setScores] = useState({});
+  const [reentry, setReentry] = useState([]);
+  const [config, setConfig] = useState(DEFAULT_PARTICIPATION);
+  // "manual" is deliberately excluded here — see the picker below, which
+  // no longer offers it as a selectable option at all (kept only in the
+  // registry itself, for historical challenges that already used it —
+  // see lib/challengeGames.js). Defaulting to it here would leave the
+  // picker showing nothing highlighted at all on first load, since it's
+  // no longer one of the rendered options.
+  const [gameType, setGameType] = useState(Object.keys(GAME_REGISTRY).find((k) => k !== "manual"));
+  const [mazeSize, setMazeSize] = useState(GAME_REGISTRY.maze2d.config.size);
+  const [busy, setBusy] = useState(false);
+  const [plinkoBracket, setPlinkoBracket] = useState(null);
+  const [chainsState, setChainsState] = useState(null);
+  const [torchedState, setTorchedState] = useState(null);
+  const [scavengerState, setScavengerState] = useState(null);
+  const [musicalChairsState, setMusicalChairsState] = useState(null);
+  const [hostNow, setHostNow] = useState(Date.now());
+  const [resettingId, setResettingId] = useState(null);
+  const [challengeHistory, setChallengeHistory] = useState([]);
+  const [exileHistory, setExileHistory] = useState([]);
+  const [randomPickState, setRandomPickState] = useState(null);
+  const [globallyDisabled, setGloballyDisabled] = useState(null); // null = not loaded yet; the random-pick effect below waits for this rather than risk picking before it's known
+  const [hephaestusDraw, setHephaestusDraw] = useState(null);
+  const [editingScoreId, setEditingScoreId] = useState(null); // playerId currently showing the edit-score input, or null
+  const [scoreDraft, setScoreDraft] = useState("");
+  const [savingScoreId, setSavingScoreId] = useState(null);
+
+  const resetAttempt = async (playerId, playerName) => {
+    if (!confirm(`Reset ${playerName}'s attempt at this challenge? Their score and any in-progress clock are cleared — they get a completely fresh run next time they open this challenge. Takes effect the next time their screen reloads, not necessarily instantly if they're mid-game right now.`)) return;
+    setResettingId(playerId);
+    const res = await resetPlayerAttempt(gameId, round.round, challenge?.startedAt, playerId);
+    setResettingId(null);
+    if (!res.ok) alert("Couldn't reset that attempt — try again.");
+  };
+
+  const startEditingScore = (playerId, currentValue) => {
+    setEditingScoreId(playerId);
+    setScoreDraft(currentValue != null ? String(currentValue) : "");
+  };
+
+  // A direct correction to an already-finalized score — for a bad
+  // number that made it into the record somehow (a scoring formula
+  // edge case, a game reporting the wrong thing), not a way to redo
+  // someone's attempt. Confirms before writing since, unlike Reset
+  // (which just clears a slot for a fresh attempt), this replaces the
+  // actual recorded result and can change round outcomes.
+  const saveScoreOverride = async (playerId, playerName) => {
+    const parsed = Number(scoreDraft);
+    if (scoreDraft.trim() === "" || Number.isNaN(parsed)) { alert("Enter a number."); return; }
+    if (!confirm(`Set ${playerName}'s score to exactly ${parsed}? This directly overwrites their recorded result and will be flagged as host-edited wherever it's shown.`)) return;
+    setSavingScoreId(playerId);
+    const res = await overridePlayerScore(gameId, round.round, playerId, playerName, parsed);
+    setSavingScoreId(null);
+    if (!res.ok) { alert("Couldn't save that score — try again."); return; }
+    setEditingScoreId(null);
+  };
+
+  useEffect(() => {
+    const unsubscribe = subscribeGameState(gameId, KEY_CHALLENGE, setChallenge);
+    return unsubscribe;
+  }, [gameId, round?.round]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!round?.round) return;
+    const unsubscribe = subscribeScores(gameId, round.round, setScores);
+    return unsubscribe;
+  }, [gameId, round?.round]);
+
+  useEffect(() => {
+    if (!round?.round) return;
+    const unsubscribe = subscribePlinkoBracket(gameId, round.round, setPlinkoBracket);
+    return unsubscribe;
+  }, [gameId, round?.round]);
+
+  useEffect(() => {
+    if (!round?.round) return;
+    const unsubscribe = subscribeChains(gameId, round.round, setChainsState);
+    return unsubscribe;
+  }, [gameId, round?.round]);
+
+  useEffect(() => {
+    if (!round?.round) return;
+    const unsubscribe = subscribeTorched(gameId, round.round, setTorchedState);
+    return unsubscribe;
+  }, [gameId, round?.round]);
+
+  useEffect(() => {
+    if (!round?.round) return;
+    const unsubscribe = subscribeScavengerHunt(gameId, round.round, setScavengerState);
+    return unsubscribe;
+  }, [gameId, round?.round]);
+
+  useEffect(() => {
+    if (!round?.round) return;
+    const unsubscribe = subscribeMusicalChairs(gameId, round.round, setMusicalChairsState);
+    return unsubscribe;
+  }, [gameId, round?.round]);
+
+  // Only the "when do chairs open next" countdown below actually needs
+  // a live clock — see its own comment on why the host (unlike every
+  // player's own screen) gets to see this at all.
+  useEffect(() => {
+    const id = setInterval(() => setHostNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeGameState(gameId, KEY_CHALLENGE_HISTORY, (v) => setChallengeHistory(v || []));
+    return unsubscribe;
+  }, [gameId]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeGameState(gameId, KEY_EXILE_HISTORY, (v) => setExileHistory(v || []));
+    return unsubscribe;
+  }, [gameId]);
+
+  useEffect(() => {
+    if (!round?.round) return;
+    const unsubscribe = subscribeGameState(gameId, randomPickKey(round.round), setRandomPickState);
+    return unsubscribe;
+  }, [gameId, round?.round]);
+
+  useEffect(() => {
+    if (!round?.round) return;
+    const unsubscribe = subscribeGameState(gameId, hephaestusDrawKey(round.round), setHephaestusDraw);
+    return unsubscribe;
+  }, [gameId, round?.round]);
+
+  // Random challenge selection (see lib/challengeSelection.js) — the
+  // simple, no-Hephaestus case auto-triggers the moment the setup screen
+  // loads, no host button needed (nothing for a host to deliberately
+  // "kick off" here, it's just a straight random pick). Hephaestus's
+  // two-option draw, further down, is deliberately host-triggered
+  // instead — that one puts a choice in front of another player, so the
+  // host controls WHEN that happens rather than it firing the instant
+  // the round begins.
+  const hephaestusPlayer = (players || []).find((p) => p.alive && p.approved && powerFor(p, settings) === "Hephaestus");
+  useEffect(() => {
+    fetchGloballyDisabledChallenges().then(setGloballyDisabled);
+  }, []);
+  // If the currently-selected manual game type turns out to be
+  // disabled (either the initial default happened to land on one, or
+  // a platform admin disables the one a host already had selected),
+  // switch to the first still-enabled option instead of leaving a
+  // disabled game selected under the hood even though it's no longer
+  // shown as a choice.
+  useEffect(() => {
+    if (globallyDisabled === null) return;
+    const disabledTypes = [...(settings?.disabledChallenges || []), ...globallyDisabled, ...extraDisabledTypes];
+    const stockMarketBlocked = gameType === "stockmarket" && !canRunStockMarketChallenge(Date.now(), settings?.challengeDurationSec || 900);
+    const triviaBlocked = gameType === "seasontrivia" && !hasEnoughTriviaHistory(challengeHistory, exileHistory);
+    const timelineBlocked = gameType === "timeline" && !hasEnoughTimelineHistory(challengeHistory, exileHistory);
+    if (!disabledTypes.includes(gameType) && !stockMarketBlocked && !triviaBlocked && !timelineBlocked) return;
+    const firstEnabled = Object.keys(GAME_REGISTRY).find((k) => k !== "manual" && !disabledTypes.includes(k)
+      && !(k === "stockmarket" && stockMarketBlocked)
+      && !(k === "seasontrivia" && triviaBlocked)
+      && !(k === "timeline" && timelineBlocked));
+    if (firstEnabled) setGameType(firstEnabled);
+  }, [globallyDisabled, settings?.disabledChallenges, settings?.challengeDurationSec, gameType, challengeHistory, exileHistory]);
+  useEffect(() => {
+    if (settings?.challengeSelectionMode !== "random" || hephaestusPlayer || !round?.round || challenge?.active || randomPickState || globallyDisabled === null) return;
+    const disabledTypes = [...(settings?.disabledChallenges || []), ...globallyDisabled, ...extraDisabledTypes];
+    storageUpdate(gameId, randomPickKey(round.round), (fresh) => (fresh ? fresh : { gameType: pickRandomChallenge(challengeHistory, disabledTypes, Date.now(), settings?.challengeDurationSec, exileHistory) }));
+  }, [settings?.challengeSelectionMode, settings?.disabledChallenges, hephaestusPlayer, round?.round, challenge?.active, randomPickState, globallyDisabled, gameId, challengeHistory, exileHistory]);
+
+  // Keeps gameType (the state everything else in this component — maze
+  // size, duration, the start button — already reads from) in sync with
+  // whichever random-mode resolution actually applies, so the rest of
+  // the setup flow works completely unchanged regardless of selection
+  // mode.
+  useEffect(() => {
+    if (settings?.challengeSelectionMode !== "random") return;
+    if (hephaestusDraw?.chosen) setGameType(hephaestusDraw.chosen);
+    else if (!hephaestusPlayer && randomPickState?.gameType) setGameType(randomPickState.gameType);
+  }, [settings?.challengeSelectionMode, hephaestusDraw?.chosen, hephaestusPlayer, randomPickState?.gameType]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeReentry(gameId, setReentry);
+    return unsubscribe;
+  }, [gameId]);
+
+  const approvedAlive = players.filter((p) => p.approved && p.alive);
+  // A player barred from THIS round's Battle (see lib/roundEngine.js's
+  // autoNominateTimedOutNominators — the consequence for any of the
+  // three Fates nominators missing their own nomination within the
+  // ceremony's configured time limit) is excluded from the participant pool
+  // entirely, same as if they'd never been alive-and-approved in the
+  // first place. battle_ban_round naturally stops applying after this
+  // round passes — a later round's number will never match it again.
+  const eligibleForBattle = approvedAlive.filter((p) => p.battle_ban_round !== round?.round);
+  const battleBannedPlayers = approvedAlive.filter((p) => p.battle_ban_round === round?.round);
+  const alivePicker = eligibleForBattle.map((p) => ({ id: p.id, name: p.display_name }));
+
+  // Every exiled player still eligible (hasn't used their one shot yet)
+  // gets to opt in or out of THIS specific challenge, deliberately, from
+  // their own screen — see components/ChallengePlayer.jsx and
+  // lib/reentryData.js's setReentryDecision. Nothing for the host to pick
+  // here; this is just who's currently eligible to decide.
+  const pendingReentrants = reentry.filter((r) => r.status === REENTRY_STATUS.PENDING);
+
+  const pickGameType = (type) => {
+    setGameType(type);
+    setDurationSec(GAME_REGISTRY[type].defaultDurationSec);
+    if (MAZE_TYPES.includes(type)) setMazeSize(GAME_REGISTRY[type].config.size);
+  };
+
+  const startChallenge = async () => {
+    if (randomModeNotReady) return; // defense-in-depth alongside the disabled Start Battle button — gameType isn't finalized yet
+    setBusy(true);
+    const { participants } = computeParticipants(config, { alive: alivePicker });
+    const participantIds = participants.map((p) => p.id);
+    // Read fresh rather than trusting the subscribed `reentry` state above —
+    // right after an Exile Vote resolves, a host clicking Start Challenge
+    // quickly could otherwise snapshot a beat-behind list and permanently
+    // lock a just-exiled player out of opting into this specific
+    // challenge. Snapshotted (not recomputed later) so someone exiled
+    // mid-challenge doesn't suddenly become eligible to opt into a
+    // challenge that's already running.
+    const freshReentry = await getReentry(gameId);
+    const reentryEligibleIds = freshReentry.filter((r) => r.status === REENTRY_STATUS.PENDING).map((r) => r.playerId);
+    const now = Date.now();
+    // torched and masquerade both now run for the season's own
+    // configured challengeDurationSec like any other challenge — see
+    // lib/roundEngine.js's own matching endsAt computation and its
+    // comments (autoTimeoutTorched, autoTimeoutMasquerade) for why an
+    // unbounded per-turn wait inside a now-bounded battle would defeat
+    // the whole point of giving it a duration at all. chains and
+    // pandorasboxes now run for the real duration too, now that both
+    // report real interim progress (see their own placementValue
+    // comments) instead of reporting nothing at all until the very end
+    // — settings.infiniteTime remains the one deliberate, host-
+    // controlled way to still get an unbounded battle for any game
+    // type.
+    //
+    // This mirrors lib/roundEngine.js's own endsAt computation
+    // exactly, on purpose — this file's normal-start path and that
+    // file's automatic-start path both need to agree, and they'd
+    // already drifted out of sync once (this file kept the old
+    // masquerade/torched/chains/pandorasboxes exclusion well after
+    // roundEngine.js had already been fixed, which is exactly the kind
+    // of duplicated-logic bug worth flagging here as a reminder to
+    // check both files together if this ever needs changing again).
+    const endsAt = settings?.infiniteTime ? null : now + (settings?.challengeDurationSec || 900) * 1000;
+    const configOverrides = MAZE_TYPES.includes(gameType) ? { size: mazeSize } : undefined;
+    await storageSet(gameId, KEY_CHALLENGE, {
+      round: round.round, active: true, startedAt: now, endsAt,
+      participantIds, reentryEligibleIds, reentryDecisions: {}, reentryAttemptIds: [], placements: [], finalized: false,
+      gameType, gameConfig: gameConfigWithDefaults(gameType, configOverrides),
+    });
+    // Same battle-start notification as lib/roundEngine.js's own
+    // autoStartRandomChallenge now sends (see that function's own
+    // comment on why this was genuinely missing before) — this is the
+    // manual, host-triggered path, so it's a client-side call to the
+    // existing push API route rather than the direct in-process
+    // notifyRoundChange helper that file uses (that helper runs
+    // server-side and isn't reachable from here). Best-effort and
+    // fire-and-forget — a notification failing here should never block
+    // the host from actually starting the challenge, which already
+    // succeeded via the storageSet above.
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (token) {
+        await fetch("/api/push/notify-round-change", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            gameId, title: `⚔️ ${GAME_REGISTRY[gameType]?.label || gameType} Has Started`, body: "The Battle is live — go compete!",
+          }),
+        });
+      }
+    } catch (e) {
+      console.error("Battle-start push notify failed:", e);
+    }
+    if (gameType === "plinko") {
+      await initPlinkoBracket(gameId, round.round, participants, now);
+    }
+    if (gameType === "pit") {
+      await initPit(gameId, round.round, participants, now);
+    }
+    if (gameType === "masquerade") {
+      await initMasquerade(gameId, round.round, participants, now);
+    }
+    if (gameType === "wordscrambletv") {
+      await initWordScrambleTv(gameId, round.round, participants, now);
+    }
+    if (gameType === "simontv") {
+      await initSimonTv(gameId, round.round, participants, now);
+    }
+    if (gameType === "musicalchairstv") {
+      await initMusicalChairsTv(gameId, round.round, participants, now);
+    }
+    if (gameType === "eyesinthesystem") {
+      await initEyesInTheSystem(gameId, round.round, participants, now);
+    }
+    if (gameType === "eyesinthesystemtv") {
+      await initEyesInTheSystemTv(gameId, round.round, participants, now);
+    }
+    if (gameType === "balloono") {
+      await initBalloono(gameId, round.round, participants, now);
+    }
+    if (gameType === "laurelthief" || gameType === "laurelthieftv") {
+      await initLaurelThief(gameId, round.round, participants, now);
+    }
+    if (gameType === "wagertriviatv") {
+      await initWagerTrivia(gameId, round.round, participants, now);
+    }
+    if (gameType === "tartarustreadmill") {
+      await initTartarusTreadmill(gameId, round.round, participants, now);
+    }
+    if (gameType === "spyfall") {
+      await initSpyfall(gameId, round.round, participants, now);
+    }
+    if (gameType === "acrophobia") {
+      await initAcrophobia(gameId, round.round, participants, now);
+    }
+    if (gameType === "minigolf") {
+      await initMiniGolf(gameId, round.round, participants, now);
+    }
+    if (gameType === "closeto20") {
+      await initCloseToTwenty(gameId, round.round, participants, now);
+    }
+    if (gameType === "torched") {
+      // Pulled from the full roster (not just the participants array,
+      // which only carries id/name), player-set ahead of time from
+      // their own Help tab — see sql/add-torched-preset.sql.
+      const presetsByPlayerId = {};
+      players.forEach((p) => { if (p.torched_preset) presetsByPlayerId[p.id] = p.torched_preset; });
+      await initTorched(gameId, round.round, participants, now, presetsByPlayerId);
+    }
+    if (gameType === "chains") {
+      await initChains(gameId, round.round, participants);
+    }
+    if (gameType === "pandorasboxes") {
+      await initPandorasBoxes(gameId, round.round, participants);
+    }
+    if (gameType === "musicalchairs") {
+      await initMusicalChairs(gameId, round.round, participants, now, settings?.challengeDurationSec);
+    }
+    if (gameType === "floor") {
+      await initFloor(gameId, round.round, participants, now, settings?.challengeDurationSec);
+    }
+    if (gameType === "artauction") {
+      await initArtAuction(gameId, round.round, participants, now, settings?.challengeDurationSec);
+    }
+    if (gameType === "mysterybutton") {
+      await initMysteryButton(gameId, round.round, participants, now, settings?.challengeDurationSec);
+    }
+    if (gameType === "goldenfleece") {
+      await initGoldenFleece(gameId, round.round, participants, now);
+    }
+    if (gameType === "riverstyx") {
+      await initRiverStyx(gameId, round.round, participants, now);
+    }
+    if (gameType === "winedarksea") {
+      await initWineDarkSea(gameId, round.round, participants, now);
+    }
+    if (gameType === "scavengerhunt") {
+      await initScavengerHunt(gameId, round.round, participants, now);
+    }
+    if (gameType === "majorityrules") {
+      await initMajorityRules(gameId, round.round, participants, now);
+    }
+    if (gameType === "majorityrulestv") {
+      await initMajorityRulesTv(gameId, round.round, participants, now);
+    }
+    if (gameType === "triggerhappytv") {
+      await initTriggerHappyTv(gameId, round.round, participants, now);
+    }
+    if (gameType === "godsandgambits") {
+      await initGodsAndGambits(gameId, round.round, participants, now);
+    }
+    if (gameType === "divinersdice") {
+      await initDivinersDice(gameId, round.round, participants, now);
+    }
+    if (gameType === "splitfriction") {
+      await initSplitFriction(gameId, round.round, participants, now, settings?.challengeDurationSec);
+    }
+    if (gameType === "crowns" || gameType === "crownstv") {
+      await initCrowns(gameId, round.round, participants, now);
+    }
+    if (gameType === "poseidonspool" || gameType === "poseidonspooltv") {
+      await initPoseidonsPool(gameId, round.round, participants, now, settings?.challengeDurationSec);
+    }
+    await storageUpdate(gameId, KEY_ROUND, (fresh) => ({ ...(fresh || {}), phaseStartedAt: now, phaseEndsAt: endsAt }));
+    setBusy(false);
+  };
+
+  const setPlace = async (playerId, place) => {
+    await storageUpdate(gameId, KEY_CHALLENGE, (fresh) => {
+      if (!fresh) return null;
+      const list = (fresh.placements || []).filter((p) => p.playerId !== playerId);
+      if (place) {
+        const name = players.find((p) => p.id === playerId)?.display_name || "?";
+        list.push({ playerId, name, place: Number(place) });
+      }
+      fresh.placements = list;
+      return fresh;
+    });
+  };
+
+  const clearResults = async () => {
+    await storageUpdate(gameId, KEY_CHALLENGE, (fresh) => {
+      if (!fresh) return null;
+      fresh.placements = [];
+      return fresh;
+    });
+  };
+
+  const finishNow = async () => {
+    if (isDigital && (inProgressParticipants.length > 0 || notStartedParticipants.length > 0)) {
+      const stillGoing = [...inProgressParticipants, ...notStartedParticipants].map((p) => p.display_name);
+      const verb = stillGoing.length > 1 ? "haven't" : "hasn't";
+      if (!confirm(`${stillGoing.join(", ")} ${verb} finished yet — ending now ranks them last. Continue?`)) return;
+    }
+    setBusy(true);
+    const result = await requestAdvance(gameId, true);
+    setBusy(false);
+    if (result.error) alert("Couldn't finish the challenge: " + result.error);
+  };
+
+  if (round?.phase !== "challenge") {
+    return <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>Not in the Battle phase right now.</p></Card>;
+  }
+
+  const participants = challenge?.participantIds
+    ? players.filter((p) => challenge.participantIds.includes(p.id))
+    : [];
+  const isDigital = challenge?.gameType && challenge.gameType !== "manual";
+  const complete = challenge
+    ? (isDigital ? true : placementsComplete(challenge.placements, participants.length))
+    : false;
+  // Random challenge selection isn't "ready to start" until whichever
+  // resolution applies has actually landed — Hephaestus hasn't chosen
+  // yet, or (no Hephaestus this round) the straight random pick hasn't
+  // come back yet. gameType itself stays whatever it was left at from a
+  // prior manual-mode session until one of those resolves and the sync
+  // effect above updates it, so this can't just check gameType alone.
+  const randomModeNotReady = settings?.challengeSelectionMode === "random"
+    && (hephaestusPlayer ? !hephaestusDraw?.chosen : !randomPickState?.gameType);
+
+  if (!challenge?.active) {
+    return (
+      <Card>
+        <h3 style={{ color: "#f5f0ff", margin: "0 0 8px", fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>⚔️ Battle — Setup</h3>
+        <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+          Pick a challenge — each one plays out live on each player's own screen and scores itself.
+        </p>
+
+        {settings?.challengeSelectionMode === "random" ? (
+          <div style={{ marginBottom: 10 }}>
+            {hephaestusPlayer ? (
+              !hephaestusDraw ? (
+                <div style={{ background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: 14, textAlign: "center" }}>
+                  <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>
+                    🔥 <strong style={{ color: "#f5f0ff" }}>{hephaestusPlayer.display_name}</strong> holds Hephaestus's power this round — their two options are drawn automatically, then the battle starts the moment they choose.
+                  </p>
+                </div>
+              ) : !hephaestusDraw.chosen ? (
+                <div style={{ background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: 14, textAlign: "center" }}>
+                  <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>
+                    Waiting on {hephaestusPlayer.display_name} to choose between{" "}
+                    <strong style={{ color: "#f5f0ff" }}>
+                      {hephaestusDraw.options.map((k) => `${GAME_REGISTRY[k].icon} ${GAME_REGISTRY[k].label}`).join(" and ")}
+                    </strong>. The battle starts automatically the moment they pick.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: 14, textAlign: "center" }}>
+                  <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>
+                    🔥 {hephaestusPlayer.display_name} chose <strong style={{ color: "#f5f0ff" }}>{GAME_REGISTRY[gameType].icon} {GAME_REGISTRY[gameType].label}</strong> — starting automatically...
+                  </p>
+                </div>
+              )
+            ) : randomPickState?.gameType ? (
+              <div style={{ background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: 14, textAlign: "center" }}>
+                <p style={{ color: "#a68fd6", fontSize: 12, margin: 0 }}>
+                  🎲 Randomly selected: <strong style={{ color: "#f5f0ff" }}>{GAME_REGISTRY[gameType].icon} {GAME_REGISTRY[gameType].label}</strong> — starting automatically...
+                </p>
+              </div>
+            ) : (
+              <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic", textAlign: "center" }}>🎲 Rolling...</p>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 6, marginBottom: 10 }}>
+            {Object.entries(GAME_REGISTRY).filter(([key]) => {
+              if (key === "manual") return false;
+              if ((settings?.disabledChallenges || []).includes(key) || (globallyDisabled || []).includes(key)) return false;
+              // Stock Market specifically also needs the battle's own
+              // scheduled window to overlap real market hours — see
+              // lib/games/stockMarketData.js's own reasoning. Filtered
+              // out entirely here (with the note below explaining why)
+              // rather than shown-but-disabled, same treatment the
+              // disabledChallenges/globallyDisabled filters just above
+              // already get.
+              if (key === "stockmarket" && !canRunStockMarketChallenge(Date.now(), settings?.challengeDurationSec || 900)) return false;
+              // Season Trivia and Timeline both need a real season's
+              // worth of history to draw from — see
+              // lib/games/seasonTriviaData.js / lib/games/timelineData.js.
+              // Same filtered-out-with-a-note treatment as Stock
+              // Market immediately above, for the same reason: a
+              // brand-new season just doesn't have enough real events
+              // yet for either to be a fair (or even possible) battle.
+              if (key === "seasontrivia" && !hasEnoughTriviaHistory(challengeHistory, exileHistory)) return false;
+              if (key === "timeline" && !hasEnoughTimelineHistory(challengeHistory, exileHistory)) return false;
+              // extraDisabledTypes covers two genuinely different
+              // reasons a game type might need filtering here, merged
+              // into one list since both just mean "don't offer this
+              // right now": Torched and The Floor both have a preset a
+              // player sets ahead of time from their own Options tab
+              // (torched_preset, floor_specialty — see
+              // lib/presetReadiness.js and components/OptionsPanel.jsx)
+              // — offering one before everyone's actually set theirs
+              // just forces whoever hasn't into a live, on-the-spot
+              // setup the whole rest of the room is sitting around
+              // waiting on. Separately, some game types (see
+              // lib/bigScreenOnlyGames.js) only work at all with a
+              // shared TV display — those stay filtered out unless
+              // settings.bigScreenMode is actually on for this season.
+              if (extraDisabledTypes.includes(key)) return false;
+              return true;
+            }).map(([key, g]) => (
+              <button key={key} onClick={() => pickGameType(key)} style={{
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                padding: "10px 8px", borderRadius: 8, cursor: "pointer",
+                background: gameType === key ? "rgba(255,45,149,0.15)" : "#0d0618",
+                border: `1px solid ${gameType === key ? "#ff2d95" : "#3d1f5c"}`,
+                color: gameType === key ? "#ff2d95" : "#a68fd6",
+              }}>
+                <span style={{ fontSize: 20 }}>{g.icon}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, textAlign: "center" }}>{g.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <p style={{ fontSize: 11.5, color: "#6b4f99", margin: "0 0 14px", fontStyle: "italic" }}>{GAME_REGISTRY[gameType].blurb}</p>
+        {gameType !== "stockmarket" && !canRunStockMarketChallenge(Date.now(), settings?.challengeDurationSec || 900) && (
+          <p style={{ fontSize: 11, color: "#6b4f99", margin: "0 0 10px", fontStyle: "italic" }}>
+            📈 Stock Market isn't shown right now — it's only offered when the battle's scheduled hours overlap real stock market trading hours (weekdays, 9:30am-4:00pm ET).
+          </p>
+        )}
+        {gameType !== "seasontrivia" && !hasEnoughTriviaHistory(challengeHistory, exileHistory) && (
+          <p style={{ fontSize: 11, color: "#6b4f99", margin: "0 0 10px", fontStyle: "italic" }}>
+            📜 Season Trivia isn't shown right now — it needs a few completed rounds of real history to draw questions from.
+          </p>
+        )}
+        {gameType !== "timeline" && !hasEnoughTimelineHistory(challengeHistory, exileHistory) && (
+          <p style={{ fontSize: 11, color: "#6b4f99", margin: "0 0 10px", fontStyle: "italic" }}>
+            🕰️ Timeline isn't shown right now — it needs a few completed rounds of real history to build a puzzle from.
+          </p>
+        )}
+
+        {MAZE_TYPES.includes(gameType) && (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+            <label style={{ fontSize: 12, color: "#a68fd6" }}>Maze size:</label>
+            <input type="number" min={5} max={31} step={2} value={mazeSize}
+              onChange={(e) => setMazeSize(Math.max(5, Math.min(31, Number(e.target.value) || 11)))}
+              style={{ width: 70, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "6px 10px", color: "#f5f0ff", fontSize: 13 }} />
+            <span style={{ fontSize: 12, color: "#a68fd6" }}>cells (odd numbers work best)</span>
+          </div>
+        )}
+
+        <ParticipantPicker alive={alivePicker} value={config} onChange={setConfig} />
+
+        {battleBannedPlayers.length > 0 && (
+          <div style={{ background: "rgba(255,56,96,0.08)", border: "1px solid rgba(255,56,96,0.3)", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: "#ff3860", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+              🚫 Barred from this battle
+            </div>
+            <p style={{ fontSize: 11, color: "#a68fd6", margin: 0, fontStyle: "italic" }}>
+              {battleBannedPlayers.map((p) => p.display_name).join(", ")} — missed their {settings?.fatesDurationSec ? formatDurationHours(settings.fatesDurationSec) : "Fates"} nomination window last round, so the game auto-nominated on their behalf and barred them from competing this round as the consequence.
+            </p>
+          </div>
+        )}
+
+        {pendingReentrants.length > 0 && (
+          <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+              Exiled players eligible to opt in
+            </div>
+            <p style={{ fontSize: 11, color: "#6b4f99", margin: "0 0 8px", fontStyle: "italic" }}>
+              Each gets exactly one re-entry attempt, ever. Once this challenge starts, they'll each choose — deliberately, from
+              their own screen — whether to compete in THIS one. Not deciding by the time everyone else finishes counts as sitting
+              it out (costs them nothing); opting in and not finishing 1st uses up their one shot for good.
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {pendingReentrants.map((r) => (
+                <span key={r.playerId} style={{
+                  fontSize: 11, padding: "4px 10px", borderRadius: 12,
+                  background: "rgba(255,56,96,0.12)", border: "1px solid #ff3860", color: "#ff3860",
+                }}>{r.name}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {settings?.infiniteTime ? (
+          <p style={{ color: "#ff2d95", fontSize: 12, margin: "0 0 12px" }}>∞ Infinite time is on — this battle runs until you end it. (Change this in Admin → Round Lengths.)</p>
+        ) : (
+          <p style={{ color: "#a68fd6", fontSize: 12, margin: "0 0 12px" }}>
+            Duration: {Math.round((settings?.challengeDurationSec || 900) / 60)} min <span style={{ color: "#6b4f99", fontStyle: "italic" }}>(set in Admin → Round Lengths)</span>
+          </p>
+        )}
+
+        {settings?.challengeSelectionMode === "random" ? (
+          <p style={{ color: "#6b4f99", fontSize: 12, fontStyle: "italic", textAlign: "center", margin: 0 }}>
+            ⚙️ Starts automatically once the game type's resolved — nothing to click here.
+          </p>
+        ) : (
+          <Btn onClick={startChallenge} disabled={busy}>{busy ? "Starting..." : "Start Battle"}</Btn>
+        )}
+      </Card>
+    );
+  }
+
+  const registryEntry = GAME_REGISTRY[challenge.gameType || "manual"];
+  const rankDirection = registryEntry?.rank === "time-asc" ? "time-asc" : "score-desc";
+
+  // The leaderboard only ever ranks players who have actually FINISHED
+  // (a locked, non-forfeited score) — someone who hasn't played yet, or
+  // is still mid-game, never gets a placement number or a "#1" badge.
+  // Ranking everyone the instant the challenge starts (as if a no-show
+  // were simply "last place") is correct for the FINAL result once the
+  // timer's genuinely up — see scoresToPlacements — but showing that
+  // same logic live, while people (including anyone attempting
+  // re-entry) are still actively playing, makes an in-progress challenge
+  // look like a decided one. That's misleading and risks the host
+  // ending it early on a false impression that it's already over.
+  const finishedParticipants = participants.filter((p) => scores[p.id]?.locked && !scores[p.id]?.forfeited);
+  const forfeitedParticipants = participants.filter((p) => scores[p.id]?.forfeited);
+  const inProgressParticipants = participants.filter((p) => scores[p.id] && !scores[p.id].locked);
+  const notStartedParticipants = participants.filter((p) => !scores[p.id]);
+
+  const finishedRanking = isDigital
+    ? scoresToPlacements(scores, finishedParticipants.map((p) => ({ playerId: p.id, name: p.display_name })), rankDirection)
+    : [];
+
+  const scoreLabel = (s) => {
+    if (!s) return null;
+    if (s.foundCount != null) return `${s.foundCount}/${challenge.gameConfig?.differences || 5} found`;
+    return rankDirection === "time-asc" ? `${(s.value / 1000).toFixed(2)}s` : s.value;
+  };
+
+  return (
+    <Card>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <h3 style={{ color: "#f5f0ff", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
+          {registryEntry?.icon} {registryEntry?.label} — In Progress
+        </h3>
+        {challenge.reentryAttemptIds?.length > 0 && <Badge color="#ff3860">{challenge.reentryAttemptIds.length} re-entry attempt{challenge.reentryAttemptIds.length > 1 ? "s" : ""} in progress</Badge>}
+      </div>
+      <p style={{ color: "#6b4f99", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+        1st place wins immunity{round.finalFour ? " — everyone else is automatically nominated (Final Four)." : "; the top 3 each get to make a nomination at the Fates Ceremony."}
+      </p>
+
+      {(() => {
+        // Union of the challenge's original snapshot and anyone
+        // currently PENDING — covers a player who opted in despite not
+        // being captured in the snapshot (see lib/reentryData.js's
+        // setReentryDecision, which no longer requires snapshot
+        // membership), so the host's list here can't miss someone who's
+        // actually deciding or has decided.
+        const liveEligibleIds = new Set([
+          ...(challenge.reentryEligibleIds || []),
+          ...reentry.filter((r) => r.status === REENTRY_STATUS.PENDING || challenge.reentryDecisions?.[r.playerId]).map((r) => r.playerId),
+        ]);
+        if (liveEligibleIds.size === 0) return null;
+        return (
+          <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+              🔥 Re-entry — deciding whether to compete
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {[...liveEligibleIds].map((id) => {
+                const name = players.find((p) => p.id === id)?.display_name || "?";
+                const decision = challenge.reentryDecisions?.[id];
+                const color = decision === "in" ? "#ff3860" : decision === "out" ? "#6b4f99" : "#a68fd6";
+                const label = decision === "in" ? `${name} — opted in` : decision === "out" ? `${name} — sitting out` : `${name} — deciding...`;
+                return (
+                  <span key={id} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 12, border: `1px solid ${color}`, color, opacity: decision === "out" ? 0.7 : 1 }}>
+                    {label}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {challenge?.gameType === "plinko" && challenge.active && plinkoBracket && (
+        <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+            🔴 Duel Bracket — {plinkoBracket.eliminationCount} eliminated, {plinkoBracket.pool.length} waiting
+          </div>
+          <p style={{ fontSize: 12, color: "#f5f0ff", margin: 0 }}>
+            {plinkoBracket.current
+              ? `Dueling now: ${players.find((p) => p.id === plinkoBracket.current[0])?.display_name || "?"} vs ${players.find((p) => p.id === plinkoBracket.current[1])?.display_name || "?"}`
+              : plinkoBracket.champion
+                ? `${players.find((p) => p.id === plinkoBracket.champion)?.display_name || "?"} is picking their next challenger...`
+                : "Setting up..."}
+          </p>
+        </div>
+      )}
+
+      {challenge?.gameType === "chains" && challenge.active && chainsState && !chainsState.revealed && (
+        <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+            ✊ Chains — {Object.keys(chainsState.chains || {}).length} of {chainsState.participantIds.length} locked in
+          </div>
+          <p style={{ fontSize: 12, color: "#f5f0ff", margin: 0 }}>
+            {chainsState.participantIds.map((id) => {
+              const locked = !!chainsState.chains?.[id];
+              return `${locked ? "✓" : "⋯"} ${players.find((p) => p.id === id)?.display_name || "?"}`;            }).join("  ·  ")}
+          </p>
+          <p style={{ fontSize: 10, color: "#6b4f99", margin: "6px 0 0", fontStyle: "italic" }}>
+            Only who's locked in — what they actually picked stays hidden until everyone's in.
+          </p>
+        </div>
+      )}
+
+      {challenge?.gameType === "torched" && challenge.active && torchedState && !torchedState.winnerId && (() => {
+        // Live board for the host — same shot log every player already
+        // sees (see components/games/TorchedPlayer.jsx's own comment:
+        // shots are resolved and public once a round finishes, whoever
+        // called them), rendered the same visual way that component
+        // does. Deliberately does NOT reveal any marker's position
+        // before it's actually been hit — the host gets the same "fog
+        // of war" every player has, not a spoiler view. What the host
+        // gets that a player doesn't: seeing every cell at once
+        // regardless of elimination status, and the alive/eliminated
+        // summary below the grid.
+        //
+        // Shooting is simultaneous now, in timed rounds, not turn-based
+        // — see lib/games/torchedData.js's own header comment for the
+        // full mechanic — so there's no "whose turn" to show anymore;
+        // this shows the round number and how many of the still-alive
+        // players have already submitted their call for it instead,
+        // which is the actual thing worth knowing about a round in
+        // progress.
+        const gridSize = torchedState.gridSize;
+        const cells = Array.from({ length: gridSize }, (_, r) => Array.from({ length: gridSize }, (_, c) => [r, c]));
+        const shotAt = (r, c) => torchedState.shotsLog.find((s) => s.at[0] === r && s.at[1] === c);
+        const alivePlayers = Object.entries(torchedState.markers).filter(([, m]) => m.alive).map(([id]) => id);
+        const eliminatedPlayers = Object.entries(torchedState.markers).filter(([, m]) => !m.alive).map(([id]) => id);
+        const submittedCount = Object.keys(torchedState.pendingShots || {}).length;
+        const byName = (id) => players.find((p) => p.id === id)?.display_name || "?";
+
+        return (
+          <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                🔥 Torched — live board
+              </div>
+              {torchedState.shooting && <Badge>Round {torchedState.roundNum} — {submittedCount}/{alivePlayers.length} in</Badge>}
+            </div>
+            {!torchedState.shooting ? (
+              <p style={{ fontSize: 12, color: "#f5f0ff", margin: "0 0 8px" }}>
+                {torchedState.placedIds.length} of {challenge.participantIds.length} players have placed their marker — grid isn't visible until shooting starts.
+              </p>
+            ) : (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridSize}, 1fr)`, gap: 3, maxWidth: 280, margin: "0 auto 10px" }}>
+                  {cells.flat().map(([r, c]) => {
+                    const shot = shotAt(r, c);
+                    let bg = "#150a28";
+                    let border = "#3d1f5c";
+                    let boxShadow = "none";
+                    if (shot?.hitPlayerId) {
+                      bg = "radial-gradient(circle at 50% 40%, #fff3c4, #ff9f4d 40%, #ff3860 75%)";
+                      border = "#ff3860";
+                      boxShadow = "0 0 8px rgba(255,56,96,0.7)";
+                    } else if (shot) {
+                      bg = "radial-gradient(circle at 50% 40%, rgba(107,79,153,0.55), rgba(107,79,153,0.2))";
+                      border = "#6b4f99";
+                    }
+                    return <div key={`${r}-${c}`} style={{ aspectRatio: "1", borderRadius: 3, background: bg, border: `1px solid ${border}`, boxShadow }} />;
+                  })}
+                </div>
+                <p style={{ fontSize: 10, color: "#6b4f99", margin: "0 0 8px", textAlign: "center" }}>🟣 a miss · 🔴 a hit — marker positions stay hidden until hit, same as every player sees</p>
+              </>
+            )}
+            <p style={{ fontSize: 11, color: "#f5f0ff", margin: 0 }}>
+              <strong style={{ color: "#00ff9d" }}>Alive:</strong> {alivePlayers.map(byName).join(", ") || "—"}
+              {eliminatedPlayers.length > 0 && <><br /><strong style={{ color: "#ff3860" }}>Eliminated:</strong> {eliminatedPlayers.map(byName).join(", ")}</>}
+            </p>
+          </div>
+        );
+      })()}
+
+      {challenge?.gameType === "scavengerhunt" && challenge.active && scavengerState && !scavengerState.gameOver && (
+        <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+            🏺 Scavenger Hunt — Round {scavengerState.roundIndex} · {scavengerState.finishedOrder.length} of 3 returned to Olympus
+          </div>
+          <div style={{ display: "grid", gap: 4 }}>
+            {Object.entries(scavengerState.players).map(([pid, p]) => {
+              const name = players.find((pl) => pl.id === pid)?.display_name || "?";
+              const distinctTypes = new Set(p.inventory).size;
+              const locationLabel = p.finishedRound != null ? "🏛 Olympus"
+                : p.currentLocation == null ? "choosing a starting temple..."
+                : scavengerState.temples[p.currentLocation]?.name || "?";
+              return (
+                <p key={pid} style={{ fontSize: 12, color: p.finishedRound != null ? "#00ff9d" : "#f5f0ff", margin: 0 }}>
+                  {p.nextLocation != null || p.finishedRound != null ? "✓" : "⋯"} {name} — {distinctTypes}/{SCAVENGER_OFFERING_TYPES.length} · {locationLabel}
+                </p>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {challenge?.gameType === "musicalchairs" && challenge.active && musicalChairsState && musicalChairsState.gamePhase === "playing" && (() => {
+        const alive = musicalChairsState.remainingPlayerIds.length;
+        const byName = (id) => players.find((pl) => pl.id === id)?.display_name || "?";
+        const secLeft = (deadline) => Math.max(0, Math.ceil((deadline - hostNow) / 1000));
+        return (
+          <div style={{ background: "#0d0618", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+              🎵 Musical Chairs — Round {musicalChairsState.roundIndex + 1} of {musicalChairsState.totalRounds} · {alive} still standing
+            </div>
+            {/* This countdown is deliberately hidden on every player's
+                own screen (see components/games/MusicalChairsPlayer.jsx's
+                own "deliberately no countdown shown" comment) — not
+                knowing when the music stops is the entire game. The
+                host isn't playing, though, and needs to actually know
+                what's happening to run the Battle, so it shows here. */}
+            {musicalChairsState.roundPhase === "music" ? (
+              <p style={{ fontSize: 13, color: "#f5f0ff", margin: 0 }}>
+                🎼 Music playing — chairs open in <strong style={{ color: "#ffd700" }}>{secLeft(musicalChairsState.musicEndsAt)}s</strong> (players can't see this countdown)
+              </p>
+            ) : (() => {
+              const claims = musicalChairsState.claims || {};
+              const claimedIds = Object.keys(claims).sort((a, b) => claims[a].chairIndex - claims[b].chairIndex);
+              const unclaimedIds = musicalChairsState.remainingPlayerIds.filter((id) => !claims[id]);
+              return (
+                <>
+                  <p style={{ fontSize: 13, color: "#f5f0ff", margin: 0 }}>
+                    🪑 Chairs are open ({musicalChairsState.chairCount} available, {claimedIds.length} claimed) — window closes in <strong style={{ color: "#00ff9d" }}>{secLeft(musicalChairsState.seatsEndsAt)}s</strong>
+                  </p>
+                  <p style={{ fontSize: 12, color: "#00ff9d", margin: "6px 0 0" }}>
+                    Claimed: {claimedIds.length > 0 ? claimedIds.map(byName).join(", ") : "no one yet"}
+                  </p>
+                  <p style={{ fontSize: 12, color: "#ff3860", margin: "4px 0 0" }}>
+                    Still without a chair: {unclaimedIds.map(byName).join(", ") || "—"}
+                  </p>
+                </>
+              );
+            })()}
+            {musicalChairsState.roundPhase === "music" && (
+              <p style={{ fontSize: 11, color: "#6b4f99", margin: "6px 0 0" }}>
+                Still standing: {musicalChairsState.remainingPlayerIds.map(byName).join(", ") || "—"}
+              </p>
+            )}
+          </div>
+        );
+      })()}
+
+      {isDigital ? (
+        <div style={{ display: "grid", gap: 10, marginBottom: 12 }}>
+          {finishedRanking.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+                Finished ({finishedRanking.length}/{participants.length})
+              </div>
+              <div style={{ display: "grid", gap: 6 }}>
+                {finishedRanking.map((r) => {
+                  const isReentrant = challenge.reentryAttemptIds?.includes(r.playerId);
+                  const currentScoreObj = scores[r.playerId];
+                  if (editingScoreId === r.playerId) {
+                    return (
+                      <div key={r.playerId} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0d0618", borderRadius: 6, padding: "6px 10px", border: "1px solid #ff3860" }}>
+                        <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff" }}>{r.name}</span>
+                        <input
+                          type="number" value={scoreDraft} onChange={(e) => setScoreDraft(e.target.value)} autoFocus
+                          style={{ width: 110, background: "#150a28", border: "1px solid #3d1f5c", borderRadius: 6, padding: "4px 8px", color: "#f5f0ff", fontSize: 12 }}
+                        />
+                        <button
+                          onClick={() => saveScoreOverride(r.playerId, r.name)}
+                          disabled={savingScoreId === r.playerId}
+                          style={{ background: "#ff3860", border: "none", borderRadius: 6, color: "#05010f", fontSize: 10, fontWeight: 700, padding: "4px 10px", cursor: "pointer" }}
+                        >
+                          {savingScoreId === r.playerId ? "..." : "Save"}
+                        </button>
+                        <button
+                          onClick={() => setEditingScoreId(null)}
+                          style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, color: "#a68fd6", fontSize: 10, padding: "4px 10px", cursor: "pointer" }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={r.playerId} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0d0618", borderRadius: 6, padding: "6px 10px" }}>
+                      <Badge color={r.place === 1 ? "#ff2d95" : "#a68fd6"}>#{r.place}</Badge>
+                      <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff" }}>
+                        {r.name}{isReentrant && <span style={{ color: "#ff3860", fontSize: 11 }}> (re-entry attempt)</span>}
+                      </span>
+                      <span style={{ fontSize: 12, color: currentScoreObj?.hostOverridden ? "#ff3860" : "#a68fd6" }}>{scoreLabel(currentScoreObj)} ✓</span>
+                      <button
+                        onClick={() => startEditingScore(r.playerId, currentScoreObj?.value)}
+                        style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, color: "#a68fd6", fontSize: 10, padding: "3px 8px", cursor: "pointer" }}
+                      >
+                        ✎ Edit
+                      </button>
+                      <button
+                        onClick={() => resetAttempt(r.playerId, r.name)}
+                        disabled={resettingId === r.playerId}
+                        style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, color: "#a68fd6", fontSize: 10, padding: "3px 8px", cursor: "pointer" }}
+                      >
+                        {resettingId === r.playerId ? "..." : "↺ Reset"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {(inProgressParticipants.length > 0 || notStartedParticipants.length > 0 || forfeitedParticipants.length > 0) && (
+            <div>
+              <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+                Still playing — not ranked yet
+              </div>
+              <div style={{ display: "grid", gap: 6 }}>
+                {inProgressParticipants.map((p) => {
+                  const isReentrant = challenge.reentryAttemptIds?.includes(p.id);
+                  return (
+                    <div key={p.id} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0d0618", borderRadius: 6, padding: "6px 10px", opacity: 0.85 }}>
+                      <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff" }}>
+                        {p.display_name}{isReentrant && <span style={{ color: "#ff3860", fontSize: 11 }}> (re-entry attempt)</span>}
+                      </span>
+                      <span style={{ fontSize: 12, color: "#a68fd6" }}>{scoreLabel(scores[p.id])} — playing...</span>
+                      <button
+                        onClick={() => resetAttempt(p.id, p.display_name)}
+                        disabled={resettingId === p.id}
+                        style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, color: "#a68fd6", fontSize: 10, padding: "3px 8px", cursor: "pointer" }}
+                      >
+                        {resettingId === p.id ? "..." : "↺ Reset"}
+                      </button>
+                    </div>
+                  );
+                })}
+                {notStartedParticipants.map((p) => {
+                  const isReentrant = challenge.reentryAttemptIds?.includes(p.id);
+                  return (
+                    <div key={p.id} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0d0618", borderRadius: 6, padding: "6px 10px", opacity: 0.6 }}>
+                      <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff" }}>
+                        {p.display_name}{isReentrant && <span style={{ color: "#ff3860", fontSize: 11 }}> (re-entry attempt)</span>}
+                      </span>
+                      <span style={{ fontSize: 12, color: "#6b4f99", fontStyle: "italic" }}>hasn't started</span>
+                    </div>
+                  );
+                })}
+                {forfeitedParticipants.map((p) => {
+                  const isReentrant = challenge.reentryAttemptIds?.includes(p.id);
+                  return (
+                    <div key={p.id} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0d0618", borderRadius: 6, padding: "6px 10px", opacity: 0.7 }}>
+                      <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff" }}>
+                        {p.display_name}{isReentrant && <span style={{ color: "#ff3860", fontSize: 11 }}> (re-entry attempt)</span>}
+                      </span>
+                      <span style={{ fontSize: 12, color: "#ff3860" }}>🏳️ Forfeited</span>
+                      <button
+                        onClick={() => resetAttempt(p.id, p.display_name)}
+                        disabled={resettingId === p.id}
+                        style={{ background: "none", border: "1px solid #3d1f5c", borderRadius: 6, color: "#a68fd6", fontSize: 10, padding: "3px 8px", cursor: "pointer" }}
+                      >
+                        {resettingId === p.id ? "..." : "↺ Reset"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
+          {participants.map((p) => {
+            const current = (challenge.placements || []).find((pl) => pl.playerId === p.id);
+            const isReentrant = challenge.reentryAttemptIds?.includes(p.id);
+            const isForfeited = challenge.forfeitedIds?.includes(p.id);
+            return (
+              <div key={p.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span style={{ flex: 1, fontSize: 13, color: "#f5f0ff" }}>
+                  {p.display_name}{isReentrant && <span style={{ color: "#ff3860", fontSize: 11 }}> (re-entry attempt)</span>}
+                  {isForfeited && <span style={{ color: "#ff3860", fontSize: 11 }}> (forfeited)</span>}
+                </span>
+                <input type="number" min={1} max={participants.length} value={current?.place || ""}
+                  onChange={(e) => setPlace(p.id, e.target.value)}
+                  placeholder="place"
+                  style={{ width: 70, background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 6, padding: "5px 8px", color: "#f5f0ff", fontSize: 13, textAlign: "center" }} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+        {!isDigital && <Btn small variant="ghost" onClick={clearResults}>Clear Results</Btn>}
+        <Btn small onClick={finishNow} disabled={!complete || busy}>{busy ? "Working..." : "Finish Battle Now"}</Btn>
+      </div>
+      {!isDigital && !complete && <p style={{ color: "#6b4f99", fontSize: 11, fontStyle: "italic", margin: "0 0 12px" }}>Every competitor needs a distinct place (1, 2, 3, ...) before this can finish.</p>}
+
+      <CopyMessage icon={registryEntry?.icon || "⚔️"} label="Battle Announcement"
+        text={`From Achilles to Odysseus, legends are forged on the battlefield. Today, you go to battle. Will you become a legend in your own right?\n\n${registryEntry?.icon || "⚔️"} ${registryEntry?.label} underway! ${participants.length} competing. 1st place wins immunity${round.finalFour ? " — this is the FINAL FOUR, everyone else is automatically nominated." : "."}`} />
+    </Card>
+  );
+}

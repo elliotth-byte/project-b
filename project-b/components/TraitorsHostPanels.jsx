@@ -1,0 +1,283 @@
+import { useState, useEffect } from "react";
+import { subscribeHostState } from "../lib/hostStorage";
+import { STORAGE_KEY_TRAITOR_ROLES } from "../lib/traitorData";
+import { fetchAllConfessionals, subscribeConfessionalsTable } from "../lib/confessionalsData";
+import { subscribeChallengeArchive } from "../lib/challengeArchive";
+import { fetchGloballyDisabledChallenges } from "../lib/platformSettings";
+import { DEFAULT_SETTINGS, subscribeSettings } from "../lib/gameState";
+import { resolveIdentitiesForHost } from "../lib/playerIdentity";
+import { resolveAvatars } from "../lib/avatarIdentity";
+import ChatHostPanel from "./ChatHostPanel";
+import {
+  STORAGE_KEY_WORDS, STORAGE_KEY_CASINO, STORAGE_KEY_HOT_POTATO, STORAGE_KEY_ZOMBIE,
+  STORAGE_KEY_PIGGY, STORAGE_KEY_MASQUERADE, STORAGE_KEY_ATTACK_DEFEND, STORAGE_KEY_VOODOO,
+  STORAGE_KEY_MAZE3D, STORAGE_KEY_COFFIN, STORAGE_KEY_ICEBREAKER,
+} from "../lib/traitorsMiniGames";
+import ChallengeArchiveList from "./ChallengeArchiveList";
+import MissionsHost from "./MissionsHost";
+import ScheduledPostsList from "./ScheduledPostsList";
+import ChallengeErrorBoundary from "./ChallengeErrorBoundary";
+import TraitorRolesHost from "./TraitorRolesHost";
+import TraitorsMasqueradeGate from "./TraitorsMasqueradeGate";
+import TraitorsToday from "./TraitorsToday";
+import TraitorsWorkDayGate from "./TraitorsWorkDayGate";
+import MurderVoteHost from "./MurderVoteHost";
+import AdminHost from "./TraitorsAdminHost";
+import HistoryTab from "./TraitorsHistoryTab";
+import ConfessionalsHost from "./TraitorsConfessionalsHost";
+import RoundtableHost from "./RoundtableHost";
+import PandoraBoxHost from "./PandoraBoxHost";
+import WordHost from "./WordHost";
+import CasinoHost from "./CasinoHost";
+import HotPotatoHost from "./HotPotatoHost";
+import ZombieHost from "./ZombieHost";
+import PiggyHost from "./PiggyHost";
+import MasqueradeHost from "./MasqueradeHost";
+import AttackDefendHost from "./AttackDefendHost";
+import VoodooHost from "./VoodooHost";
+import Maze3DHost from "./Maze3DHost";
+import CoffinHost from "./CoffinHost";
+import IcebreakerHost from "./IcebreakerHost";
+import StereoTypesSpotifyWidget from "./StereoTypesSpotifyWidget";
+import { isSpotifyConfigured } from "../lib/spotify/auth";
+
+const BASE_TABS = [
+  { key: "today", label: "📅 Today" },
+  { key: "traitor", label: "🎭 Traitor Roles" },
+  { key: "votes", label: "⚖️ Roundtable" },
+  { key: "missions", label: "🎯 Missions" },
+  { key: "challenges", label: "⚔️ Challenges" },
+  { key: "confessionals", label: "🎥 Confessionals" },
+  { key: "chat", label: "💬 Chat" },
+  { key: "history", label: "📜 History & Log" },
+  { key: "admin", label: "🛠 Admin" },
+];
+
+// Tabbed host layout, mirroring the original artifact's tab bar (Host
+// Actions / Missions / Challenges / Roundtable / History / Log) instead of
+// one long page of every panel stacked on top of each other. This is
+// purely a layout change — every component here is the same one used
+// elsewhere, just organized under tabs now.
+export default function HostPanels({ gameId, players, adminExtra }) {
+  const [tab, setTab] = useState("traitor");
+  const [tr, setTr] = useState(null);
+  const [unreadConfessionals, setUnreadConfessionals] = useState(0);
+  const [challengeArchive, setChallengeArchive] = useState([]);
+  const [globallyDisabled, setGloballyDisabled] = useState(null); // null = not loaded yet; see the "challenges" tab below
+  // Same shared, game-type-agnostic settings record TraitorsAdminHost.jsx
+  // reads/writes (see lib/gameState.js) — needed here too, for the
+  // chatEnabled tab gate below and to thread inactivityEnabled/
+  // aliasEnabled/chatEnabled down into RoundtableHost.
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+
+  useEffect(() => {
+    fetchGloballyDisabledChallenges().then(setGloballyDisabled);
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeSettings(gameId, setSettings);
+    return unsubscribe;
+  }, [gameId]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeChallengeArchive(gameId, setChallengeArchive);
+    return unsubscribe;
+  }, [gameId]);
+
+  // A second, independent subscription to the same host-only data
+  // TraitorRolesHost itself reads — used here just to drive the summary
+  // header and the History tab, without needing TraitorRolesHost to expose
+  // its internal state upward.
+  useEffect(() => {
+    const unsubscribe = subscribeHostState(gameId, STORAGE_KEY_TRAITOR_ROLES, setTr);
+    return unsubscribe;
+  }, [gameId]);
+
+  // Drives the "🎥 Confessionals 7" unread-count badge on the tab itself.
+  useEffect(() => {
+    const reloadCount = async () => {
+      const data = await fetchAllConfessionals(gameId);
+      setUnreadConfessionals(data.filter((c) => !c.read_by_host && !c.archived).length);
+    };
+    reloadCount();
+    const unsubscribe = subscribeConfessionalsTable(gameId, reloadCount);
+    return unsubscribe;
+  }, [gameId]);
+
+  const approvedPlayers = players.filter((p) => p.approved);
+  const alive = approvedPlayers.filter((p) => p.alive);
+  const aliveMapped = alive.map((p) => ({ id: p.id, name: p.display_name }));
+  const allMapped = approvedPlayers.map((p) => ({ id: p.id, name: p.display_name }));
+  // Feeds ParticipantPicker's "exclude shielded" / "include returned"
+  // toggles — see lib/challengeParticipants.js.
+  const shieldedNames = tr ? Object.keys(tr.shielded || {}).filter((n) => tr.shielded[n]) : [];
+  const returnedNames = tr
+    ? [...new Set((tr.returns || []).map((r) => r.name))].filter((n) => alive.some((p) => p.display_name === n))
+    : [];
+  const participantProps = { allPlayers: allMapped, shieldedNames, returnedNames };
+  const redCount = tr ? alive.filter((p) => tr.roles[p.display_name] === "traitor-red").length : 0;
+  const blackCount = tr ? alive.filter((p) => tr.roles[p.display_name] === "traitor-black").length : 0;
+  const pendingCount = players.filter((p) => !p.approved).length;
+
+  // Real name with the alias alongside, baked right into display_name —
+  // same "hosts always see both" treatment HostPanels.jsx's identical
+  // hostRoster gives Project B. Only actually differs from `players`
+  // once aliasEnabled is on; a no-op list transform otherwise.
+  const hostRoster = resolveAvatars(resolveIdentitiesForHost(players, { settings }), settings);
+  const hostApprovedRoster = hostRoster.filter((p) => p.approved);
+
+  const TABS = BASE_TABS
+    .filter((t) => t.key !== "chat" || settings?.chatEnabled)
+    .map((t) => {
+      if (t.key === "confessionals" && unreadConfessionals > 0) return { ...t, label: `${t.label} (${unreadConfessionals})` };
+      if (t.key === "admin" && pendingCount > 0) return { ...t, label: `${t.label} (${pendingCount})` };
+      return t;
+    });
+
+  return (
+    <div>
+      {/* Summary header — visible above every tab, same info the original kept pinned at the top */}
+      <div style={{ marginBottom: 12 }}>
+        <p style={{ color: "#a09080", fontSize: 13, margin: 0 }}>
+          {alive.length} alive
+          {tr && <> · <span style={{ color: "#c45c3c" }}>{redCount}R</span> · <span style={{ color: "#c9a84c" }}>{blackCount}B</span></>}
+          {tr?.daggerStolen && <span style={{ color: "#c45c3c" }}> · 🗡️ Dagger Stolen</span>}
+        </p>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 2, marginBottom: 16, borderBottom: "1px solid #253550", overflowX: "auto" }}>
+        {TABS.map((t) => (
+          <button key={t.key} onClick={() => setTab(t.key)} style={{
+            background: tab === t.key ? "rgba(201,168,76,0.13)" : "transparent",
+            color: tab === t.key ? "#c9a84c" : "#a09080",
+            border: "none", borderRadius: "8px 8px 0 0", padding: "8px 14px",
+            fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+            borderBottom: tab === t.key ? "2px solid #c9a84c" : "2px solid transparent",
+          }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "today" && (
+        <TraitorsToday
+          gameId={gameId} aliveMapped={aliveMapped} allMapped={allMapped} participantProps={participantProps}
+          approvedPlayers={approvedPlayers} tr={tr} settings={settings}
+        />
+      )}
+
+      {tab === "traitor" && (
+        <div style={{ display: "grid", gap: 16 }}>
+          <ChallengeErrorBoundary label="Masquerade Pre-Elimination"><TraitorsMasqueradeGate gameId={gameId} alive={aliveMapped} allPlayers={allMapped} /></ChallengeErrorBoundary>
+          <ChallengeErrorBoundary label="Traitor Roles"><TraitorRolesHost gameId={gameId} players={approvedPlayers} /></ChallengeErrorBoundary>
+          <TraitorsWorkDayGate gameId={gameId}>
+            <ChallengeErrorBoundary label="Murder Vote"><MurderVoteHost gameId={gameId} players={approvedPlayers} tr={tr} /></ChallengeErrorBoundary>
+          </TraitorsWorkDayGate>
+        </div>
+      )}
+
+      {tab === "votes" && (
+        <div style={{ display: "grid", gap: 16 }}>
+          <TraitorsWorkDayGate gameId={gameId}>
+            <ChallengeErrorBoundary label="Roundtable"><RoundtableHost gameId={gameId} players={approvedPlayers} settings={settings} /></ChallengeErrorBoundary>
+          </TraitorsWorkDayGate>
+        </div>
+      )}
+
+      {tab === "missions" && (
+        <div style={{ display: "grid", gap: 16 }}>
+          <ChallengeErrorBoundary label="Mission Briefs"><MissionsHost gameId={gameId} round={tr?.round} /></ChallengeErrorBoundary>
+          <ChallengeErrorBoundary label="Pandora's Box"><PandoraBoxHost gameId={gameId} alive={aliveMapped} allPlayers={allMapped} /></ChallengeErrorBoundary>
+        </div>
+      )}
+
+      {tab === "challenges" && (
+        <div style={{ display: "grid", gap: 16 }}>
+          {challengeArchive.length > 0 && (
+            <ChallengeErrorBoundary label="Challenge Archive">
+              <ChallengeArchiveList gameId={gameId} archive={challengeArchive} />
+            </ChallengeErrorBoundary>
+          )}
+          {/* Each mini-game is skipped entirely (not shown as merely
+              greyed-out) once platform admin disables it — same
+              treatment ChallengeHost.jsx gives GAME_REGISTRY's own
+              disabled entries, just applied to a mount instead of a
+              picker option. globallyDisabled === null (not loaded yet)
+              intentionally renders everything, same as ChallengeHost's
+              own "don't risk gating on a still-loading list" reasoning. */}
+          <TraitorsWorkDayGate gameId={gameId}>
+          {!globallyDisabled?.includes(STORAGE_KEY_WORDS) && (
+            <ChallengeErrorBoundary label="Word Scramble"><WordHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_CASINO) && (
+            <ChallengeErrorBoundary label="Casino"><CasinoHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_HOT_POTATO) && (
+            <ChallengeErrorBoundary label="Hot Potato"><HotPotatoHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_ZOMBIE) && (
+            <ChallengeErrorBoundary label="Zombie Game"><ZombieHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_PIGGY) && (
+            <ChallengeErrorBoundary label="Piggy Bank"><PiggyHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_MASQUERADE) && (
+            <ChallengeErrorBoundary label="Masquerade Houses"><MasqueradeHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_ATTACK_DEFEND) && (
+            <ChallengeErrorBoundary label="Attack/Defend"><AttackDefendHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_VOODOO) && (
+            <ChallengeErrorBoundary label="Voodoo Doll"><VoodooHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_MAZE3D) && (
+            <ChallengeErrorBoundary label="3D Maze"><Maze3DHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_COFFIN) && (
+            <ChallengeErrorBoundary label="Coffin Slide"><CoffinHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_ICEBREAKER) && (
+            <ChallengeErrorBoundary label="Icebreaker"><IcebreakerHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          </TraitorsWorkDayGate>
+        </div>
+      )}
+
+      {tab === "confessionals" && (
+        <ChallengeErrorBoundary label="Confessionals">
+          <ConfessionalsHost gameId={gameId} round={tr?.round} />
+        </ChallengeErrorBoundary>
+      )}
+
+      {tab === "chat" && settings?.chatEnabled && (
+        <ChallengeErrorBoundary label="Chat">
+          <ChatHostPanel gameId={gameId} players={hostApprovedRoster} />
+        </ChallengeErrorBoundary>
+      )}
+
+      {tab === "history" && (
+        <ChallengeErrorBoundary label="History & Log">
+          <HistoryTab gameId={gameId} players={approvedPlayers} tr={tr} challengeArchive={challengeArchive} />
+        </ChallengeErrorBoundary>
+      )}
+
+      {tab === "admin" && (
+        <div style={{ display: "grid", gap: 16 }}>
+          {adminExtra}
+          {/* Same generic Boombox control added to HostPanels.jsx (Project
+              B) — see that file's own comment above its matching mount.
+              Reuses StereoTypesSpotifyWidget.jsx as-is; silently absent
+              when Spotify isn't configured for this deployment. */}
+          {isSpotifyConfigured() && (
+            <ChallengeErrorBoundary label="Boombox">
+              <StereoTypesSpotifyWidget gameId={gameId} />
+            </ChallengeErrorBoundary>
+          )}
+          <ChallengeErrorBoundary label="Scheduled Slack Posts"><ScheduledPostsList gameId={gameId} /></ChallengeErrorBoundary>
+          <ChallengeErrorBoundary label="Admin"><AdminHost gameId={gameId} players={players} /></ChallengeErrorBoundary>
+        </div>
+      )}
+    </div>
+  );
+}

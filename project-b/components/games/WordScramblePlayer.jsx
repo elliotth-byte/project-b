@@ -1,0 +1,125 @@
+import { useState, useEffect, useRef } from "react";
+import { Card } from "../ui";
+import GameResultCard from "./GameResultCard";
+import { WORDS_PER_SET, wordColorsFor, WORD_FONTS, getPlayerWordSet, initFloatingLetters } from "../../lib/games/wordData";
+import { reportScore } from "../../lib/challengeScores";
+import { usePersistedStart } from "./usePersistedStart";
+
+export default function WordScramblePlayer({ gameId, round, challenge, player }) {
+  const [answers, setAnswers] = useState(Array(WORDS_PER_SET).fill(""));
+  const [solved, setSolved] = useState(new Set());
+  // Persisted (not just local) so a navigate-away-and-back doesn't reset
+  // the elapsed-time clock this game's score is based on.
+  const startTime = usePersistedStart(gameId, round.round, challenge?.startedAt, player.id);
+  const [finishMs, setFinishMs] = useState(null);
+  const [, setTick] = useState(0);
+  const lettersRef = useRef([]);
+  const rafRef = useRef(null);
+  const lastRenderRef = useRef(0);
+  const arenaW = 320, arenaH = 240;
+  const WORD_COLORS = wordColorsFor(!!player?.gamePrefs?.colorBlindMode);
+
+  const seed = challenge?.startedAt || 1;
+  const words = getPlayerWordSet(player.name, seed).words;
+
+  useEffect(() => {
+    if (lettersRef.current.length === 0) lettersRef.current = initFloatingLetters(words, arenaW, arenaH);
+  }, [words]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (finishMs) return;
+    const animate = (now) => {
+      lettersRef.current.forEach((l) => {
+        l.x += l.vx; l.y += l.vy;
+        if (l.x < 0 || l.x > arenaW - 24) { l.vx = -l.vx; l.x = Math.max(0, Math.min(l.x, arenaW - 24)); }
+        if (l.y < 0 || l.y > arenaH - 30) { l.vy = -l.vy; l.y = Math.max(0, Math.min(l.y, arenaH - 30)); }
+      });
+      if (now - lastRenderRef.current > 33) { lastRenderRef.current = now; setTick((t) => t + 1); }
+      rafRef.current = requestAnimationFrame(animate);
+    };
+    rafRef.current = requestAnimationFrame(animate);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [finishMs]);
+
+  useEffect(() => {
+    if (solved.size === words.length && !finishMs && startTime) {
+      const time = Math.max(0, Date.now() - startTime); // clamped -- see RedLightGreenLightPlayer.jsx for why a device clock drifting mid-session must never send this negative
+      setFinishMs(time);
+      reportScore(gameId, round.round, player.id, player.name, time, { final: true });
+    }
+  }, [solved.size, startTime]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleInput = (idx, val) => {
+    const upper = val.toUpperCase();
+    const next = [...answers];
+    next[idx] = upper;
+    setAnswers(next);
+    if (upper === words[idx]) setSolved((prev) => new Set([...prev, idx]));
+  };
+
+  if (finishMs) {
+    return <GameResultCard icon="🔤" title="All Words Found" valueLabel={`${(finishMs / 1000).toFixed(2)}s`} />;
+  }
+  if (!startTime) {
+    return <Card style={{ marginBottom: 20, textAlign: "center" }}><p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic" }}>Loading...</p></Card>;
+  }
+
+  const visibleLetters = lettersRef.current.filter((l) => !solved.has(l.wi));
+  const elapsedSec = Math.floor(Math.max(0, Date.now() - startTime) / 1000);
+  const timerLabel = `${Math.floor(elapsedSec / 60)}:${String(elapsedSec % 60).padStart(2, "0")}`;
+
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🔤 Word Scramble</h3>
+        <span style={{ color: "#a68fd6", fontSize: 13, fontFamily: "'Orbitron', 'Segoe UI', sans-serif", fontVariantNumeric: "tabular-nums" }}>
+          ⏱ {timerLabel}
+        </span>
+      </div>
+      <div style={{
+        position: "relative", width: "100%", maxWidth: arenaW, aspectRatio: `${arenaW} / ${arenaH}`, margin: "0 auto 12px",
+        background: "#0d0618", borderRadius: 10, border: "1px solid #3d1f5c", overflow: "hidden",
+      }}>
+        {visibleLetters.map((l, i) => {
+          // Opacity oscillates between a faint 0.08 (never fully gone —
+          // still playable, just hard to screenshot-and-solve-later) and
+          // a full 1, on each letter's own randomized cycle.
+          const opacity = 0.08 + 0.92 * (0.5 + 0.5 * Math.sin((Date.now() / l.fadePeriodMs) * Math.PI * 2 + l.fadePhase));
+          return (
+            <div key={i} style={{
+              // Percentage-based, not raw pixels — the physics
+              // simulation itself still runs in the fixed arenaW x
+              // arenaH coordinate space (see initFloatingLetters and the
+              // bounce logic above, both unchanged), but rendering as a
+              // percentage of that space is what lets the actual
+              // container be genuinely responsive (width: 100%, capped
+              // at arenaW) without letters spilling past its right edge
+              // on a narrower viewport than arenaW's fixed pixel value —
+              // exactly what was happening before this on some Android
+              // screens.
+              position: "absolute", left: `${(l.x / arenaW) * 100}%`, top: `${(l.y / arenaH) * 100}%`,
+              fontSize: 20, fontWeight: 900, color: WORD_COLORS[l.wi],
+              fontFamily: WORD_FONTS[l.wi % WORD_FONTS.length],
+              textShadow: `0 0 8px ${WORD_COLORS[l.wi]}66`, userSelect: "none", pointerEvents: "none",
+              opacity, transition: "opacity 0.05s linear",
+            }}>{l.char}</div>
+          );
+        })}
+      </div>
+      <div style={{ display: "grid", gap: 6 }}>
+        {words.map((word, i) => (
+          <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <div style={{ width: 12, height: 12, borderRadius: 3, background: WORD_COLORS[i], flexShrink: 0 }} />
+            {solved.has(i) ? (
+              <div style={{ flex: 1, padding: "8px 12px", borderRadius: 8, fontSize: 15, fontWeight: 700, color: WORD_COLORS[i], background: `${WORD_COLORS[i]}12`, border: `1px solid ${WORD_COLORS[i]}44` }}>✓ {word}</div>
+            ) : (
+              <input value={answers[i]} onChange={(e) => handleInput(i, e.target.value)} placeholder={`${word.length} letters`} maxLength={word.length}
+                style={{ flex: 1, background: "#0d0618", border: `1px solid ${WORD_COLORS[i]}55`, borderRadius: 8, padding: "8px 12px", color: WORD_COLORS[i], fontSize: 15, fontWeight: 700, outline: "none", letterSpacing: 2, textTransform: "uppercase" }} />
+            )}
+          </div>
+        ))}
+      </div>
+      <div style={{ textAlign: "center", marginTop: 8, fontSize: 11, color: "#6b4f99" }}>{solved.size}/{words.length} words found</div>
+    </Card>
+  );
+}
