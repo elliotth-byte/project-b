@@ -76,8 +76,9 @@ export default function VotingHistorySpreadsheet({ exileHistory, finaleState, pl
       </div>
       <div style={{ fontSize: 10, color: "#6b4f99", marginBottom: 4 }}><s style={{ textDecorationColor: "#ff3860" }}>Struck-through</s> votes were nullified by the Favor of the Fates.</div>
       <div style={{ fontSize: 10, color: "#6b4f99", marginBottom: 10, display: "flex", gap: 14, flexWrap: "wrap" }}>
-        <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: "rgba(74,144,217,0.35)", border: "1px solid #4a90d9", marginRight: 4, verticalAlign: "middle" }} />Voted while nominated</span>
-        <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: "rgba(0,255,157,0.2)", border: "1px solid #00ff9d", marginRight: 4, verticalAlign: "middle" }} />Voted while immune</span>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: "rgba(74,144,217,0.35)", border: "1px solid #4a90d9", marginRight: 4, verticalAlign: "middle" }} />Nominated that round</span>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: "rgba(0,255,157,0.2)", border: "1px solid #00ff9d", marginRight: 4, verticalAlign: "middle" }} />Immune (Battle Winner) that round</span>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: "rgba(184,41,255,0.22)", border: "1px solid #b829ff", marginRight: 4, verticalAlign: "middle" }} />Nominated, saved by the Favor of the Fates</span>
       </div>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "max-content", minWidth: "100%", borderCollapse: "collapse", fontSize: 12 }}>
@@ -114,18 +115,26 @@ export default function VotingHistorySpreadsheet({ exileHistory, finaleState, pl
                     key={i}
                     style={{
                       padding: "6px 10px", whiteSpace: "nowrap",
-                      color: cell ? "#f5f0ff" : "#6b4f99",
-                      background: cell?.nominated ? "rgba(74,144,217,0.16)" : cell?.immune ? "rgba(0,255,157,0.1)" : undefined,
+                      color: cell?.target ? "#f5f0ff" : "#6b4f99",
+                      background: cell?.savedByFates
+                        ? "rgba(184,41,255,0.18)"
+                        : cell?.nominated
+                        ? "rgba(74,144,217,0.16)"
+                        : cell?.immune
+                        ? "rgba(0,255,157,0.1)"
+                        : "rgba(107,79,153,0.08)",
                     }}
                   >
-                    {cell ? (
+                    {cell?.target ? (
                       <span
                         style={cell.nullified ? { textDecoration: "line-through", textDecorationColor: "#ff3860", textDecorationThickness: 2, color: "#6b4f99" } : undefined}
-                        title={cell.nullified ? "Nullified by the Favor of the Fates" : cell.nominated ? "Voted while nominated this round" : cell.immune ? "Voted while immune this round" : undefined}
+                        title={cell.nullified ? "Nullified by the Favor of the Fates" : cell.savedByFates ? "Nominated, saved by the Favor of the Fates" : cell.nominated ? "Nominated this round" : cell.immune ? "Immune (Battle Winner) this round" : undefined}
                       >
                         {cell.target}
                       </span>
-                    ) : "—"}
+                    ) : (
+                      <span title={cell?.savedByFates ? "Nominated, saved by the Favor of the Fates" : cell?.nominated ? "Nominated this round" : cell?.immune ? "Immune (Battle Winner) this round" : undefined}>—</span>
+                    )}
                   </td>
                 ))}
               </tr>

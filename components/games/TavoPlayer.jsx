@@ -118,7 +118,7 @@ export default function TavoPlayer({ gameId, round, challenge, player }) {
   return (
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-        <h3 style={{ color: "#7a5cff", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>📦 Tavo</h3>
+        <h3 style={{ color: "#7a5cff", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>📦 Pandora's Moving Company</h3>
         <Badge>{homeCount}/{level.markers.length} home · {moveCount} moves</Badge>
       </div>
       <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 10px" }}>

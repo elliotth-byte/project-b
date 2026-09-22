@@ -38,6 +38,8 @@ import VoodooHost from "./VoodooHost";
 import Maze3DHost from "./Maze3DHost";
 import CoffinHost from "./CoffinHost";
 import IcebreakerHost from "./IcebreakerHost";
+import StereoTypesSpotifyWidget from "./StereoTypesSpotifyWidget";
+import { isSpotifyConfigured } from "../lib/spotify/auth";
 
 const BASE_TABS = [
   { key: "today", label: "📅 Today" },
@@ -263,6 +265,15 @@ export default function HostPanels({ gameId, players, adminExtra }) {
       {tab === "admin" && (
         <div style={{ display: "grid", gap: 16 }}>
           {adminExtra}
+          {/* Same generic Boombox control added to HostPanels.jsx (Project
+              B) — see that file's own comment above its matching mount.
+              Reuses StereoTypesSpotifyWidget.jsx as-is; silently absent
+              when Spotify isn't configured for this deployment. */}
+          {isSpotifyConfigured() && (
+            <ChallengeErrorBoundary label="Boombox">
+              <StereoTypesSpotifyWidget gameId={gameId} />
+            </ChallengeErrorBoundary>
+          )}
           <ChallengeErrorBoundary label="Scheduled Slack Posts"><ScheduledPostsList gameId={gameId} /></ChallengeErrorBoundary>
           <ChallengeErrorBoundary label="Admin"><AdminHost gameId={gameId} players={players} /></ChallengeErrorBoundary>
         </div>

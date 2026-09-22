@@ -4,6 +4,10 @@ import { supabase } from "../lib/supabaseClient";
 import { signInHostFlexible, isHost } from "../lib/auth";
 import { subscribeRound, subscribeSettings, KEY_EXILE_HISTORY, KEY_CHALLENGE } from "../lib/gameState";
 import { subscribeGameState } from "../lib/gameStorage";
+import { isSpotifyConfigured } from "../lib/spotify/auth";
+import { subscribeStereoTypesNowPlaying } from "../lib/stereoTypesNowPlaying";
+import StereoTypesCityscape from "../components/StereoTypesCityscape";
+import NowPlayingCorner from "../components/bigscreen/NowPlayingCorner";
 import ExileRevealTV from "../components/bigscreen/ExileRevealTV";
 import WordScrambleTvDisplay from "../components/bigscreen/WordScrambleTvDisplay";
 import SimonTvDisplay from "../components/bigscreen/SimonTvDisplay";
@@ -13,7 +17,23 @@ import BalloonoTvDisplay from "../components/bigscreen/BalloonoTvDisplay";
 import LaurelThiefTvDisplay from "../components/bigscreen/LaurelThiefTvDisplay";
 import WagerTriviaTvDisplay from "../components/bigscreen/WagerTriviaTvDisplay";
 import TartarusTreadmillTvDisplay from "../components/bigscreen/TartarusTreadmillTvDisplay";
+import SpyfallTvDisplay from "../components/bigscreen/SpyfallTvDisplay";
 import ArtAuctionTvDisplay from "../components/bigscreen/ArtAuctionTvDisplay";
+import AcrophobiaTvDisplay from "../components/bigscreen/AcrophobiaTvDisplay";
+import MiniGolfTvDisplay from "../components/bigscreen/MiniGolfTvDisplay";
+import LifesTapestryTvDisplay from "../components/bigscreen/LifesTapestryTvDisplay";
+import GoldenFleeceTvDisplay from "../components/bigscreen/GoldenFleeceTvDisplay";
+import CrownsTvDisplay from "../components/bigscreen/CrownsTvDisplay";
+import PoseidonsPoolTvDisplay from "../components/bigscreen/PoseidonsPoolTvDisplay";
+import RiverStyxTvDisplay from "../components/bigscreen/RiverStyxTvDisplay";
+import WineDarkSeaTvDisplay from "../components/bigscreen/WineDarkSeaTvDisplay";
+import MajorityRulesTvDisplay from "../components/bigscreen/MajorityRulesTvDisplay";
+import TriggerHappyTvDisplay from "../components/bigscreen/TriggerHappyTvDisplay";
+import GodsAndGambitsTvDisplay from "../components/bigscreen/GodsAndGambitsTvDisplay";
+import DivinersDiceTvDisplay from "../components/bigscreen/DivinersDiceTvDisplay";
+import MidasHoardTvDisplay from "../components/bigscreen/MidasHoardTvDisplay";
+import ChariotsTvDisplay from "../components/bigscreen/ChariotsTvDisplay";
+import ScyllasStraitTvDisplay from "../components/bigscreen/ScyllasStraitTvDisplay";
 
 // ============================================================
 // Battle TV components — each one keyed by gameType, rendered only
@@ -34,12 +54,40 @@ const BATTLE_TV_COMPONENTS = {
   laurelthieftv: LaurelThiefTvDisplay,
   wagertriviatv: WagerTriviaTvDisplay,
   tartarustreadmill: TartarusTreadmillTvDisplay,
+  spyfall: SpyfallTvDisplay,
+  acrophobia: AcrophobiaTvDisplay,
+  minigolf: MiniGolfTvDisplay,
+  lifestapestrytv: LifesTapestryTvDisplay,
+  goldenfleece: GoldenFleeceTvDisplay,
+  riverstyx: RiverStyxTvDisplay,
+  winedarksea: WineDarkSeaTvDisplay,
+  majorityrulestv: MajorityRulesTvDisplay,
+  triggerhappytv: TriggerHappyTvDisplay,
+  godsandgambits: GodsAndGambitsTvDisplay,
+  divinersdice: DivinersDiceTvDisplay,
+  midashoard: MidasHoardTvDisplay,
+  chariots: ChariotsTvDisplay,
+  scyllasstrait: ScyllasStraitTvDisplay,
   // Not a Big-Screen-exclusive game type like the three above — see
   // components/bigscreen/ArtAuctionTvDisplay.jsx's own header comment.
   // The regular artauction game type already works fully normally
   // without Big Screen Mode; this just gives it a real TV view when
   // one's available, on top of what it already does.
   artauction: ArtAuctionTvDisplay,
+  // Big-Screen-exclusive — see lib/bigScreenOnlyGames.js. The regular
+  // "crowns" game type is intentionally NOT listed here: it's fully
+  // playable phone-only (see components/games/CrownsPlayer.jsx), and
+  // display.jsx's own BattleComponent lookup below falls back to the
+  // normal idle/other-content TV view whenever the active challenge's
+  // gameType has no entry here.
+  crownstv: CrownsTvDisplay,
+  // Big-Screen-exclusive — see lib/bigScreenOnlyGames.js. The regular
+  // "poseidonspool" game type is intentionally NOT listed here: it's
+  // fully playable phone-only (see components/games/
+  // PoseidonsPoolPlayer.jsx), and this file's own BattleComponent
+  // lookup below falls back to the normal idle/other-content TV view
+  // whenever the active challenge's gameType has no entry here.
+  poseidonspooltv: PoseidonsPoolTvDisplay,
 };
 
 // ============================================================
@@ -106,6 +154,17 @@ export default function DisplayPage() {
   const [players, setPlayers] = useState([]);
   const [exileHistory, setExileHistory] = useState([]);
   const [challenge, setChallenge] = useState(null);
+  // Generic "now playing" widget/visual — see this file's own header
+  // block above this state for the placement reasoning. Independent of
+  // BATTLE_TV_COMPONENTS entirely: it's not tied to any specific
+  // Battle, works for all three game types (project_b/traitors/
+  // stereo_types) alike, and reads the SAME shared now-playing
+  // broadcast (lib/stereoTypesNowPlaying.js) regardless of which game
+  // type actually published it — Stereo Types' own host widget, or the
+  // generic "Boombox" admin-tab control HostPanels.jsx/
+  // TraitorsHostPanels.jsx now also offer (see those files), both write
+  // the exact same game_state key.
+  const [nowPlaying, setNowPlaying] = useState(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data?.user || null));
@@ -136,6 +195,11 @@ export default function DisplayPage() {
   useEffect(() => {
     if (!gameId) return;
     return subscribeGameState(gameId, KEY_CHALLENGE, setChallenge);
+  }, [gameId]);
+
+  useEffect(() => {
+    if (!gameId) return;
+    return subscribeStereoTypesNowPlaying(gameId, setNowPlaying);
   }, [gameId]);
 
   useEffect(() => {
@@ -195,6 +259,20 @@ export default function DisplayPage() {
   const latestExileEntry = exileHistory.length > 0 ? exileHistory.reduce((a, b) => (b.round > a.round ? b : a)) : null;
   const exileRevealActive = latestExileEntry && round && latestExileEntry.round === round.round;
   const BattleComponent = challenge?.active ? BATTLE_TV_COMPONENTS[challenge.gameType] : null;
+  // Gates the whole feature on Spotify actually being set up for this
+  // deployment (see lib/spotify/auth.js's own isSpotifyConfigured) AND
+  // something having actually been published at least once — a season
+  // that's never had anyone open a Spotify-control widget has no
+  // now-playing row to read yet, and this degrades to rendering nothing
+  // in either case, exactly like the rest of this feature.
+  const spotifyReady = isSpotifyConfigured() && !!nowPlaying;
+  // Nothing else is already claiming the whole screen — this is the
+  // "Big Screen is otherwise idle, between rounds/ceremonies" case,
+  // where a fullscreen reactive cityscape is a nicer resting state than
+  // a static placeholder. While a Battle or the Exile reveal legitimately
+  // owns the screen, that takeover would just visually clash with them,
+  // so those cases instead only ever get the small corner widget below.
+  const idleTakeoverActive = spotifyReady && !BattleComponent && !exileRevealActive;
 
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #05010f, #1a0a2e)", color: "#f5f0ff", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
@@ -206,28 +284,59 @@ export default function DisplayPage() {
       </div>
 
       {BattleComponent ? (
-        <BattleComponent gameId={gameId} round={round} players={players} settings={settings} />
+        <>
+          <BattleComponent gameId={gameId} round={round} players={players} settings={settings} />
+          {spotifyReady && <NowPlayingCorner nowPlaying={nowPlaying} />}
+        </>
       ) : exileRevealActive ? (
-        <ExileRevealTV gameId={gameId} players={players} entry={latestExileEntry} />
+        <>
+          <ExileRevealTV gameId={gameId} players={players} entry={latestExileEntry} />
+          {spotifyReady && <NowPlayingCorner nowPlaying={nowPlaying} />}
+        </>
       ) : (
-        <div style={{ minHeight: "70vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 40 }}>
-          <div style={{ fontSize: 14, color: "#6b4f99", textTransform: "uppercase", letterSpacing: 3, marginBottom: 12 }}>
-            Round {round?.round ?? "—"} {round?.phase ? `— ${round.phase}` : ""}
-          </div>
-          <p style={{ color: "#a68fd6", fontSize: 20, maxWidth: 500 }}>
-            Nothing to show on the big screen for this moment yet — check phones for now. This page grows a TV variant for a phase or
-            battle as each one gets built (see this page's own file header for the plan).
-          </p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "center", marginTop: 32, maxWidth: 900 }}>
-            {players.filter((p) => p.approved).map((p) => (
-              <div key={p.id} style={{
-                background: "#0d0618", border: `1px solid ${p.alive === false ? "#3d1f5c" : "#ff2d95"}`, borderRadius: 10,
-                padding: "10px 18px", fontSize: 16, color: p.alive === false ? "#6b4f99" : "#f5f0ff",
-                textDecoration: p.alive === false ? "line-through" : "none",
-              }}>
-                {p.display_name}
-              </div>
-            ))}
+        <div style={{ position: "relative", minHeight: "70vh" }}>
+          {idleTakeoverActive && (
+            // Fullscreen reactive skyline, same visual StereoTypesCityscape
+            // already gives Stereo Types' own title screen — reused as-is
+            // here (see that component's own header: it's plain, generic
+            // visual geometry with zero stereo_types-schema coupling, so
+            // this is genuine reuse, not a fork). Sits behind the idle
+            // content below it (round/phase label + roster), rather than
+            // replacing it, so the Big Screen still tells the host at a
+            // glance what's happening even while the skyline runs.
+            <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
+              <StereoTypesCityscape
+                height={typeof window !== "undefined" ? Math.round(window.innerHeight * 0.7) : 500}
+                reactive={!!nowPlaying?.isPlaying}
+                intensity={nowPlaying?.intensity || 0}
+                bpm={nowPlaying?.bpm || null}
+              />
+            </div>
+          )}
+          <div style={{
+            position: "relative", zIndex: 1, minHeight: "70vh", display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", textAlign: "center", padding: 40,
+            background: idleTakeoverActive ? "rgba(5,1,15,0.35)" : "none",
+          }}>
+            <div style={{ fontSize: 14, color: "#6b4f99", textTransform: "uppercase", letterSpacing: 3, marginBottom: 12 }}>
+              Round {round?.round ?? "—"} {round?.phase ? `— ${round.phase}` : ""}
+            </div>
+            <p style={{ color: "#a68fd6", fontSize: 20, maxWidth: 500 }}>
+              Nothing to show on the big screen for this moment yet — check phones for now. This page grows a TV variant for a phase or
+              battle as each one gets built (see this page's own file header for the plan).
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "center", marginTop: 32, maxWidth: 900 }}>
+              {players.filter((p) => p.approved).map((p) => (
+                <div key={p.id} style={{
+                  background: "#0d0618", border: `1px solid ${p.alive === false ? "#3d1f5c" : "#ff2d95"}`, borderRadius: 10,
+                  padding: "10px 18px", fontSize: 16, color: p.alive === false ? "#6b4f99" : "#f5f0ff",
+                  textDecoration: p.alive === false ? "line-through" : "none",
+                }}>
+                  {p.display_name}
+                </div>
+              ))}
+            </div>
+            {idleTakeoverActive && <NowPlayingCorner nowPlaying={nowPlaying} />}
           </div>
         </div>
       )}

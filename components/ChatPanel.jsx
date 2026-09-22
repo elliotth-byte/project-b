@@ -10,7 +10,8 @@ import {
 import { colorFor } from "../lib/playerColors";
 import { isPoseidonDmBlockActive, hestiaChatBlockActive } from "../lib/characterPowers";
 import { subscribeGameState } from "../lib/gameStorage";
-import { KEY_EXILE, KEY_FINALE, PHASES } from "../lib/gameState";
+import { KEY_EXILE, KEY_FINALE, KEY_CHALLENGE, PHASES } from "../lib/gameState";
+import { majorityRulesKey, isMajorityRulesChatLocked } from "../lib/games/majorityRulesData";
 import { notifyPushForMessage } from "../lib/pushNotifications";
 import { markOnboardingChatSent, markOnboardingDmSent } from "../lib/onboarding";
 import { fetchMyBlockedIds, blockUser } from "../lib/blockedUsers";
@@ -96,6 +97,31 @@ function MessageBubble({ mine, name, nameColor, avatarUrl, body, time, reactions
   const [customOpen, setCustomOpen] = useState(false);
   const [customEmoji, setCustomEmoji] = useState("");
   const grouped = groupReactions(reactions, myPlayerId);
+
+  // Automated game-state announcements (see lib/announcements.js's
+  // makeInAppPostMessage/postSystemAnnouncement) now post straight into
+  // this same group thread rather than the separate feed they used to
+  // — see that file's own header comment. They're tagged with the
+  // sentinel senderId "system" (never a real player id) so they render
+  // as a centered, muted system line instead of a normal left/right
+  // chat bubble from a named sender — the "X joined" convention most
+  // chat apps use for non-conversational lines, rather than looking
+  // like an actual person is talking. Not treated as `mine` by either
+  // caller (no real player id equals "system"), reactions/report/block
+  // are skipped entirely for it below.
+  if (senderId === "system") {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", margin: "10px 0" }}>
+        <div style={{
+          maxWidth: "88%", textAlign: "center", fontSize: 11, fontStyle: "italic", color: "#a68fd6",
+          background: "rgba(107,79,153,0.12)", border: "1px solid #3d1f5c", borderRadius: 10, padding: "6px 12px",
+        }}>
+          {body}
+          <div style={{ fontSize: 9, color: "#6b4f99", marginTop: 2, fontStyle: "normal" }}>{formatChatTime(time)}</div>
+        </div>
+      </div>
+    );
+  }
 
   const submitCustom = () => {
     // Unicode code points, not JS string length (which counts UTF-16
@@ -286,6 +312,34 @@ function Composer({ onSend, placeholder, readOnly = false, disabledMessage = nul
   );
 }
 
+// Majority Rules chat/DM gate (see lib/games/majorityRulesData.js's
+// isMajorityRulesChatLocked for the actual "blocked or not" rule) — same
+// scoping discipline as Poseidon's and Hestia's own blocks nearby:
+// subscribing to KEY_CHALLENGE at all is gated on a round even being
+// passed in, and the second, more specific subscription (the actual
+// majorityrules state) only ever fires once that challenge is confirmed
+// to be a Majority Rules battle — so a chat render during any other
+// battle, or between battles, never pays for either subscription.
+function useMajorityRulesChatBlock(gameId, round, playerId) {
+  const [challenge, setChallenge] = useState(null);
+  useEffect(() => {
+    if (!gameId || !round) { setChallenge(null); return; }
+    const unsubscribe = subscribeGameState(gameId, KEY_CHALLENGE, setChallenge);
+    return unsubscribe;
+  }, [gameId, round]);
+
+  const isMajorityRulesBattle = !!(challenge?.active && challenge.gameType === "majorityrules");
+  const [mrState, setMrState] = useState(null);
+  useEffect(() => {
+    if (!isMajorityRulesBattle || !round) { setMrState(null); return; }
+    const unsubscribe = subscribeGameState(gameId, majorityRulesKey(round.round), setMrState);
+    return unsubscribe;
+  }, [gameId, isMajorityRulesBattle, round?.round]);
+
+  if (!isMajorityRulesBattle) return false;
+  return isMajorityRulesChatLocked(mrState, playerId);
+}
+
 function GroupChatView({ gameId, player, players, realName, onRead, readOnly = false, round, settings }) {
   const [messages, setMessages] = useState([]);
   const listRef = useRef(null);
@@ -298,6 +352,7 @@ function GroupChatView({ gameId, player, players, realName, onRead, readOnly = f
   // relevant state to read outside Exile/Finale anyway.
   const hestiaKey = round?.phase === "exile" ? KEY_EXILE : round?.phase === "finale" ? KEY_FINALE : null;
   const [hestiaState, setHestiaState] = useState(null);
+  const majorityRulesBlocked = useMajorityRulesChatBlock(gameId, round, player.id);
 
   useEffect(() => {
     if (!hestiaKey) { setHestiaState(null); return; }
@@ -370,6 +425,7 @@ function GroupChatView({ gameId, player, players, realName, onRead, readOnly = f
       <MessageList messages={rows} containerRef={listRef} />
       <Composer
         placeholder="Message everyone..." readOnly={readOnly}
+        disabledMessage={majorityRulesBlocked ? "🗳️ Lock in your Majority Rules answers before you can chat." : null}
         onSend={async (t) => {
           const res = await sendGroupMessage(gameId, player.id, player.name, t, realName);
           if (res.ok) { notifyPushForMessage(gameId, "group", player.id, player.name, t); markOnboardingChatSent(player.id); }
@@ -402,6 +458,7 @@ function ThreadView({ gameId, thread, player, players, byId, onBack, onRead, rea
   // whatever round's Fates/Exile deliberation Poseidon actually blocked,
   // so there'd be nothing for this to meaningfully affect there anyway.
   const poseidonBlocked = round && settings && isPoseidonDmBlockActive(players, settings, round);
+  const majorityRulesBlocked = useMajorityRulesChatBlock(gameId, round, player.id);
 
   useEffect(() => {
     const unsubscribe = subscribeThreadMessages(thread.id, setMessages);
@@ -457,7 +514,7 @@ function ThreadView({ gameId, thread, player, players, byId, onBack, onRead, rea
       <MessageList messages={rows} containerRef={listRef} />
       <Composer
         placeholder={`Message ${label}...`} readOnly={readOnly}
-        disabledMessage={poseidonBlocked ? "🌊 Poseidon has turned off DMs for this Fates Ceremony and Exile Vote." : null}
+        disabledMessage={poseidonBlocked ? "🌊 Poseidon has turned off DMs for this Fates Ceremony and Exile Vote." : majorityRulesBlocked ? "🗳️ Lock in your Majority Rules answers before you can chat." : null}
         onSend={async (t) => {
           const res = await sendThreadMessage(thread.id, player.id, t);
           if (res.ok) { notifyPushForMessage(gameId, "thread", player.id, player.name, t, thread.id); markOnboardingDmSent(player.id); }
