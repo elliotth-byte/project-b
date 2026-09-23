@@ -870,10 +870,28 @@ export default function PlayPage() {
                 {round?.round === 1 && powerFor(player, settings) === "Aphrodite" && (
                   <AphroditePicker gameId={gameId} player={player} players={identityAllPlayers} settings={settings} />
                 )}
-                {round && powerFor(player, settings) === "Poseidon" && (
+                {/* Both of these are ongoing, self-triggered powers (not tied
+                    to one specific phase's own player block the way
+                    Hephaestus/Fates/Exile-deliberation powers are), so they
+                    need their own explicit "is this power actually in play
+                    right now" gate rather than inheriting one from a
+                    surrounding phase block. Two conditions, not one:
+                    round.phase !== FINALE (a season's active powers stop
+                    applying once the game's down to jury voting — nothing
+                    left for a DM blackout or a fresh Ares target to affect
+                    at that point) AND !exiled (once out of the game, a
+                    player has no round left to use a power ON — this was
+                    the actual gap: Poseidon could still trigger the DM
+                    block from the exiled side of the roster, stamping the
+                    CURRENT round — which, during the Finale, is exactly
+                    the finale "round" itself — as their one-time use, for
+                    a lockout that (per isPoseidonDmBlockActive) only ever
+                    checks the Fates/Exile phases and so could never
+                    actually fire). */}
+                {round && round.phase !== PHASES.FINALE && !exiled && powerFor(player, settings) === "Poseidon" && (
                   <PoseidonTrigger player={player} round={round} gameId={gameId} />
                 )}
-                {round && powerFor(player, settings) === "Ares" && (
+                {round && round.phase !== PHASES.FINALE && !exiled && powerFor(player, settings) === "Ares" && (
                   <AresTarget gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
                 )}
                 {(!round || round.phase === PHASES.LOBBY) && (

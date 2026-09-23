@@ -21,6 +21,7 @@ export default function FinaleHost({ gameId, players, round }) {
   const [drawPicks, setDrawPicks] = useState({});
   const [qa, setQa] = useState({ statements: {}, questions: [] });
   const [busy, setBusy] = useState(false);
+  const [showComments, setShowComments] = useState(false);
   const dirtyRef = useRef(new Set());
 
   useEffect(() => {
@@ -189,6 +190,30 @@ export default function FinaleHost({ gameId, players, round }) {
         </div>
       </div>
 
+      {/* Same "Show Comments" pattern as ExileVoteHost.jsx's own voting
+          list — was missing here even though the per-row 💬 icon above
+          already let a host see there WAS a comment, just not its text
+          without hovering each one individually. */}
+      {voteRows.some((r) => r.reason) && (
+        <div style={{ marginBottom: 12 }}>
+          <Btn small variant="ghost" onClick={() => setShowComments(!showComments)}>
+            {showComments ? "▲ Hide Comments" : `▼ Show Comments (${voteRows.filter((r) => r.reason).length})`}
+          </Btn>
+          {showComments && (
+            <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
+              {voteRows.filter((r) => r.reason).map((r) => (
+                <div key={r.voterId} style={{ background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "8px 12px" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#f5f0ff", marginBottom: 2 }}>
+                    {players.find((p) => p.id === r.voterId)?.display_name || "?"}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#a68fd6", fontStyle: "italic" }}>"{r.reason}"</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {outcome.needsTieBreak && (
         <Card style={{ borderColor: finale.tieBreakChoiceId ? "rgba(0,255,157,0.5)" : "rgba(255,56,96,0.5)", marginBottom: 12 }}>
           {finale.tieBreakChoiceId ? (
@@ -215,11 +240,6 @@ export default function FinaleHost({ gameId, players, round }) {
           <CopyMessage icon="🔥" label="Copy Finale Vote Summary" text={buildFinaleSummary()} />
         </div>
       )}
-
-      <div style={{ marginTop: 12 }}>
-        <CopyMessage icon="🔥" label="Finale Announcement"
-          text={`🔥 The Finale is here! ${finale.finalists.map((f) => f.name).join(", ")} — every exiled player now votes for a winner.`} />
-      </div>
     </Card>
   );
 }

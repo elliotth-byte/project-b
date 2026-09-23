@@ -110,33 +110,49 @@ export default function VotingHistorySpreadsheet({ exileHistory, finaleState, pl
                   )}
                   {r.status && <span style={{ marginLeft: 6 }}><Badge color={r.status.color}>{r.status.label}</Badge></span>}
                 </td>
-                {r.cells.map((cell, i) => (
-                  <td
-                    key={i}
-                    style={{
-                      padding: "6px 10px", whiteSpace: "nowrap",
-                      color: cell?.target ? "#f5f0ff" : "#6b4f99",
-                      background: cell?.savedByFates
-                        ? "rgba(184,41,255,0.18)"
-                        : cell?.nominated
-                        ? "rgba(74,144,217,0.16)"
-                        : cell?.immune
-                        ? "rgba(0,255,157,0.1)"
-                        : "rgba(107,79,153,0.08)",
-                    }}
-                  >
-                    {cell?.target ? (
-                      <span
-                        style={cell.nullified ? { textDecoration: "line-through", textDecorationColor: "#ff3860", textDecorationThickness: 2, color: "#6b4f99" } : undefined}
-                        title={cell.nullified ? "Nullified by the Favor of the Fates" : cell.savedByFates ? "Nominated, saved by the Favor of the Fates" : cell.nominated ? "Nominated this round" : cell.immune ? "Immune (Battle Winner) this round" : undefined}
-                      >
-                        {cell.target}
-                      </span>
-                    ) : (
-                      <span title={cell?.savedByFates ? "Nominated, saved by the Favor of the Fates" : cell?.nominated ? "Nominated this round" : cell?.immune ? "Immune (Battle Winner) this round" : undefined}>—</span>
-                    )}
-                  </td>
-                ))}
+                {r.cells.map((cell, i) => {
+                  const votes = cell?.votes || [];
+                  const cellTitle = cell?.savedByFates ? "Nominated, saved by the Favor of the Fates" : cell?.nominated ? "Nominated this round" : cell?.immune ? "Immune (Battle Winner) this round" : undefined;
+                  return (
+                    <td
+                      key={i}
+                      style={{
+                        padding: "6px 10px", whiteSpace: "nowrap",
+                        color: votes.length > 0 ? "#f5f0ff" : "#6b4f99",
+                        background: cell?.savedByFates
+                          ? "rgba(184,41,255,0.18)"
+                          : cell?.nominated
+                          ? "rgba(74,144,217,0.16)"
+                          : cell?.immune
+                          ? "rgba(0,255,157,0.1)"
+                          : "rgba(107,79,153,0.08)",
+                      }}
+                    >
+                      {votes.length > 0 ? (
+                        // Almost always just one vote. A SECOND entry only
+                        // ever shows up for Apollo's character power (cast
+                        // a second vote, same round) — stacked on its own
+                        // line under the same cell rather than dropped,
+                        // each with its own independent nullified styling
+                        // (the Favor of the Fates can zero out one of his
+                        // two votes without touching the other).
+                        <div style={{ display: "grid", gap: 2 }}>
+                          {votes.map((v, vi) => (
+                            <span
+                              key={vi}
+                              style={v.nullified ? { textDecoration: "line-through", textDecorationColor: "#ff3860", textDecorationThickness: 2, color: "#6b4f99" } : undefined}
+                              title={v.nullified ? "Nullified by the Favor of the Fates" : cellTitle}
+                            >
+                              {v.target}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span title={cellTitle}>—</span>
+                      )}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>
