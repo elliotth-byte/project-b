@@ -262,23 +262,31 @@ export function IdentityRevealCard({ players }) {
 // Small circular tiles for the finalists — profile pictures (see
 // lib/profiles.js's fetchProfilePhotos) rather than any season-scoped
 // avatar (lib/avatarIdentity.js's effectiveAvatarUrl, which the
-// interactive MemoryWall/PlayerMemoryWall tiles already use elsewhere):
-// by the time this renders, the game has already ended and real names
-// are already unmasked (see lib/playerIdentity.js's own comment on
-// aliasActive), so there's no identity-leak concern here the way there
-// would be showing someone's real photo next to a still-secret alias
-// mid-season — this is genuinely safe to be the one place in the app
-// that reaches for the cross-season profile photo instead. Falls back
-// to a plain initial-in-a-circle for anyone who hasn't set one — same
-// "never show nothing" instinct as everywhere else a photo is optional.
-function FinaleFinalistTiles({ finalists, byId, profilePhotos, players, winnerId }) {
+// interactive MemoryWall/PlayerMemoryWall tiles already use elsewhere).
+//
+// This card renders for the WHOLE Finale phase, not just after it
+// wraps — final statements and jury questions are shown live, the same
+// way a regular round's Battle results show before that round's Exile
+// Vote is tallied (see the comment on FinaleCard below). Real names
+// only actually unmask once finale.revealed (jury vote tallied — same
+// signal lib/roundEngine.js's advanceFromExile sets alongside winnerId,
+// and the one lib/activeGames.js now keys "season truly over" off of).
+// A cross-season profile photo is exactly as identity-revealing as the
+// real name would be, so it's gated on the same `revealed` flag rather
+// than shown unconditionally the moment someone becomes a finalist —
+// otherwise a still-aliased season's photos leak who's who days before
+// the jury actually decides anything. Falls back to a plain
+// initial-in-a-circle both pre-reveal and for anyone who hasn't set a
+// photo — same "never show nothing" instinct as everywhere else a photo
+// is optional.
+function FinaleFinalistTiles({ finalists, byId, profilePhotos, players, winnerId, revealed }) {
   if (!finalists || finalists.length === 0) return null;
   const userIdFor = (playerId) => (players || []).find((p) => p.id === playerId)?.user_id;
   return (
     <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", margin: "10px 0" }}>
       {finalists.map((f) => {
         const name = byId[f.playerId] || f.name;
-        const photoUrl = profilePhotos?.[userIdFor(f.playerId)];
+        const photoUrl = revealed ? profilePhotos?.[userIdFor(f.playerId)] : null;
         const isWinner = winnerId && f.playerId === winnerId;
         return (
           <div key={f.playerId} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, width: 76 }}>
@@ -321,6 +329,7 @@ export function FinaleCard({ finale, rows, byId, showComments, qa, players, prof
         players={players}
         profilePhotos={profilePhotos}
         winnerId={finale.revealed ? finale.winnerId : null}
+        revealed={!!finale.revealed}
       />
       {finale.chaosHolderId && (
         <div style={{ margin: "0 0 4px" }}>
