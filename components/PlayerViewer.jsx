@@ -317,7 +317,7 @@ export default function PlayerViewer({ gameId, targetPlayer, allPlayers, round, 
           )}
 
           {tab === "help" && (
-            <HelpPanel player={player} />
+            <HelpPanel gameId={gameId} player={player} />
           )}
 
           {tab === "options" && (

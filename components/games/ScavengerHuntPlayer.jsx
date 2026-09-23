@@ -21,7 +21,7 @@ import { OFFERING_ICON_BY_TYPE, TempleIcon, OlympusIcon } from "./ScavengerHuntI
 // (lib/roundEngine.js) — never lazily from whichever player's client
 // happens to load first, which would leave "which client's own
 // players list wins" as an avoidable ambiguity.
-export default function ScavengerHuntPlayer({ gameId, round, player, players }) {
+export default function ScavengerHuntPlayer({ gameId, round, challenge, player, players }) {
   const [state, setState] = useState(null);
   const reportedRef = useRef(false);
 
@@ -33,7 +33,17 @@ export default function ScavengerHuntPlayer({ gameId, round, player, players }) 
   useEffect(() => {
     if (state?.gameOver && !reportedRef.current) {
       reportedRef.current = true;
-      reportScore(gameId, round.round, player.id, player.name, placementValue(state, player.id), { final: true });
+      const finished = state.finishedOrder.includes(player.id);
+      // timeMs is display-only (see formatPlacementValue in lib/
+      // challenges/scores.js) — placementValue above still does the
+      // actual ranking (by finish order, not time), this just lets a
+      // finisher's leaderboard/history line show real elapsed time
+      // instead of a meaningless raw ranking number. Only meaningful
+      // for someone who actually finished — a non-finisher's "elapsed
+      // time" is just however long the whole battle happened to run,
+      // same for everyone, so it says nothing about their own play.
+      const timeMs = finished && challenge?.startedAt ? Math.max(0, Date.now() - challenge.startedAt) : null;
+      reportScore(gameId, round.round, player.id, player.name, placementValue(state, player.id), { final: true, ...(timeMs != null ? { timeMs } : {}) });
     }
   }, [state?.gameOver]); // eslint-disable-line react-hooks/exhaustive-deps
 

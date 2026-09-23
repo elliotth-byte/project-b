@@ -66,7 +66,11 @@ export default function SlidingPuzzlePlayer({ gameId, challenge, round, player }
     // must always exceed the highest possible unsolved-progress score,
     // even in the floor case.
     const value = finishedMs != null ? Math.max(SIZE * SIZE, FINISH_BASE - finishedMs) : correctCount(board);
-    reportScore(gameId, round.round, player.id, player.name, value, { final: true });
+    // timeMs is display-only (see formatPlacementValue in lib/challenges/
+    // scores.js) — value above still does the actual ranking, this just
+    // lets a finisher's leaderboard/history line show their real solve
+    // time instead of that internal FINISH_BASE-derived number.
+    reportScore(gameId, round.round, player.id, player.name, value, { final: true, ...(finishedMs != null ? { timeMs: finishedMs } : {}) });
   }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const elapsedSec = myStartTime ? (Math.max(0, Date.now() - myStartTime) / 1000).toFixed(1) : "0.0";

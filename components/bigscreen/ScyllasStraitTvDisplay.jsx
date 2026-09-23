@@ -38,7 +38,7 @@ export default function ScyllasStraitTvDisplay({ gameId, round, players }) {
     return (
       <div style={{ padding: 40, textAlign: "center", minHeight: "70vh" }}>
         <div style={{ fontSize: 14, color: "#6b4f99", textTransform: "uppercase", letterSpacing: 3, marginBottom: 20 }}>
-          🐙 Scylla's Strait
+          🐙 The Scylla's The Limit
         </div>
         <div style={{ fontSize: 60, marginBottom: 12 }}>⛵</div>
         <p style={{ fontSize: 26, color: "#c9a84c", fontWeight: 800 }}>{byId[state.winnerId] || "?"} made it through the strait!</p>
@@ -66,7 +66,7 @@ export default function ScyllasStraitTvDisplay({ gameId, round, players }) {
   return (
     <div style={{ padding: 32, minHeight: "70vh" }}>
       <div style={{ textAlign: "center", fontSize: 14, color: "#6b4f99", textTransform: "uppercase", letterSpacing: 3, marginBottom: 6 }}>
-        🐙 Scylla's Strait — Round {state.phase === "resolved" && result ? result.round : state.round}
+        🐙 The Scylla's The Limit — Round {state.phase === "resolved" && result ? result.round : state.round}
       </div>
       <div style={{ textAlign: "center", fontSize: 13, color: secLeft <= 3 ? "#ff3860" : "#6b4f99", marginBottom: 20 }}>
         {state.phase === "choosing" ? `Choosing cards — ${pickedCount}/${state.order.length} in — ${secLeft}s` : `Revealing... next round in ${secLeft}s`}

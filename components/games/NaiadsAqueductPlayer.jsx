@@ -136,7 +136,7 @@ export default function NaiadsAqueductPlayer({ gameId, challenge, round, player 
   return (
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🏺 Naiads' Aqueduct</h3>
+        <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🏺 Aqueducts</h3>
         <Badge>{elapsedSec}s · {progress}/{puzzle.size * puzzle.size}</Badge>
       </div>
       <p style={{ color: "#6b4f99", fontSize: 11, margin: "0 0 10px", fontStyle: "italic" }}>

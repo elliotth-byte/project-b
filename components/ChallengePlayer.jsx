@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { Btn, Card, Badge } from "./ui";
 import { subscribeGameState, storageUpdate } from "../lib/gameStorage";
 import { KEY_CHALLENGE, KEY_REENTRY } from "../lib/gameState";
-import { setReentryDecision } from "../lib/reentryData";
+import { setReentryDecision, setReentryPreDecision } from "../lib/reentryData";
 import { REENTRY_STATUS } from "../lib/reentryLogic";
+import { hephaestusDrawKey, randomPickKey } from "../lib/challengeSelection";
 import { formatDurationHours } from "../lib/fatesLogic";
 import { subscribeScores, forfeitChallenge, unlockScoreForRetry } from "../lib/challengeScores";
 import { GAME_REGISTRY } from "../lib/challengeGames";
@@ -259,6 +260,24 @@ export default function ChallengePlayer({ gameId, player, players, round, settin
     return unsubscribe;
   }, [gameId]);
 
+  // The upcoming gameType, the moment it's actually decided — before the
+  // battle itself goes active. Only meaningful in "random" selection
+  // mode (see lib/challenges/selection.js): Hephaestus's own two-option
+  // draw (his `chosen` field once he's picked, or the auto-pick that
+  // takes over if he doesn't in time) or, with no Hephaestus this
+  // round, the plain single random pick. Subscribed unconditionally
+  // (cheap, and simplest) — only actually used below once someone's
+  // re-entry-eligible and the challenge hasn't started yet.
+  const [hephaestusDraw, setHephaestusDraw] = useState(null);
+  const [randomPick, setRandomPick] = useState(null);
+  useEffect(() => {
+    if (!round?.round || settings?.challengeSelectionMode !== "random") return;
+    const unsubDraw = subscribeGameState(gameId, hephaestusDrawKey(round.round), setHephaestusDraw);
+    const unsubPick = subscribeGameState(gameId, randomPickKey(round.round), setRandomPick);
+    return () => { unsubDraw(); unsubPick(); };
+  }, [gameId, round?.round, settings?.challengeSelectionMode]);
+  const upcomingGameType = hephaestusDraw?.chosen || randomPick?.gameType || null;
+
   // A brand new challenge (new round, or the host re-starting one) always
   // needs the rules screen shown again — clicking "Go" on a previous
   // challenge shouldn't let a player skip straight past the next one.
@@ -268,16 +287,6 @@ export default function ChallengePlayer({ gameId, player, players, round, settin
   }, [gameId, round?.round, challenge?.startedAt]);
 
   if (round?.phase !== "challenge") return null;
-
-  if (!challenge?.active) {
-    return (
-      <Card style={{ marginBottom: 20, textAlign: "center" }}>
-        <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: 0 }}>
-          Waiting for the host to start this round's challenge.
-        </p>
-      </Card>
-    );
-  }
 
   // Exiled players get exactly one re-entry attempt, ever — and they
   // decide, deliberately, per challenge, whether to use it here. Checked
@@ -291,9 +300,19 @@ export default function ChallengePlayer({ gameId, player, players, round, settin
   // Once they opt in, they're folded into the normal competing flow
   // below, same as anyone else (see lib/reentryData.js's
   // setReentryDecision).
+  //
+  // Deliberately checked BEFORE the "waiting for the host" return just
+  // below: an exiled player should see what the upcoming battle even
+  // IS — and be able to opt in — the moment it's actually decided
+  // (Hephaestus's own choice, or the plain auto-pick with no
+  // Hephaestus this round), not only once it's already live. Before
+  // the challenge exists, "in"/"out" is a standing pre-decision (see
+  // lib/reentryData.js's setReentryPreDecision) that gets folded
+  // straight into the real challenge the moment it's created.
   const myReentry = reentry.find((r) => r.playerId === player?.id);
   const isReentryEligible = myReentry?.status === REENTRY_STATUS.PENDING;
-  const reentryDecision = challenge.reentryDecisions?.[player?.id];
+  const reentryDecision = challenge?.active ? challenge.reentryDecisions?.[player?.id] : myReentry?.preDecision;
+  const upcomingGame = upcomingGameType && GAME_REGISTRY[upcomingGameType];
 
   if (isReentryEligible && reentryDecision !== "in") {
     if (readOnly) {
@@ -303,6 +322,9 @@ export default function ChallengePlayer({ gameId, player, players, round, settin
           <p style={{ color: "#f5f0ff", fontSize: 15, fontWeight: 600, margin: "0 0 6px", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
             One shot at re-entry
           </p>
+          {upcomingGame && !challenge?.active && (
+            <p style={{ color: "#f5f0ff", fontSize: 13, margin: "0 0 6px" }}>Up next: {upcomingGame.icon} {upcomingGame.label}</p>
+          )}
           <p style={{ color: "#a68fd6", fontSize: 13, margin: 0 }}>
             {reentryDecision === "out" ? "Opted to sit this battle out." : "Hasn't decided whether to compete yet."}
           </p>
@@ -312,7 +334,9 @@ export default function ChallengePlayer({ gameId, player, players, round, settin
 
     const decide = async (decision) => {
       setDeciding(true);
-      const ok = await setReentryDecision(gameId, player.id, decision);
+      const ok = challenge?.active
+        ? await setReentryDecision(gameId, player.id, decision)
+        : await setReentryPreDecision(gameId, player.id, decision);
       setDeciding(false);
       if (!ok) alert("Couldn't save your decision — try again.");
     };
@@ -323,11 +347,20 @@ export default function ChallengePlayer({ gameId, player, players, round, settin
         <p style={{ color: "#f5f0ff", fontSize: 15, fontWeight: 600, margin: "0 0 6px", fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>
           One shot at re-entry
         </p>
-        <p style={{ color: "#a68fd6", fontSize: 13, margin: "0 0 14px" }}>
-          Compete in THIS battle for a chance to return? Finish 1st and you're back in the game. Anything else, and this was
-          your one shot. Not deciding by the time everyone else finishes counts as sitting this one out — that costs you nothing,
-          and you'll get to decide again next challenge.
-        </p>
+        {challenge?.active ? (
+          <p style={{ color: "#a68fd6", fontSize: 13, margin: "0 0 14px" }}>
+            Compete in THIS battle for a chance to return? Finish 1st and you're back in the game. Anything else, and this was
+            your one shot. Not deciding by the time everyone else finishes counts as sitting this one out — that costs you nothing,
+            and you'll get to decide again next challenge.
+          </p>
+        ) : (
+          <p style={{ color: "#a68fd6", fontSize: 13, margin: "0 0 14px" }}>
+            {upcomingGame
+              ? <>The next battle is <strong style={{ color: "#f5f0ff" }}>{upcomingGame.icon} {upcomingGame.label}</strong> — decide now whether to compete for a chance to return, before it even starts.</>
+              : "The host hasn't started this round's battle yet — decide now whether to compete for a chance to return, and it'll carry straight over the moment it starts."}
+            {" "}Finish 1st and you're back in the game; anything else and this was your one shot. You can change your mind any time before it starts, and not deciding at all just counts as sitting this one out.
+          </p>
+        )}
         {reentryDecision === "out" && (
           <p style={{ color: "#6b4f99", fontSize: 12, margin: "0 0 10px", fontStyle: "italic" }}>You've opted out of this one — you can still change your mind below.</p>
         )}
@@ -335,6 +368,16 @@ export default function ChallengePlayer({ gameId, player, players, round, settin
           <Btn onClick={() => decide("in")} disabled={deciding}>{deciding ? "..." : "Compete this round"}</Btn>
           <Btn variant="ghost" onClick={() => decide("out")} disabled={deciding}>Sit this one out</Btn>
         </div>
+      </Card>
+    );
+  }
+
+  if (!challenge?.active) {
+    return (
+      <Card style={{ marginBottom: 20, textAlign: "center" }}>
+        <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: 0 }}>
+          Waiting for the host to start this round's challenge.
+        </p>
       </Card>
     );
   }

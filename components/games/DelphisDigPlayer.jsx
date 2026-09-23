@@ -217,9 +217,9 @@ export default function DelphisDigPlayer({ gameId, challenge, round, player }) {
                 border: `1px solid ${shake === eq.index ? "#ff3850" : "#00ff9d"}`,
               }}
             >
-              <span style={{ fontSize: 16 }}>{grid.flat().find((c) => c.eq === eq.index)?.symbol}</span>
+              <span style={{ fontSize: 22 }}>{grid.flat().find((c) => c.eq === eq.index)?.symbol}</span>
               <span style={{ color: "#f5f0ff", fontSize: 14, fontWeight: 700, fontFamily: "'Courier New', Courier, monospace" }}>
-                {eq.a} {OP_LABEL[eq.op]} {eq.b} =
+                =
               </span>
               <input
                 type="number" inputMode="numeric"

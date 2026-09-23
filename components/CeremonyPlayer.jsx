@@ -4,7 +4,6 @@ import { subscribeGameState } from "../lib/gameStorage";
 import { KEY_EXILE_HISTORY, KEY_FINALE, KEY_CHALLENGE_HISTORY, KEY_EXILE, KEY_FATES, PHASES } from "../lib/gameState";
 import { buildVotingRows } from "../lib/votingSpreadsheet";
 import AnnouncementsFeed from "./AnnouncementsFeed";
-import VotingHistorySpreadsheet from "./VotingHistorySpreadsheet";
 import VotingHistoryModal from "./VotingHistoryModal";
 import { LiveNominationsRecap, ChallengeResultsCard, RoundCeremonyCard, FinaleCard, IdentityRevealCard } from "./CeremonyCards";
 import { subscribeFinaleQa } from "../lib/finaleQaData";
@@ -49,7 +48,6 @@ export default function CeremonyPlayer({ gameId, players, round, settings }) {
   const [liveExile, setLiveExile] = useState(null);
   const [liveFates, setLiveFates] = useState(null);
   const [showComments, setShowComments] = useState(false);
-  const [showVotingSheet, setShowVotingSheet] = useState(false);
   const [votingSheetFullScreen, setVotingSheetFullScreen] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
 
@@ -160,17 +158,6 @@ export default function CeremonyPlayer({ gameId, players, round, settings }) {
           💬 {showComments ? "Hide" : "Show"} all comments
         </button>
         <button
-          onClick={() => setShowVotingSheet(!showVotingSheet)}
-          style={{
-            background: showVotingSheet ? "rgba(255,45,149,0.13)" : "transparent",
-            border: "1px solid #3d1f5c", borderRadius: 8, padding: "6px 12px",
-            color: showVotingSheet ? "#ff2d95" : "#a68fd6", fontSize: 12, cursor: "pointer",
-            fontFamily: "'Orbitron', 'Segoe UI', sans-serif",
-          }}
-        >
-          🗳 {showVotingSheet ? "Hide" : "Show"} voting sheet
-        </button>
-        <button
           onClick={() => setVotingSheetFullScreen(true)}
           style={{
             background: "transparent", border: "1px solid #3d1f5c", borderRadius: 8, padding: "6px 12px",
@@ -181,10 +168,6 @@ export default function CeremonyPlayer({ gameId, players, round, settings }) {
           ⛶ View Full Voting History
         </button>
       </div>
-
-      {showVotingSheet && (
-        <VotingHistorySpreadsheet exileHistory={exileHistory} finaleState={finale} players={players} challengeHistory={challengeHistory} />
-      )}
 
       <VotingHistoryModal
         open={votingSheetFullScreen}

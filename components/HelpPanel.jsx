@@ -1,5 +1,7 @@
+import { useState, useEffect } from "react";
 import { Card } from "./ui";
 import { RULES_SECTIONS, battleList } from "../lib/rulesContent";
+import { subscribeUnlockedGames } from "../lib/unlockedGames";
 import RulesAccordion from "./RulesAccordion";
 import PracticeMode from "./PracticeMode";
 
@@ -15,6 +17,17 @@ import PracticeMode from "./PracticeMode";
 // Options tab now (see OptionsPanel.jsx); this tab is purely
 // informational.
 export default function HelpPanel({ gameId, player, onReplayTour, readOnly = false }) {
+  // Only battles this season has actually surfaced so far (played, or
+  // offered to Hephaestus) get listed — see lib/unlockedGames.js. Starts
+  // empty/undefined until the first snapshot arrives, which battleList's
+  // own `unlockedTypes` param treats as "nothing unlocked yet" rather
+  // than "no filter" (that's only for callers passing null outright).
+  const [unlockedTypes, setUnlockedTypes] = useState(new Set());
+  useEffect(() => {
+    if (!gameId) return;
+    return subscribeUnlockedGames(gameId, (types) => setUnlockedTypes(new Set(types)));
+  }, [gameId]);
+
   // The one section (see lib/rulesContent.js's own comment on it) that
   // needs real markup instead of a plain paragraph — attached here via
   // renderBody rather than in the data file itself, so rulesContent.js
@@ -26,7 +39,12 @@ export default function HelpPanel({ gameId, player, onReplayTour, readOnly = fal
       ...section,
       renderBody: () => (
         <div style={{ display: "grid", gap: 10 }}>
-          {battleList().map((g) => (
+          {battleList(unlockedTypes).length === 0 && (
+            <p style={{ fontSize: 12, color: "#6b4f99", fontStyle: "italic", margin: 0 }}>
+              No Battles have been revealed yet this season — rules for each one show up here the moment it's actually played, or offered to Hephaestus.
+            </p>
+          )}
+          {battleList(unlockedTypes).map((g) => (
             <div key={g.label}>
               <div style={{ fontSize: 13, color: "#f5f0ff", fontWeight: 700, marginBottom: 2 }}>{g.icon} {g.label}</div>
               <div style={{ fontSize: 12, color: "#a68fd6", lineHeight: 1.5 }}>{g.blurb}</div>

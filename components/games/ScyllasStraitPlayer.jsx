@@ -41,7 +41,7 @@ export default function ScyllasStraitPlayer({ gameId, round, challenge, player }
 
   if (!challenge?.active) {
     const myScore = state ? placementValue(state, player.id) : 0;
-    return <GameResultCard icon="🐙" title="Scylla's Strait" valueLabel={`Score: ${myScore}`} />;
+    return <GameResultCard icon="🐙" title="The Scylla's The Limit" valueLabel={`Score: ${myScore}`} />;
   }
   if (!state) return <Card style={{ marginBottom: 20, textAlign: "center" }}><p style={{ color: "#6b4f99", fontStyle: "italic" }}>Loading...</p></Card>;
 
@@ -71,7 +71,7 @@ export default function ScyllasStraitPlayer({ gameId, round, challenge, player }
   return (
     <Card style={{ marginBottom: 20, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🐙 Scylla's Strait</h3>
+        <h3 style={{ color: "#ff2d95", margin: 0, fontSize: 15, fontFamily: "'Orbitron', 'Segoe UI', sans-serif" }}>🐙 The Scylla's The Limit</h3>
         <Badge color={myPosition === 0 ? "#00ff9d" : "#6b4f99"}>
           {myPosition === 0 ? "Front of the line!" : `${myPosition + 1} of ${state.order.length}`}
         </Badge>

@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import { Btn, Card, Badge } from "./ui";
 import { storageSet, storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { KEY_CHALLENGE, KEY_ROUND, KEY_CHALLENGE_HISTORY, KEY_EXILE_HISTORY } from "../lib/gameState";
+import { markGameTypesUnlocked } from "../lib/unlockedGames";
 import { placementsComplete } from "../lib/challengeLogic";
 import { GAME_REGISTRY, gameConfigWithDefaults } from "../lib/challengeGames";
 import { presetIncompleteGameTypes } from "../lib/presetReadiness";
 import { bigScreenOnlyGameTypesToExclude } from "../lib/bigScreenOnlyGames";
 import { supabase } from "../lib/supabaseClient";
 import { subscribeScores, scoresToPlacements, resetPlayerAttempt, overridePlayerScore } from "../lib/challengeScores";
-import { subscribeReentry, getReentry } from "../lib/reentryData";
+import { subscribeReentry, getReentry, consumePreDecidedReentryIns } from "../lib/reentryData";
 import { REENTRY_STATUS } from "../lib/reentryLogic";
 import { formatDurationHours } from "../lib/fatesLogic";
 import { DEFAULT_PARTICIPATION, computeParticipants } from "../lib/challengeParticipants";
@@ -47,6 +48,9 @@ import { initDivinersDice } from "../lib/games/divinersDiceData";
 import { initSplitFriction } from "../lib/games/splitFrictionData";
 import { initCrowns } from "../lib/games/crownsData";
 import { initPoseidonsPool } from "../lib/games/poseidonsPoolData";
+import { initMidasHoard } from "../lib/games/midasHoardData";
+import { initChariots } from "../lib/games/chariotsData";
+import { initScyllasStrait } from "../lib/games/scyllasStraitData";
 import { pickRandomChallenge, hephaestusDrawKey, randomPickKey } from "../lib/challengeSelection";
 import { canRunStockMarketChallenge } from "../lib/games/stockMarketData";
 import { hasEnoughHistoryForSelection as hasEnoughTriviaHistory } from "../lib/games/seasonTriviaData";
@@ -317,9 +321,20 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     // check both files together if this ever needs changing again).
     const endsAt = settings?.infiniteTime ? null : now + (settings?.challengeDurationSec || 900) * 1000;
     const configOverrides = MAZE_TYPES.includes(gameType) ? { size: mazeSize } : undefined;
+    // A battle actually starting is one of the two ways a game type gets
+    // "unlocked" for the Help tab's rules list — see lib/unlockedGames.js.
+    await markGameTypesUnlocked(gameId, gameType);
+    // Anyone who opted in before this battle even existed (see
+    // components/ChallengePlayer.jsx and lib/reentryData.js's own
+    // comment on setReentryPreDecision) gets folded straight into it as
+    // a real competitor from the start, instead of needing to click
+    // "Compete this round" all over again now that it's live.
+    const preDecidedInIds = await consumePreDecidedReentryIns(gameId);
+    const finalParticipantIds = [...new Set([...participantIds, ...preDecidedInIds])];
+    const reentryDecisions = Object.fromEntries(preDecidedInIds.map((id) => [id, "in"]));
     await storageSet(gameId, KEY_CHALLENGE, {
       round: round.round, active: true, startedAt: now, endsAt,
-      participantIds, reentryEligibleIds, reentryDecisions: {}, reentryAttemptIds: [], placements: [], finalized: false,
+      participantIds: finalParticipantIds, reentryEligibleIds, reentryDecisions, reentryAttemptIds: preDecidedInIds, placements: [], finalized: false,
       gameType, gameConfig: gameConfigWithDefaults(gameType, configOverrides),
     });
     // Same battle-start notification as lib/roundEngine.js's own
@@ -456,6 +471,15 @@ export default function ChallengeHost({ gameId, players, round, settings }) {
     }
     if (gameType === "poseidonspool" || gameType === "poseidonspooltv") {
       await initPoseidonsPool(gameId, round.round, participants, now, settings?.challengeDurationSec);
+    }
+    if (gameType === "midashoard") {
+      await initMidasHoard(gameId, round.round, participants, now);
+    }
+    if (gameType === "chariots") {
+      await initChariots(gameId, round.round, participants, now);
+    }
+    if (gameType === "scyllasstrait") {
+      await initScyllasStrait(gameId, round.round, participants, now);
     }
     await storageUpdate(gameId, KEY_ROUND, (fresh) => ({ ...(fresh || {}), phaseStartedAt: now, phaseEndsAt: endsAt }));
     setBusy(false);

@@ -333,9 +333,6 @@ export default function ExileVoteHost({ gameId, players, round }) {
           )}
         </div>
       )}
-
-      <CopyMessage icon="🃏" label="Exile Vote Announcement"
-        text={`In Olympus, all crave power. Power, however, comes at a cost. Whom are you willing to betray, to manipulate, to exile?\n\n🃏 The Exile Vote is underway. Nominees: ${exile.nominees.map((n) => n.name).join(", ")}. Favor of the Fates: ${chaosHolder?.display_name || "?"}.`} />
     </Card>
   );
 }

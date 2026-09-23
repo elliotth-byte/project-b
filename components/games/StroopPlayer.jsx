@@ -91,7 +91,11 @@ export default function StroopPlayer({ gameId, challenge, round, player }) {
     if (!done || reportedRef.current) return;
     reportedRef.current = true;
     const score = finalMs != null ? Math.max(1, DNF_BASE - finalMs) : cleared.size; // finishers occupy a high tier (faster = higher, since it's DNF_BASE minus their time); DNFs rank below by raw progress
-    reportScore(gameId, round.round, player.id, player.name, score, { final: true });
+    // timeMs is display-only (see formatPlacementValue in lib/challenges/
+    // scores.js) — the score value above still does the actual ranking,
+    // this just lets a finisher's leaderboard/history line show their
+    // real finish time instead of that internal DNF_BASE-derived number.
+    reportScore(gameId, round.round, player.id, player.name, score, { final: true, ...(finalMs != null ? { timeMs: finalMs } : {}) });
   }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const elapsedDisplay = myStartTime ? ((Math.max(0, Date.now() - myStartTime) + penaltyMs) / 1000).toFixed(1) : "0.0";
