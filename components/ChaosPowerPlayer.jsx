@@ -7,6 +7,7 @@ import { exileContext, FINALE_CONTEXT, setChaosNullify, subscribeChaosSecret } f
 import { exileDrawContext, FINALE_DRAW_CONTEXT, submitChaosDrawPick, chaosPicksKey } from "../lib/chaosDraw";
 import { chaosCardLabel } from "../lib/chaosCardNames";
 import { powerFor, filterCancelledVote } from "../lib/characterPowers";
+import { isJuryEligible } from "../lib/finaleQaData";
 import MemoryWall from "./MemoryWall";
 
 // ─── The Favor of the Fates ───
@@ -107,7 +108,15 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
   if (!key || !state) return null;
 
   const me = (players || []).find((p) => p.id === player?.id);
-  const eligible = isExile ? me?.alive !== false : isFinale ? me?.alive === false : false;
+  // Finale draw eligibility has to match pages/api/chaos-draw.js's own
+  // server-side check exactly (isJuryEligible, not bare !alive) — a quit
+  // or removed-for-inactivity player was previously shown this whole
+  // draw stage despite the server always rejecting their pick, and
+  // worse, the button COUNT rendered below used to come from the same
+  // too-wide `!alive` pool, which could offer a button index the server
+  // would never actually award to anyone (see the matching fix in
+  // lib/roundEngine.js's finale setup).
+  const eligible = isExile ? me?.alive !== false : isFinale ? isJuryEligible(me) : false;
   if (!eligible) return null;
 
   const iAmHolder = state.chaosHolderId === player?.id;
@@ -135,7 +144,7 @@ export default function ChaosPowerPlayer({ gameId, round, player, players, readO
   const holderName = state.chaosHolderId ? (players || []).find((p) => p.id === state.chaosHolderId)?.display_name : null;
   const poolSize = isExile
     ? (players || []).filter((p) => p.approved && p.alive).length
-    : (players || []).filter((p) => p.approved && !p.alive).length;
+    : (players || []).filter(isJuryEligible).length;
   // Any button someone's already tried is guaranteed wrong — if it were
   // right, chaosHolderId would already be set and we wouldn't be in this
   // branch at all — so these are safe to mark (and skip) for everyone.

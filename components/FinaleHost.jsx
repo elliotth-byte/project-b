@@ -53,7 +53,14 @@ export default function FinaleHost({ gameId, players, round }) {
   }
   if (!finale) return <Card><p style={{ color: "#6b4f99", fontStyle: "italic" }}>Loading...</p></Card>;
 
-  const exiledPlayers = players.filter((p) => p.approved && !p.alive);
+  // Jury-eligible only — a quit or removed-for-inactivity player never
+  // gets a jury voice (see lib/finaleQaData.js's isJuryEligible, and the
+  // matching filter lib/roundEngine.js's advanceFromExile tally already
+  // applies at vote-counting time). This list used to just check !alive,
+  // which kept showing them here as if they still had a vote pending —
+  // isJuryEligible was already imported for FinaleQaPanel below but
+  // never actually applied to this list.
+  const exiledPlayers = players.filter(isJuryEligible);
   const chaosHolder = players.find((p) => p.id === finale.chaosHolderId);
   const nullifiedId = chaosSecret?.nomineeId || null;
   const byId = {};

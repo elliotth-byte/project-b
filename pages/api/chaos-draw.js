@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { makeDb } from "../../lib/dbAdapter";
 import { KEY_ROUND, KEY_EXILE, KEY_FINALE, KEY_SETTINGS, DEFAULT_SETTINGS } from "../../lib/gameState";
 import { powerFor } from "../../lib/characterPowers";
+import { isJuryEligible } from "../../lib/finaleQaData";
 
 // ============================================================
 // The Favor of the Fates "draw" — replaces the old host-side Fan of Cards
@@ -44,7 +45,7 @@ export default async function handler(req, res) {
 
   // RLS-gated read: only returns a row for the caller's own player row in
   // this game, confirming both membership and giving us their player id.
-  const { data: me } = await userClient.from("players").select("id, alive, approved, alias, power_state").eq("game_id", gameId).eq("user_id", userData.user.id).maybeSingle();
+  const { data: me } = await userClient.from("players").select("id, alive, approved, alias, power_state, elimination_type").eq("game_id", gameId).eq("user_id", userData.user.id).maybeSingle();
   if (!me || !me.approved) return res.status(403).json({ error: "Not an approved player in this game." });
 
   const adminClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -68,9 +69,14 @@ export default async function handler(req, res) {
   } else if (context === "finale") {
     stateKey = KEY_FINALE;
     stateRoundOk = round.phase === "finale";
-    if (me.alive) return res.status(403).json({ error: "Only exiled players vote (and pick) in the Finale." });
-    const { count } = await adminClient.from("players").select("id", { count: "exact", head: true }).eq("game_id", gameId).eq("approved", true).eq("alive", false);
-    poolSize = count || 0;
+    // Jury-eligible only (see lib/finaleQaData.js's isJuryEligible) — a
+    // player who quit or was removed for inactivity never gets a jury
+    // voice, and the Favor of the Fates draw is part of that. `me` here
+    // has the same shape isJuryEligible expects (approved/alive/
+    // elimination_type), just missing the fields it doesn't check.
+    if (!isJuryEligible(me)) return res.status(403).json({ error: "Only jury-eligible exiled players vote (and pick) in the Finale." });
+    const { data: exiledRows } = await adminClient.from("players").select("approved, alive, elimination_type").eq("game_id", gameId).eq("approved", true).eq("alive", false);
+    poolSize = (exiledRows || []).filter(isJuryEligible).length;
   } else {
     return res.status(400).json({ error: "Invalid context." });
   }
