@@ -6,7 +6,7 @@ import { supabase } from "../lib/supabaseClient";
 import { signOut, isHost, displayNameFromUser } from "../lib/auth";
 import { checkIsPlatformAdmin } from "../lib/adminModeration";
 import { useSiteTheme } from "../lib/siteTheme";
-import { fetchActiveGames } from "../lib/activeGames";
+import { fetchMyGames } from "../lib/activeGames";
 
 // ─── Cruel Summer House — the front door ───
 // This used to always show every entry point at once (signup, login,
@@ -47,7 +47,13 @@ export default function Home() {
   // "Continue to Game" work when someone reopens the app from a
   // bookmark or home-screen shortcut instead, which never carries that
   // param (see lib/activeGames.js's own header comment).
-  const [activeGames, setActiveGames] = useState([]);
+  //
+  // ALL of this account's games, not just active ones — a finished
+  // season's chat and recap (Ceremony/History tabs) are still there on
+  // pages/play.jsx, so a completed game gets its own link too, just
+  // labeled differently below rather than vanishing from the hub
+  // entirely the moment it wraps.
+  const [myGames, setMyGames] = useState([]);
   const { theme, logoSrc, logoDimensions } = useSiteTheme();
 
   useEffect(() => {
@@ -62,8 +68,8 @@ export default function Home() {
   }, [user]);
 
   useEffect(() => {
-    if (!user) { setActiveGames([]); return; }
-    fetchActiveGames(user.id).then(setActiveGames);
+    if (!user) { setMyGames([]); return; }
+    fetchMyGames(user.id).then(setMyGames);
   }, [user]);
 
   const pageStyle = {
@@ -116,9 +122,13 @@ export default function Home() {
               Welcome back, {displayNameFromUser(user)}.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {activeGames.map((g) => (
-                <Link key={g.gameId} href={`/play?game=${g.gameId}`} style={{ ...linkBtn, borderColor: theme.accent, color: theme.accent }}>
-                  ▶️ Continue to {g.name}
+              {myGames.map((g) => (
+                <Link
+                  key={g.gameId}
+                  href={`/play?game=${g.gameId}`}
+                  style={g.active ? { ...linkBtn, borderColor: theme.accent, color: theme.accent } : linkBtn}
+                >
+                  {g.active ? `▶️ Continue to ${g.name}` : `📜 View ${g.name}`}
                 </Link>
               ))}
               {/* Fallback for the moment right after joining, before the
@@ -126,7 +136,7 @@ export default function Home() {
                   depends on the URL's own ?game= param, but only shows
                   up if that game isn't already covered above, so a
                   slow load never produces two buttons for the same game. */}
-              {game && !activeGames.some((g) => g.gameId === game) && (
+              {game && !myGames.some((g) => g.gameId === game) && (
                 <Link href={`/play?game=${game}`} style={{ ...linkBtn, borderColor: theme.accent, color: theme.accent }}>▶️ Continue to Game</Link>
               )}
               <Link href="/notifications" style={linkBtn}>🔔 Notifications</Link>
