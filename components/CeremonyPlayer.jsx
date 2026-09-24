@@ -32,19 +32,24 @@ export default function CeremonyPlayer({ gameId, players, round, settings }) {
   const [challengeHistory, setChallengeHistory] = useState([]);
   const [finale, setFinale] = useState(null);
   const [finaleQa, setFinaleQa] = useState({ statements: {}, questions: [] });
-  // Finalists' cross-season profile photos, for FinaleCard's tile row —
-  // only fetched once the Finale actually exists (no point querying for
-  // photos before there's anyone to show), and re-fetched if the roster
-  // of finalists itself changes (it never does mid-finale, but a
-  // fast-refresh/page-reload landing after finale.finalists is already
-  // set should still populate this rather than staying empty forever).
+  // Cross-season profile photos for the WHOLE roster — used by both
+  // FinaleCard's finalist tile row and IdentityRevealCard's "Who Was
+  // Who" grid below it. Used to only fetch finale.finalists' photos
+  // (FinaleCard's own original, narrower need), which meant
+  // IdentityRevealCard silently showed a photo for a finalist and a
+  // bare initial for literally everyone else on the reveal, even
+  // players who'd actually uploaded one. Keyed on the roster's own ids
+  // (joined into a stable string) rather than the `players` array
+  // reference itself, which is a new array identity on basically every
+  // render regardless of whether the roster actually changed.
   const [profilePhotos, setProfilePhotos] = useState({});
+  const playerIdsKey = (players || []).map((p) => p.id).join(",");
   useEffect(() => {
-    if (!finale?.finalists?.length) return;
-    const userIds = finale.finalists.map((f) => (players || []).find((p) => p.id === f.playerId)?.user_id);
+    const userIds = (players || []).map((p) => p.user_id);
+    if (userIds.length === 0) return;
     fetchProfilePhotos(userIds).then(setProfilePhotos);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [finale?.finalists]);
+  }, [playerIdsKey]);
   const [liveExile, setLiveExile] = useState(null);
   const [liveFates, setLiveFates] = useState(null);
   const [showComments, setShowComments] = useState(false);
