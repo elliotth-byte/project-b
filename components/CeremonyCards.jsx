@@ -239,7 +239,17 @@ export function RoundCeremonyCard({ entry: e, challenge, rows, byId, showComment
 // know which one produced the list. Filters to players who actually
 // have an alias on record — someone who joined after alias mode was
 // turned on, or never finished onboarding, has nothing to reveal.
-export function IdentityRevealCard({ players }) {
+//
+// profilePhotos (see lib/profiles.js's fetchProfilePhotos, same map
+// FinaleCard/FinaleFinalistTiles already reads) is safe to show here
+// unconditionally, no `revealed` gate needed the way FinaleFinalistTiles
+// has one: this whole card only ever renders once round.phase is
+// PHASES.ENDED (both call sites gate it that way), which is the exact
+// same "season truly over" condition finale.revealed gates in the
+// finalists-only view. Previously showed only the alias/real-name text
+// — every OTHER player who wasn't a finalist had no face here at all,
+// even though the season's fully over and there's nothing left to hide.
+export function IdentityRevealCard({ players, profilePhotos }) {
   const revealed = (players || []).filter((p) => p.approved && p.alias);
   if (revealed.length === 0) return null;
   return (
@@ -248,12 +258,25 @@ export function IdentityRevealCard({ players }) {
         🎭 Who Was Who
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 8 }}>
-        {revealed.map((p) => (
-          <div key={p.id} style={{ background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "8px 10px" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#ff2d95" }}>{p.alias}</div>
-            <div style={{ fontSize: 11, color: "#a68fd6" }}>{p.real_display_name}</div>
-          </div>
-        ))}
+        {revealed.map((p) => {
+          const photoUrl = profilePhotos?.[p.user_id];
+          return (
+            <div key={p.id} style={{ background: "#0d0618", border: "1px solid #3d1f5c", borderRadius: 8, padding: "8px 10px", display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: "50%", overflow: "hidden", flexShrink: 0,
+                background: "#1a0a2e", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #3d1f5c",
+              }}>
+                {photoUrl
+                  ? <img src={photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <span style={{ fontSize: 13, fontWeight: 900, color: "#6b4f99" }}>{(p.alias || "?").charAt(0).toUpperCase()}</span>}
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#ff2d95" }}>{p.alias}</div>
+                <div style={{ fontSize: 11, color: "#a68fd6" }}>{p.real_display_name}</div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </Card>
   );

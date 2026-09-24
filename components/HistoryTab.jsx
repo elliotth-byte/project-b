@@ -179,7 +179,7 @@ export default function HistoryTab({ gameId, players, gameName, round, settings 
 
       {currentPage?.type === "finale" && (
         <>
-          {round?.phase === PHASES.ENDED && settings?.aliasEnabled && <IdentityRevealCard players={players} />}
+          {round?.phase === PHASES.ENDED && settings?.aliasEnabled && <IdentityRevealCard players={players} profilePhotos={profilePhotos} />}
           <FinaleCard finale={finale} rows={finaleRows} byId={byId} showComments={showComments} qa={finaleQa} players={players} profilePhotos={profilePhotos} />
         </>
       )}
