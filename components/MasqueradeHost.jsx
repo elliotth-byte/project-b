@@ -13,6 +13,7 @@ export default function MasqueradeHost({ gameId, alive, allPlayers = [], shielde
   const [loading, setLoading] = useState(true);
   const [houseSize, setHouseSize] = useState(5);
   const [numHousesOverride, setNumHousesOverride] = useState(null);
+  const [loseTargetOverride, setLoseTargetOverride] = useState(null);
   const [participation, setParticipation] = useState(DEFAULT_PARTICIPATION);
 
   useEffect(() => {
@@ -27,6 +28,13 @@ export default function MasqueradeHost({ gameId, alive, allPlayers = [], shielde
   const { participants: pool, spectators: pickerSpectators } = computeParticipants(participation, { alive, allPlayers, shieldedNames, returnedNames });
   const maxHouses = Math.max(0, Math.floor(pool.length / houseSize));
   const numHouses = numHousesOverride ? Math.max(2, Math.min(numHousesOverride, maxHouses)) : maxHouses;
+  // Winners aren't capped — only how many houses must be ELIMINATED is
+  // configurable. Every house not eliminated by the time that target is
+  // hit is automatically safe (see MasqueradePlayer.jsx's resolveGuess),
+  // so this is the one number that actually controls the win/lose split.
+  const defaultLoseTarget = Math.max(1, Math.floor(numHouses / 2));
+  const maxLoseTarget = Math.max(1, numHouses - 1);
+  const loseTarget = Math.max(1, Math.min(loseTargetOverride ?? defaultLoseTarget, maxLoseTarget));
 
   const start = async () => {
     const names = [...pool.map((p) => p.name)].sort(() => Math.random() - 0.5);
@@ -45,7 +53,7 @@ export default function MasqueradeHost({ gameId, alive, allPlayers = [], shielde
       active: true, createdAt: Date.now(), phase: "active",
       players: pool.map((p) => ({ id: p.id, name: p.name })),
       participants: [...assigned], spectators,
-      houseSize, houses, guesses: {}, resolvedOrder: [], maxResolved: 3,
+      houseSize, houses, guesses: {}, resolvedOrder: [], loseTarget,
     };
     await storageSet(gameId, STORAGE_KEY_MASQUERADE, state);
     setSt(state);
@@ -62,7 +70,7 @@ export default function MasqueradeHost({ gameId, alive, allPlayers = [], shielde
       <ChallengeSetupCard
         icon="🎭" title="Masquerade Houses" onStart={start} startLabel="Split Houses & Start"
         disabled={numHouses < 2}
-        blurb="Players are split into secret Italian houses for the masquerade. Each gets one SHIELD guess (name your own house) and one KILLER guess (name a rival house). First three houses resolved — shielded or eliminated — end the mission."
+        blurb="Players are split into secret Italian houses for the masquerade. Each gets one SHIELD guess (name your own house) and one KILLER guess (name a rival house). The host sets how many houses must be eliminated — every other house is automatically safe once that target is hit."
       >
         <ParticipantPicker
           alive={alive} allPlayers={allPlayers} shieldedNames={shieldedNames} returnedNames={returnedNames}
@@ -86,11 +94,20 @@ export default function MasqueradeHost({ gameId, alive, allPlayers = [], shielde
           {numHousesOverride !== null && <Btn variant="ghost" small onClick={() => setNumHousesOverride(null)}>Auto (max {maxHouses})</Btn>}
           <span style={{ fontSize: 11, color: "#706050" }}>{HOUSE_NAMES.slice(0, numHouses).join(", ")}</span>
         </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, color: "#a09080" }}>Houses to eliminate:</span>
+          <button onClick={() => setLoseTargetOverride(Math.max(1, loseTarget - 1))} disabled={loseTarget <= 1} style={{ width: 26, height: 26, borderRadius: 6, border: "1px solid #253550", background: "#0a1020", color: "#a09080", cursor: "pointer" }}>−</button>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#c45c3c", minWidth: 18, textAlign: "center" }}>{loseTarget}</span>
+          <button onClick={() => setLoseTargetOverride(Math.min(maxLoseTarget, loseTarget + 1))} disabled={loseTarget >= maxLoseTarget} style={{ width: 26, height: 26, borderRadius: 6, border: "1px solid #253550", background: "#0a1020", color: "#a09080", cursor: "pointer" }}>+</button>
+          {loseTargetOverride !== null && <Btn variant="ghost" small onClick={() => setLoseTargetOverride(null)}>Auto (half: {defaultLoseTarget})</Btn>}
+          <span style={{ fontSize: 11, color: "#706050" }}>{numHouses - loseTarget} house{numHouses - loseTarget === 1 ? "" : "s"} safe</span>
+        </div>
       </ChallengeSetupCard>
     );
   }
 
-  const done = st.resolvedOrder.length >= st.maxResolved;
+  const eliminatedCount = st.houses.filter((h) => h.status === "eliminated").length;
+  const done = eliminatedCount >= st.loseTarget;
 
   return (
     <Card style={{ borderColor: "rgba(124,58,237,0.3)" }}>
@@ -106,7 +123,7 @@ export default function MasqueradeHost({ gameId, alive, allPlayers = [], shielde
         </div>
       ))}
       <p style={{ fontSize: 12, color: "#a09080", margin: "8px 0" }}>
-        Guesses submitted: {Object.keys(st.guesses).length}/{st.players.length} · Resolved: {st.resolvedOrder.length}/{st.maxResolved}
+        Guesses submitted: {Object.keys(st.guesses).length}/{st.players.length} · Houses eliminated: {eliminatedCount}/{st.loseTarget}
       </p>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <Btn variant="ghost" small onClick={clear}>Clear</Btn>
@@ -115,7 +132,7 @@ export default function MasqueradeHost({ gameId, alive, allPlayers = [], shielde
           <ArchiveResultsButton
             gameId={gameId} challengeId="masquerade" challengeName="Masquerade Houses" round={null}
             participants={st.participants || st.players.map((p) => p.name)} spectators={st.spectators}
-            winner={st.houses.filter((h) => h.status === "shielded").flatMap((h) => h.members)}
+            winner={st.houses.filter((h) => h.status !== "eliminated").flatMap((h) => h.members)}
             resultSummary={st.houses.map((h) => `House ${h.name}: ${h.status}`).join("; ")}
             finalState={st} startedAt={st.createdAt}
           />

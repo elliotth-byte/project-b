@@ -21,7 +21,8 @@ export default function MasqueradePlayer({ gameId, playerName }) {
 
   const myHouse = st.houses.find((h) => h.members.includes(playerName));
   const myGuess = st.guesses?.[playerName] || {};
-  const done = st.resolvedOrder.length >= st.maxResolved;
+  const eliminatedCount = st.houses.filter((h) => h.status === "eliminated").length;
+  const done = eliminatedCount >= st.loseTarget;
   const others = st.players.filter((p) => p.name !== playerName);
 
   const toggle = (list, setList, name, max) => {
@@ -36,7 +37,7 @@ export default function MasqueradePlayer({ gameId, playerName }) {
     if (type === "shield") {
       const h = fresh.houses.find((x) => x.id === myHouseId);
       const correct = h && [...h.members].sort().join() === [...members].sort().join();
-      if (correct && h.status === "active" && fresh.resolvedOrder.length < fresh.maxResolved) {
+      if (correct && h.status === "active") {
         h.status = "shielded";
         h.resolvedAt = Date.now();
         fresh.resolvedOrder.push({ houseId: h.id, result: "shielded", by: playerName, time: Date.now() });
@@ -45,10 +46,22 @@ export default function MasqueradePlayer({ gameId, playerName }) {
     } else {
       const target = fresh.houses.find((x) => x.id !== myHouseId && x.status === "active" && [...x.members].sort().join() === [...members].sort().join());
       const correct = !!target;
-      if (correct && fresh.resolvedOrder.length < fresh.maxResolved) {
+      if (correct) {
         target.status = "eliminated";
         target.resolvedAt = Date.now();
         fresh.resolvedOrder.push({ houseId: target.id, result: "eliminated", by: playerName, time: Date.now() });
+        // Winners aren't guessed — once enough houses are eliminated to hit
+        // the mission's lose target, every house still standing is safe.
+        const eliminatedCount = fresh.houses.filter((h) => h.status === "eliminated").length;
+        if (eliminatedCount >= fresh.loseTarget) {
+          fresh.houses.forEach((h) => {
+            if (h.status === "active") {
+              h.status = "shielded";
+              h.resolvedAt = Date.now();
+              fresh.resolvedOrder.push({ houseId: h.id, result: "shielded", by: null, time: Date.now() });
+            }
+          });
+        }
       }
       return { correct, members, targetHouseId: target?.id || null, time: Date.now() };
     }
@@ -114,7 +127,7 @@ export default function MasqueradePlayer({ gameId, playerName }) {
       ) : (
         <p style={{ fontSize: 12, color: "#706050" }}>You are a spectator this mission.</p>
       )}
-      {done && <p style={{ fontSize: 12, color: "#c45c3c", marginBottom: 8 }}>Mission ended — 3 houses resolved.</p>}
+      {done && <p style={{ fontSize: 12, color: "#c45c3c", marginBottom: 8 }}>Mission ended — {st.loseTarget} house{st.loseTarget === 1 ? "" : "s"} eliminated, every other house is safe.</p>}
       {myHouse && (
         <>
           <PickGrid sel={shieldSel} setSel={setShieldSel} submit={submitShield} existing={myGuess.shieldGuess} label="🛡️ SHIELD guess (your house)" color="#7a9a5c" />
