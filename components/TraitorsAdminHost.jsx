@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import { Btn, Card } from "./traitorsUi";
 import { supabase } from "../lib/supabaseClient";
 import { storageDelete, storageGet } from "../lib/gameStorage";
-import { hostStorageDelete, subscribeHostState } from "../lib/hostStorage";
+import { hostStorageDelete, hostStorageUpdate, subscribeHostState } from "../lib/hostStorage";
 import { declareWinner, subscribeTraitorsFinale, KEY_TRAITORS_FINALE } from "../lib/traitorsFinale";
+import { setPlayerRole } from "../lib/playerRoles";
 import { DEFAULT_SETTINGS, setSettings, subscribeSettings } from "../lib/gameState";
 import { uploadAvatar, removeAvatar } from "../lib/avatarUpload";
 import { STORAGE_KEY_WORDS } from "../lib/wordGameData";
@@ -168,13 +169,44 @@ export default function AdminHost({ gameId, players }) {
     if (error) {
       alert("Couldn't approve: " + error.message);
       setOptimisticallyApproved((prev) => { const next = new Set(prev); next.delete(p.id); return next; });
+      return;
     }
+    // A player approved AFTER TraitorRolesHost's roles map was seeded
+    // (season already underway) needs an explicit "faithful" entry added
+    // to it — a no-op if roles tracking hasn't started yet (fresh is
+    // null) or this player's somehow already in it. Several places read
+    // tr.roles[name] and happen to treat a missing key as faithful today,
+    // but a latecomer should actually be IN the tracker, not just falling
+    // through those fallbacks.
+    const res = await hostStorageUpdate(gameId, STORAGE_KEY_TRAITOR_ROLES, (fresh) => {
+      if (!fresh || fresh.roles[p.display_name]) return null;
+      fresh.roles[p.display_name] = "faithful";
+      fresh.log = [{ text: `➕ ${p.display_name} joined mid-season as Faithful.`, round: fresh.round, time: new Date().toLocaleTimeString() }, ...fresh.log];
+      return fresh;
+    });
+    if (res.ok) await setPlayerRole(gameId, p.id, "faithful");
   };
 
   const rejectPlayer = async (p) => {
     if (!confirm(`Remove ${p.display_name} from this game? They'll need a new join link to try again.`)) return;
     const { error } = await supabase.from("players").delete().eq("id", p.id);
     if (error) alert("Couldn't remove: " + error.message);
+  };
+
+  // Quick one-click revive, right from the main roster — keeps whatever
+  // role they already had in the Traitor Roles tracker (a murder/banish
+  // never touched that, only players.alive), unlike TraitorRolesHost's own
+  // "Restore to the Game" section, which additionally lets the host pick a
+  // NEW role on the way back in (for a deliberate mid-season twist). Both
+  // can be used interchangeably; this one's just faster for the common
+  // "bring them back as who they already were" case, without needing to
+  // leave this tab. elimination_order cleared too, matching resetSeason's
+  // own full reset — otherwise they'd keep showing their old finishing
+  // placement after coming back alive.
+  const revivePlayer = async (p) => {
+    if (!confirm(`Revive ${p.display_name}? They'll be alive again, keeping whatever role they currently have.`)) return;
+    const { error } = await supabase.from("players").update({ alive: true, elimination_type: null, elimination_order: null }).eq("id", p.id);
+    if (error) alert("Couldn't revive: " + error.message);
   };
 
   const nameFor = (p) => names[p.id] ?? p.display_name;
@@ -303,7 +335,12 @@ export default function AdminHost({ gameId, players }) {
               <Btn small onClick={() => saveName(p)} disabled={saving[p.id] || nameFor(p) === p.display_name}>
                 {saving[p.id] ? "Saving..." : "Save"}
               </Btn>
-              {!p.alive && <span style={{ fontSize: 11, color: "#706050" }}>({p.elimination_type || "out"})</span>}
+              {!p.alive && (
+                <>
+                  <span style={{ fontSize: 11, color: "#706050" }}>({p.elimination_type || "out"})</span>
+                  <Btn small variant="success" onClick={() => revivePlayer(p)}>Revive</Btn>
+                </>
+              )}
             </div>
           ))}
           {players.length === 0 && <p style={{ color: "#706050", fontSize: 12, fontStyle: "italic" }}>No players have joined yet.</p>}

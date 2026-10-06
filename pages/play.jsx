@@ -6,6 +6,7 @@ import { removePendingPlayer, quitOrRemoveApprovedPlayer } from "../lib/playerRe
 import ColorPicker from "../components/ColorPicker";
 import TraitorsAliasPicker from "../components/TraitorsAliasPicker";
 import TraitorsOathGate from "../components/TraitorsOathGate";
+import { STORAGE_KEY_MASQUERADE } from "../lib/masqueradeData";
 import { AVATAR_COLLECTIONS } from "../lib/avatarCollections";
 import ChallengePlayer from "../components/ChallengePlayer";
 import FatesPlayer from "../components/FatesPlayer";
@@ -129,6 +130,22 @@ export default function PlayPage() {
   // their own state shape in later phases, not lib/roundEngine.js's.
   const isStereoTypes = gameInfo?.game_type === "stereo_types";
   const theme = themeFor(gameInfo?.game_type);
+
+  // Masquerade Houses hides everyone inside anonymous Houses (see
+  // lib/masqueradeData.js / MasqueradePlayer.jsx) — leaving the memory
+  // wall's real names/photos open during it would hand players a shortcut
+  // past the actual guessing game. Forced shut the moment it goes active,
+  // and the toggle itself is disabled for the duration rather than just
+  // closed once, so a player can't reopen it mid-round.
+  const [masqueradeActive, setMasqueradeActive] = useState(false);
+  useEffect(() => {
+    if (!isTraitors || !gameId) return;
+    const unsubscribe = subscribeGameState(gameId, STORAGE_KEY_MASQUERADE, (st) => setMasqueradeActive(!!st?.active));
+    return unsubscribe;
+  }, [isTraitors, gameId]);
+  useEffect(() => {
+    if (masqueradeActive) setShowMemoryWall(false);
+  }, [masqueradeActive]);
   // paddingTop uses max() rather than replacing the flat 24 outright —
   // on a non-notch device env(safe-area-inset-top) is 0, and this
   // still keeps the original spacing there; on a notched/Dynamic-
@@ -1034,13 +1051,18 @@ export default function PlayPage() {
         {isTraitors && approved && playerName && !needsTraitorsAlias && !needsTraitorsOath && (
           <>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 14, marginBottom: 10 }}>
-              <button onClick={() => setShowMemoryWall(!showMemoryWall)} style={{
-                background: showMemoryWall ? `${theme.accent}22` : "transparent",
-                border: `1px solid ${showMemoryWall ? theme.accent : theme.border}`,
-                color: showMemoryWall ? theme.accent : theme.textMuted, fontSize: 12, cursor: "pointer",
-                borderRadius: 6, padding: "4px 10px",
-              }}>
-                🖼 {showMemoryWall ? "Hide" : "Show"} memory wall
+              <button
+                onClick={() => !masqueradeActive && setShowMemoryWall(!showMemoryWall)}
+                disabled={masqueradeActive}
+                title={masqueradeActive ? "Hidden for the duration of Masquerade Houses" : undefined}
+                style={{
+                  background: showMemoryWall ? `${theme.accent}22` : "transparent",
+                  border: `1px solid ${showMemoryWall ? theme.accent : theme.border}`,
+                  color: showMemoryWall ? theme.accent : theme.textMuted, fontSize: 12,
+                  cursor: masqueradeActive ? "not-allowed" : "pointer", opacity: masqueradeActive ? 0.5 : 1,
+                  borderRadius: 6, padding: "4px 10px",
+                }}>
+                🖼 {masqueradeActive ? "Hidden during Masquerade" : showMemoryWall ? "Hide" : "Show"} memory wall
               </button>
               {myPlayer.alive !== false && (
                 <button onClick={handleQuit} disabled={quitBusy} style={{
@@ -1059,7 +1081,7 @@ export default function PlayPage() {
                 without it, just without that particular highlight. Must
                 be Sets, not arrays — PlayerMemoryWall calls .has() on
                 both. */}
-            {showMemoryWall && (
+            {showMemoryWall && !masqueradeActive && (
               <div style={{ marginBottom: 20 }}>
                 <PlayerMemoryWall players={identityAllPlayers.filter((p) => p.approved)} winnerIds={new Set()} nomineeIds={new Set()} traitorsMode />
               </div>
