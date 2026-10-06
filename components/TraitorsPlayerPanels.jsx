@@ -7,6 +7,7 @@ import {
   STORAGE_KEY_WORDS, STORAGE_KEY_CASINO, STORAGE_KEY_HOT_POTATO, STORAGE_KEY_ZOMBIE,
   STORAGE_KEY_PIGGY, STORAGE_KEY_MASQUERADE, STORAGE_KEY_ATTACK_DEFEND, STORAGE_KEY_VOODOO,
   STORAGE_KEY_MAZE3D, STORAGE_KEY_COFFIN, STORAGE_KEY_ICEBREAKER,
+  STORAGE_KEY_EYES_VILLA, STORAGE_KEY_PICKPOCKET,
 } from "../lib/traitorsMiniGames";
 import ChallengeErrorBoundary from "./ChallengeErrorBoundary";
 import TraitorsWorkDayGate from "./TraitorsWorkDayGate";
@@ -22,17 +23,35 @@ import VoodooPlayer from "./VoodooPlayer";
 import Maze3DPlayer from "./Maze3DPlayer";
 import CoffinPlayer from "./CoffinPlayer";
 import IcebreakerPlayer from "./IcebreakerPlayer";
+import EyesVillaPlayer from "./EyesVillaPlayer";
+import PickpocketGraspPlayer from "./PickpocketGraspPlayer";
 import PandoraBoxPlayer from "./PandoraBoxPlayer";
 import ConfessionalPlayer from "./TraitorsConfessionalPlayer";
 import MurderVotePlayer from "./MurderVotePlayer";
 import ChatPanel from "./ChatPanel";
+import TraitorsAvatarUpload from "./TraitorsAvatarUpload";
+import { useMissionTabStatus, useRoundtableTabStatus } from "../lib/traitorsNeedsAction";
 
 const TABS = [
-  { key: "challenge", label: "⚔️ Challenge" },
-  { key: "vote", label: "⚖️ Vote" },
+  { key: "mission", label: "🎯 Mission" },
+  { key: "roundtable", label: "⚖️ Roundtable" },
   { key: "confessional", label: "🎥 Confessional" },
   { key: "chat", label: "💬 Chat" },
+  { key: "photo", label: "📷 Photo" },
 ];
+
+// Small fixed red dot — top-right corner of whichever tab button it's
+// attached to. A sibling of the tab's label text, not a replacement for
+// it, so it reads as "there's also something here" rather than hiding
+// what the tab normally says.
+function NeedsActionDot() {
+  return (
+    <span style={{
+      position: "absolute", top: 4, right: 6, width: 8, height: 8, borderRadius: "50%",
+      background: "#c45c3c", boxShadow: "0 0 0 2px #0e1830",
+    }} />
+  );
+}
 
 // Player-side counterpart to TraitorsHostPanels.jsx — same tab layout as
 // the standalone Traitors app's own pages/play.jsx, just lifted into a
@@ -50,8 +69,8 @@ const TABS = [
 // turns it on, has a real roster + settings.chatEnabled to key off of.
 // A caller that omits them just never sees the Chat tab, same as
 // before this was added.
-export default function PlayerPanels({ gameId, player, players, settings }) {
-  const [tab, setTab] = useState("challenge");
+export default function PlayerPanels({ gameId, player, players, settings, onAvatarChanged }) {
+  const [tab, setTab] = useState("mission");
   const [myRole, setMyRole] = useState("faithful");
   const [roundInfo, setRoundInfo] = useState(null);
   const [globallyDisabled, setGloballyDisabled] = useState(null); // null = not loaded yet
@@ -77,6 +96,13 @@ export default function PlayerPanels({ gameId, player, players, settings }) {
     return unsubscribe;
   }, [gameId]);
 
+  // "Needs your action" red-dot tracking — see lib/traitorsNeedsAction.js
+  // for why each of the 13 mini-games + the two vote mechanisms needs
+  // its own completion signal rather than one shared convention.
+  const missionStatus = useMissionTabStatus(gameId, player.name, globallyDisabled);
+  const roundtableStatus = useRoundtableTabStatus(gameId, player.name, myRole);
+  const tabStatus = { mission: missionStatus, roundtable: roundtableStatus };
+
   return (
     <div>
       {/* Pandora's Box is a surprise "twist" banner — kept visible
@@ -84,20 +110,21 @@ export default function PlayerPanels({ gameId, player, players, settings }) {
       <ChallengeErrorBoundary label="Pandora's Box"><PandoraBoxPlayer gameId={gameId} player={player} /></ChallengeErrorBoundary>
 
       <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #253550" }}>
-        {TABS.filter((t) => t.key !== "chat" || settings?.chatEnabled).map((t) => (
+        {TABS.filter((t) => (t.key !== "chat" || settings?.chatEnabled) && (t.key !== "photo" || settings?.avatarMode === "player_upload")).map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)} style={{
-            flex: 1, background: tab === t.key ? "rgba(201,168,76,0.13)" : "transparent",
+            position: "relative", flex: 1, background: tab === t.key ? "rgba(201,168,76,0.13)" : "transparent",
             color: tab === t.key ? "#c9a84c" : "#a09080",
             border: "none", borderRadius: "8px 8px 0 0", padding: "10px 6px",
             fontSize: 13, fontWeight: 600, cursor: "pointer",
             borderBottom: tab === t.key ? "2px solid #c9a84c" : "2px solid transparent",
           }}>
             {t.label}
+            {tabStatus[t.key]?.needsAction && <NeedsActionDot />}
           </button>
         ))}
       </div>
 
-      {tab === "challenge" && (
+      {tab === "mission" && (
         <TraitorsWorkDayGate gameId={gameId}>
           {!globallyDisabled?.includes(STORAGE_KEY_WORDS) && (
             <ChallengeErrorBoundary label="Word Scramble"><WordPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
@@ -132,15 +159,33 @@ export default function PlayerPanels({ gameId, player, players, settings }) {
           {!globallyDisabled?.includes(STORAGE_KEY_ICEBREAKER) && (
             <ChallengeErrorBoundary label="Icebreaker"><IcebreakerPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
           )}
+          {!globallyDisabled?.includes(STORAGE_KEY_EYES_VILLA) && (
+            <ChallengeErrorBoundary label="Eyes of the Villa"><EyesVillaPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_PICKPOCKET) && (
+            <ChallengeErrorBoundary label="The Pickpocket's Grasp"><PickpocketGraspPlayer gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
+          )}
+          {!missionStatus.active && (
+            <div style={{ textAlign: "center", padding: "32px 16px", color: "#706050" }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>🎯</div>
+              <p style={{ fontSize: 13, fontStyle: "italic", margin: 0 }}>No mission running right now — check back once the host starts one.</p>
+            </div>
+          )}
         </TraitorsWorkDayGate>
       )}
 
-      {tab === "vote" && (
+      {tab === "roundtable" && (
         <TraitorsWorkDayGate gameId={gameId}>
           {["traitor-red", "traitor-black"].includes(myRole) && (
             <ChallengeErrorBoundary label="Murder Vote"><MurderVotePlayer gameId={gameId} playerName={player.name} myRole={myRole} /></ChallengeErrorBoundary>
           )}
           <ChallengeErrorBoundary label="Roundtable"><RoundtableVoter gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
+          {!roundtableStatus.active && (
+            <div style={{ textAlign: "center", padding: "32px 16px", color: "#706050" }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>⚖️</div>
+              <p style={{ fontSize: 13, fontStyle: "italic", margin: 0 }}>No vote happening right now — the Roundtable isn't open.</p>
+            </div>
+          )}
         </TraitorsWorkDayGate>
       )}
 
@@ -161,6 +206,12 @@ export default function PlayerPanels({ gameId, player, players, settings }) {
             round={null}
             settings={settings}
           />
+        </ChallengeErrorBoundary>
+      )}
+
+      {tab === "photo" && settings?.avatarMode === "player_upload" && (
+        <ChallengeErrorBoundary label="Photo">
+          <TraitorsAvatarUpload player={player} avatarUrl={player.avatarUrl} onChanged={onAvatarChanged} />
         </ChallengeErrorBoundary>
       )}
     </div>

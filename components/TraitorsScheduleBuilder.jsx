@@ -23,6 +23,8 @@ const EXISTING_MISSION_KEYS = [
   { key: "maze3d", label: "Maze" },
   { key: "coffin", label: "Coffin Slide" },
   { key: "icebreaker", label: "Icebreakers" },
+  { key: "eyesvilla", label: "Eyes of the Villa" },
+  { key: "pickpocket", label: "The Pickpocket's Grasp" },
 ];
 
 const EVENT_OPTIONS = [

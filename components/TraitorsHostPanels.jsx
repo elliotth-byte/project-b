@@ -12,6 +12,7 @@ import {
   STORAGE_KEY_WORDS, STORAGE_KEY_CASINO, STORAGE_KEY_HOT_POTATO, STORAGE_KEY_ZOMBIE,
   STORAGE_KEY_PIGGY, STORAGE_KEY_MASQUERADE, STORAGE_KEY_ATTACK_DEFEND, STORAGE_KEY_VOODOO,
   STORAGE_KEY_MAZE3D, STORAGE_KEY_COFFIN, STORAGE_KEY_ICEBREAKER,
+  STORAGE_KEY_EYES_VILLA, STORAGE_KEY_PICKPOCKET,
 } from "../lib/traitorsMiniGames";
 import ChallengeArchiveList from "./ChallengeArchiveList";
 import MissionsHost from "./MissionsHost";
@@ -38,8 +39,12 @@ import VoodooHost from "./VoodooHost";
 import Maze3DHost from "./Maze3DHost";
 import CoffinHost from "./CoffinHost";
 import IcebreakerHost from "./IcebreakerHost";
+import EyesVillaHost from "./EyesVillaHost";
+import PickpocketGraspHost from "./PickpocketGraspHost";
 import StereoTypesSpotifyWidget from "./StereoTypesSpotifyWidget";
 import { isSpotifyConfigured } from "../lib/spotify/auth";
+import ChallengeTestLab from "./ChallengeTestLab";
+import TraitorsTestLab from "./TraitorsTestLab";
 
 const BASE_TABS = [
   { key: "today", label: "📅 Today" },
@@ -47,6 +52,7 @@ const BASE_TABS = [
   { key: "votes", label: "⚖️ Roundtable" },
   { key: "missions", label: "🎯 Missions" },
   { key: "challenges", label: "⚔️ Challenges" },
+  { key: "testlab", label: "🧪 Test Lab" },
   { key: "confessionals", label: "🎥 Confessionals" },
   { key: "chat", label: "💬 Chat" },
   { key: "history", label: "📜 History & Log" },
@@ -240,7 +246,29 @@ export default function HostPanels({ gameId, players, adminExtra }) {
           {!globallyDisabled?.includes(STORAGE_KEY_ICEBREAKER) && (
             <ChallengeErrorBoundary label="Icebreaker"><IcebreakerHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
           )}
+          {!globallyDisabled?.includes(STORAGE_KEY_EYES_VILLA) && (
+            <ChallengeErrorBoundary label="Eyes of the Villa"><EyesVillaHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
+          {!globallyDisabled?.includes(STORAGE_KEY_PICKPOCKET) && (
+            <ChallengeErrorBoundary label="The Pickpocket's Grasp"><PickpocketGraspHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+          )}
           </TraitorsWorkDayGate>
+        </div>
+      )}
+
+      {tab === "testlab" && (
+        <div style={{ display: "grid", gap: 20 }}>
+          <ChallengeErrorBoundary label="Traitors Test Lab">
+            <TraitorsTestLab />
+          </ChallengeErrorBoundary>
+          <div>
+            <h3 style={{ color: "#a09080", fontSize: 13, margin: "0 0 10px", fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>
+              Battle Games (Panopticon)
+            </h3>
+            <ChallengeErrorBoundary label="Battle Game Test Lab">
+              <ChallengeTestLab gameId={gameId} />
+            </ChallengeErrorBoundary>
+          </div>
         </div>
       )}
 

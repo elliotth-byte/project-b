@@ -19,7 +19,7 @@ import PlayerPowerModal from "./PlayerPowerModal";
 // each name baked into the portrait itself), never on the color-swatch
 // fallback, and never the \"OUT\" badge, which is separate information
 // the photo doesn't carry.
-export default function PlayerMemoryWall({ players, hideNameLabels = false, winnerIds, nomineeIds, settings, fatesHolderId }) {
+export default function PlayerMemoryWall({ players, hideNameLabels = false, winnerIds, nomineeIds, settings, fatesHolderId, traitorsMode = false }) {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const roster = [...(players || [])].sort((a, b) => {
     if (a.alive !== b.alive) return a.alive ? -1 : 1; // alive players first
@@ -149,6 +149,7 @@ export default function PlayerMemoryWall({ players, hideNameLabels = false, winn
           isNominee={nomineeIds?.has(selectedPlayer.id)}
           heldFatesLastRound={fatesHolderId === selectedPlayer.id}
           onClose={() => setSelectedPlayer(null)}
+          traitorsMode={traitorsMode}
         />
       )}
     </div>

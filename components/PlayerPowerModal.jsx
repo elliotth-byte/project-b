@@ -1,4 +1,4 @@
-import { powerByName, powerFor } from "../lib/characterPowers";
+import { powerByName, powerFor, hasSacrificedPower } from "../lib/characterPowers";
 import { colorFor } from "../lib/playerColors";
 
 // ─── Player Power Modal ───
@@ -21,9 +21,24 @@ import { colorFor } from "../lib/playerColors";
 // when calling this for someone else, since colorFor needs the whole
 // roster to assign colors consistently but the wall itself already
 // colors its own tiles independently of this modal.
-export default function PlayerPowerModal({ player, allPlayers, settings, isWinner, isNominee, heldFatesLastRound, onClose }) {
+// traitorsMode: Traitors has no battles/nominations/Favor of the Fates/
+// character powers at all — those are Panopticon-only concepts this
+// modal otherwise shows unconditionally. A Traitors caller (the header
+// self-portrait and PlayerMemoryWall.jsx, both via pages/play.jsx) passes
+// this to swap that whole block for the one piece of status that IS
+// meaningful in Traitors: alive vs. eliminated (the same `alive` flag
+// PlayerMemoryWall's own tiles already gray out on).
+export default function PlayerPowerModal({ player, allPlayers, settings, isWinner, isNominee, heldFatesLastRound, onClose, traitorsMode = false }) {
   const power = powerFor(player, settings);
   const meta = power ? powerByName(power) : null;
+  // powerFor() returns null once a player has sacrificed their power at
+  // the Altar of Chiron (see lib/characterPowers.js) — same as a player
+  // who was simply never assigned one, so this is checked separately to
+  // tell those two states apart here instead of both reading as "No
+  // power assigned."
+  const sacrificed = hasSacrificedPower(player);
+  const sacrificedPowerName = sacrificed ? (player.powerState || player.power_state)?.chironSacrificedPower : null;
+  const sacrificedMeta = sacrificedPowerName ? powerByName(sacrificedPowerName) : null;
   // Only worth calling out as "originally so-and-so's" when the power
   // has actually come apart from this player's own alias — via
   // Dionysus's swap, or random-mode assignment that just happened not
@@ -62,37 +77,56 @@ export default function PlayerPowerModal({ player, allPlayers, settings, isWinne
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#a68fd6", fontSize: 20, cursor: "pointer", lineHeight: 1, padding: 0 }}>×</button>
         </div>
 
-        <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
-          <StatusRow show={isWinner} icon="🏆" color="#ffd700" label="Has won a battle this season" />
-          <StatusRow show={isNominee} icon="⚠️" color="#ff3860" label="Nominated for exile this round" />
-          <StatusRow show={heldFatesLastRound} icon="🎲" color="#00d9ff" label="Held the Favor of the Fates last round" />
-          {!isWinner && !isNominee && !heldFatesLastRound && (
-            <p style={{ color: "#6b4f99", fontSize: 12, margin: 0, fontStyle: "italic" }}>No battle wins, nominations, or Favor of the Fates yet.</p>
-          )}
-        </div>
+        {traitorsMode ? (
+          <div style={{ display: "grid", gap: 8 }}>
+            <StatusRow show={player.alive !== false} icon="🟢" color="#7a9a5c" label="Still in the game" />
+            <StatusRow show={player.alive === false} icon="💀" color="#c45c3c" label="Eliminated" />
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
+              <StatusRow show={isWinner} icon="🏆" color="#ffd700" label="Has won a battle this season" />
+              <StatusRow show={isNominee} icon="⚠️" color="#ff3860" label="Nominated for exile this round" />
+              <StatusRow show={heldFatesLastRound} icon="🎲" color="#00d9ff" label="Held the Favor of the Fates last round" />
+              {!isWinner && !isNominee && !heldFatesLastRound && (
+                <p style={{ color: "#6b4f99", fontSize: 12, margin: 0, fontStyle: "italic" }}>No battle wins, nominations, or Favor of the Fates yet.</p>
+              )}
+            </div>
 
-        <div style={{ borderTop: "1px solid #3d1f5c", paddingTop: 14 }}>
-          {settings?.characterPowersMode === "off" || settings?.characterPowersMode == null ? (
-            <p style={{ color: "#6b4f99", fontSize: 12, margin: 0, fontStyle: "italic" }}>Character powers are off this season.</p>
-          ) : !power ? (
-            <p style={{ color: "#6b4f99", fontSize: 12, margin: 0, fontStyle: "italic" }}>No power assigned.</p>
-          ) : (
-            <>
-              <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>Power</div>
-              <p style={{ color: "#f5f0ff", fontSize: 15, fontWeight: 700, margin: "0 0 6px" }}>
-                {meta?.icon} {meta?.powerName || power}
-                {decoupled && <span style={{ color: "#a68fd6", fontWeight: 400, fontSize: 12 }}> (originally {power}'s)</span>}
-              </p>
-              {meta && !meta.implemented && (
-                <p style={{ color: "#ff9f4d", fontSize: 11, margin: "0 0 6px", fontStyle: "italic" }}>Not yet active this season.</p>
+            <div style={{ borderTop: "1px solid #3d1f5c", paddingTop: 14 }}>
+              {settings?.characterPowersMode === "off" || settings?.characterPowersMode == null ? (
+                <p style={{ color: "#6b4f99", fontSize: 12, margin: 0, fontStyle: "italic" }}>Character powers are off this season.</p>
+              ) : sacrificed ? (
+                <>
+                  <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>Power</div>
+                  <p style={{ color: "#f5f0ff", fontSize: 15, fontWeight: 700, margin: "0 0 6px" }}>🔥 Sacrificed at the Altar of Chiron</p>
+                  {sacrificedMeta && (
+                    <p style={{ color: "#a68fd6", fontSize: 13, margin: 0, lineHeight: 1.5 }}>
+                      Gave up {sacrificedMeta.icon} {sacrificedMeta.powerName} — gone for good.
+                    </p>
+                  )}
+                </>
+              ) : !power ? (
+                <p style={{ color: "#6b4f99", fontSize: 12, margin: 0, fontStyle: "italic" }}>No power assigned.</p>
+              ) : (
+                <>
+                  <div style={{ fontSize: 11, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>Power</div>
+                  <p style={{ color: "#f5f0ff", fontSize: 15, fontWeight: 700, margin: "0 0 6px" }}>
+                    {meta?.icon} {meta?.powerName || power}
+                    {decoupled && <span style={{ color: "#a68fd6", fontWeight: 400, fontSize: 12 }}> (originally {power}'s)</span>}
+                  </p>
+                  {meta && !meta.implemented && (
+                    <p style={{ color: "#ff9f4d", fontSize: 11, margin: "0 0 6px", fontStyle: "italic" }}>Not yet active this season.</p>
+                  )}
+                  <p style={{ color: "#a68fd6", fontSize: 13, margin: 0, lineHeight: 1.5 }}>{meta?.description}</p>
+                  {meta?.phase && (
+                    <p style={{ color: "#6b4f99", fontSize: 11, margin: "8px 0 0", fontStyle: "italic" }}>{meta.phase}</p>
+                  )}
+                </>
               )}
-              <p style={{ color: "#a68fd6", fontSize: 13, margin: 0, lineHeight: 1.5 }}>{meta?.description}</p>
-              {meta?.phase && (
-                <p style={{ color: "#6b4f99", fontSize: 11, margin: "8px 0 0", fontStyle: "italic" }}>{meta.phase}</p>
-              )}
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

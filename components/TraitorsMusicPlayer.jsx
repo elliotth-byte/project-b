@@ -78,7 +78,13 @@ export default function MusicPlayer({ gameId, isHost = false }) {
   const currentMood = MOODS.find((m) => m.id === mood) || MOODS[0];
 
   return (
-    <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 1000 }}>
+    // bottom: 76, not 20 — components/FeedbackButton.jsx is ALSO fixed to
+    // this same bottom-right corner (bottom: 14, right: 14), and its own
+    // z-index (150) sits well under this player's circular controls
+    // (1000), so at 20 those controls rendered visually on top of the
+    // feedback pill instead of beside it. 76 clears its ~34px pill height
+    // (14 + ~34) with a comfortable margin, stacking above it instead.
+    <div style={{ position: "fixed", bottom: 76, right: 20, zIndex: 1000 }}>
       {showControls && (
         <div style={{
           background: "#132038", border: "1px solid #253550", borderRadius: 12,

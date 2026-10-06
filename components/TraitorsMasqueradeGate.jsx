@@ -27,6 +27,7 @@ export default function TraitorsMasqueradeGate({ gameId, alive, allPlayers = [] 
   const [roulette, setRoulette] = useState(null);
   const [applying, setApplying] = useState(false);
   const [spinning, setSpinning] = useState(false);
+  const [survivorCountOverride, setSurvivorCountOverride] = useState(null);
 
   useEffect(() => {
     const unsubscribe = subscribeGameState(gameId, STORAGE_KEY_MASQUERADE, setMasquerade);
@@ -51,18 +52,20 @@ export default function TraitorsMasqueradeGate({ gameId, alive, allPlayers = [] 
     : [];
   // Every eliminated-house member is one spin away from being spared — the
   // "Apply" step can't run until either nobody was eliminated at all, or
-  // the wheel has actually landed on someone to save.
-  const readyToApply = done && (eliminatedNames.length === 0 || !!roulette?.savedName);
+  // the wheel has actually finished spinning for every survivor slot.
+  const readyToApply = done && (eliminatedNames.length === 0 || roulette?.savedNames?.length > 0);
+  const maxSurvivors = Math.max(1, eliminatedNames.length);
+  const survivorCount = Math.max(1, Math.min(survivorCountOverride ?? 1, maxSurvivors));
 
   const spin = async () => {
     setSpinning(true);
-    await spinMasqueradeRoulette(gameId, masquerade);
+    await spinMasqueradeRoulette(gameId, masquerade, survivorCount);
     setSpinning(false);
   };
 
   const apply = async () => {
     setApplying(true);
-    await applyMasqueradeEliminations(gameId, masquerade, allPlayers, roulette?.savedName || null);
+    await applyMasqueradeEliminations(gameId, masquerade, allPlayers, roulette?.savedNames || []);
     setApplying(false);
   };
 
@@ -78,9 +81,9 @@ export default function TraitorsMasqueradeGate({ gameId, alive, allPlayers = [] 
             "No houses were eliminated — everyone advances to Traitor selection."
           )}
         </p>
-        {status.savedName && (
+        {status.savedNames?.length > 0 && (
           <p style={{ fontSize: 12, color: "#7a9a5c", margin: "8px 0 0" }}>
-            🎡 Saved by the wheel: <strong>{status.savedName}</strong> — joins the main cast.
+            🎡 Saved by the wheel: <strong>{status.savedNames.join(", ")}</strong> — join{status.savedNames.length > 1 ? "" : "s"} the main cast.
           </p>
         )}
       </Card>
@@ -92,7 +95,7 @@ export default function TraitorsMasqueradeGate({ gameId, alive, allPlayers = [] 
       <Card style={{ borderColor: "rgba(196,92,60,0.4)" }}>
         <h3 style={{ color: "#f0e6d3", margin: "0 0 6px", fontSize: 14 }}>🎭 Masquerade Pre-Elimination</h3>
         <p style={{ fontSize: 12, color: "#a09080", margin: 0 }}>
-          Run before Traitors are selected. Anyone in a house that ends up eliminated is eliminated from the game entirely — except one name the roulette wheel saves. Supports any number of players, not just 26.
+          Run before Traitors are selected. Anyone in a house that ends up eliminated is eliminated from the game entirely — except however many names the roulette wheel saves (host's choice). Supports any number of players, not just 26.
         </p>
       </Card>
       <MasqueradeHost gameId={gameId} alive={alive} allPlayers={allPlayers} />
@@ -100,13 +103,22 @@ export default function TraitorsMasqueradeGate({ gameId, alive, allPlayers = [] 
         <Card style={{ borderColor: "rgba(124,58,237,0.4)", textAlign: "center" }}>
           <h3 style={{ color: "#f0e6d3", margin: "0 0 8px", fontSize: 14 }}>🎡 Roulette of Mercy</h3>
           <p style={{ fontSize: 12, color: "#a09080", margin: "0 0 4px" }}>
-            {roulette?.savedName
+            {roulette?.savedNames?.length
               ? "The wheel has spoken."
-              : "Every name below is about to be eliminated — except one. Spin to see who survives."}
+              : `Every name below is about to be eliminated — except ${survivorCount}. Spin to see who survives.`}
           </p>
+          {!roulette?.savedNames?.length && (
+            <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "center", margin: "10px 0" }}>
+              <span style={{ fontSize: 12, color: "#a09080" }}>Survivors:</span>
+              <button onClick={() => setSurvivorCountOverride(Math.max(1, survivorCount - 1))} disabled={survivorCount <= 1} style={{ width: 26, height: 26, borderRadius: 6, border: "1px solid #253550", background: "#0a1020", color: "#a09080", cursor: "pointer" }}>−</button>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#7a9a5c", minWidth: 18, textAlign: "center" }}>{survivorCount}</span>
+              <button onClick={() => setSurvivorCountOverride(Math.min(maxSurvivors, survivorCount + 1))} disabled={survivorCount >= maxSurvivors} style={{ width: 26, height: 26, borderRadius: 6, border: "1px solid #253550", background: "#0a1020", color: "#a09080", cursor: "pointer" }}>+</button>
+              <span style={{ fontSize: 11, color: "#706050" }}>of {eliminatedNames.length} eliminated</span>
+            </div>
+          )}
           <MasqueradeRouletteWheel
             names={roulette?.names || eliminatedNames}
-            savedName={roulette?.savedName || null}
+            savedNames={roulette?.savedNames || []}
             onSpin={spin}
             disabled={spinning}
           />

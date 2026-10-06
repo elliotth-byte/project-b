@@ -20,18 +20,21 @@ import { STORAGE_KEY_MAZE3D } from "../lib/mazeData";
 import { STORAGE_KEY_COFFIN } from "../lib/coffinData";
 import { STORAGE_KEY_ICEBREAKER } from "../lib/icebreakerData";
 import { STORAGE_KEY_PANDORA } from "../lib/pandoraData";
+import { STORAGE_KEY_EYES_VILLA } from "../lib/eyesVillaData";
+import { STORAGE_KEY_PICKPOCKET } from "../lib/pickpocketGraspData";
 import { STORAGE_KEY_ROUND_INFO, VOTES_KEY_PREFIX, STORAGE_KEY_VOTE_HISTORY } from "../lib/roundtableData";
 import { STORAGE_KEY_CHALLENGE_HISTORY } from "../lib/challengeHistory";
 import { STORAGE_KEY_TRAITOR_ROLES } from "../lib/traitorData";
 import TraitorsScheduleBuilder from "./TraitorsScheduleBuilder";
 import TraitorsWorkDayToggle from "./TraitorsWorkDayToggle";
 
-// All 12 "mission"/"challenge" keys — this is the one place that list
+// All 14 "mission"/"challenge" keys — this is the one place that list
 // needs to be kept in sync when a new mini-game gets added.
 const CHALLENGE_KEYS = [
   STORAGE_KEY_WORDS, STORAGE_KEY_CASINO, STORAGE_KEY_HOT_POTATO, STORAGE_KEY_ZOMBIE,
   STORAGE_KEY_PIGGY, STORAGE_KEY_MASQUERADE, STORAGE_KEY_ATTACK_DEFEND, STORAGE_KEY_VOODOO,
   STORAGE_KEY_MAZE3D, STORAGE_KEY_COFFIN, STORAGE_KEY_ICEBREAKER, STORAGE_KEY_PANDORA,
+  STORAGE_KEY_EYES_VILLA, STORAGE_KEY_PICKPOCKET,
 ];
 
 export default function AdminHost({ gameId, players }) {

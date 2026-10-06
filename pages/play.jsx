@@ -41,6 +41,7 @@ import { GAME_REGISTRY } from "../lib/challengeGames";
 import AphroditePicker from "../components/AphroditePicker";
 import PoseidonTrigger from "../components/PoseidonTrigger";
 import AresTarget from "../components/AresTarget";
+import AltarOfChiron from "../components/AltarOfChiron";
 import ArtemisTrigger from "../components/ArtemisTrigger";
 import HestiaTrigger from "../components/HestiaTrigger";
 import DionysusSwap from "../components/DionysusSwap";
@@ -690,6 +691,7 @@ export default function PlayPage() {
             isNominee={nomineeIds?.has(myPlayer.id)}
             heldFatesLastRound={latestExileEntry?.chaosHolderId === myPlayer.id}
             onClose={() => setShowMyProfile(false)}
+            traitorsMode={isTraitors}
           />
         );
       })()}
@@ -894,6 +896,14 @@ export default function PlayPage() {
                 {round && round.phase !== PHASES.FINALE && !exiled && powerFor(player, settings) === "Ares" && (
                   <AresTarget gameId={gameId} round={round} player={player} players={identityAllPlayers} settings={settings} />
                 )}
+                {/* Deliberately NOT phase- or exiled-gated like every power
+                    trigger above — the whole point of the altar is that a
+                    player can walk away from their power "at any time,"
+                    not just during a specific window. Renders for anyone
+                    who currently holds a power OR already sacrificed one
+                    (see AltarOfChiron.jsx itself for the post-sacrifice
+                    memorial state). */}
+                {round && <AltarOfChiron gameId={gameId} player={player} settings={settings} />}
                 {(!round || round.phase === PHASES.LOBBY) && (
                   <Card style={{ marginBottom: 20, textAlign: "center" }}>
                     <p style={{ color: "#6b4f99", fontSize: 13, fontStyle: "italic", margin: 0 }}>
@@ -1035,16 +1045,17 @@ export default function PlayPage() {
                 both. */}
             {showMemoryWall && (
               <div style={{ marginBottom: 20 }}>
-                <PlayerMemoryWall players={identityAllPlayers.filter((p) => p.approved)} winnerIds={new Set()} nomineeIds={new Set()} />
+                <PlayerMemoryWall players={identityAllPlayers.filter((p) => p.approved)} winnerIds={new Set()} nomineeIds={new Set()} traitorsMode />
               </div>
             )}
 
             <ChallengeErrorBoundary label="Traitors">
               <TraitorsPlayerPanels
                 gameId={gameId}
-                player={{ id: myPlayer.id, name: effectivePlayerName, realName: playerName, alive: myPlayer.alive }}
+                player={{ id: myPlayer.id, name: effectivePlayerName, realName: playerName, alive: myPlayer.alive, avatarUrl: myPlayer.avatarUrl }}
                 players={identityAllPlayers}
                 settings={settings}
+                onAvatarChanged={(url) => setMyPlayer((p) => p && ({ ...p, avatarUrl: url }))}
               />
             </ChallengeErrorBoundary>
           </>
