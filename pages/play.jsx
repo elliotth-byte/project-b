@@ -5,6 +5,7 @@ import { signOut, displayNameFromUser } from "../lib/auth";
 import { removePendingPlayer, quitOrRemoveApprovedPlayer } from "../lib/playerRemoval";
 import ColorPicker from "../components/ColorPicker";
 import TraitorsAliasPicker from "../components/TraitorsAliasPicker";
+import TraitorsOathGate from "../components/TraitorsOathGate";
 import { AVATAR_COLLECTIONS } from "../lib/avatarCollections";
 import ChallengePlayer from "../components/ChallengePlayer";
 import FatesPlayer from "../components/FatesPlayer";
@@ -589,6 +590,14 @@ export default function PlayPage() {
   // in the season as Project B's needsIdentity: resolved before the
   // "waiting for host approval" screen, once, right after joining.
   const needsTraitorsAlias = isTraitors && joined && myPlayer && !traitorsIdentityComplete(myPlayer, settings);
+  // The Traitors' Oath — a mandatory per-season confidentiality/
+  // participation agreement, see components/TraitorsOathGate.jsx. Gated
+  // on !myPlayer.approved (not just "haven't signed"), same reasoning as
+  // needsOnboardingPrefs above: once a host has approved someone into a
+  // season, this must never retroactively trap an already-playing person
+  // who joined before the oath existed. Resolved after the alias step,
+  // still before the "waiting for host approval" screen.
+  const needsTraitorsOath = isTraitors && joined && myPlayer && !needsTraitorsAlias && !myPlayer.approved && !myPlayer.gamePrefs?.oathSigned;
   // Stereo Types' own identity step — boombox color (reusing
   // players.color as-is) plus an optional sticker, see
   // components/StereoTypesIdentityPicker.jsx. Same placement in the
@@ -737,6 +746,13 @@ export default function PlayPage() {
           />
         )}
 
+        {joined && myPlayer && needsTraitorsOath && (
+          <TraitorsOathGate
+            player={myPlayer}
+            onComplete={(gamePrefs) => setMyPlayer((p) => p && ({ ...p, gamePrefs }))}
+          />
+        )}
+
         {joined && myPlayer && needsStereoTypesIdentity && (
           <StereoTypesIdentityPicker
             player={myPlayer}
@@ -746,7 +762,7 @@ export default function PlayPage() {
           />
         )}
 
-        {joined && myPlayer && !needsIdentity && !needsOnboardingPrefs && !needsTraitorsAlias && !needsStereoTypesIdentity && !myPlayer.approved && (
+        {joined && myPlayer && !needsIdentity && !needsOnboardingPrefs && !needsTraitorsAlias && !needsTraitorsOath && !needsStereoTypesIdentity && !myPlayer.approved && (
           <div style={{
             marginBottom: 20, textAlign: "center", padding: "28px 20px",
             background: theme.cardBg,
@@ -1015,7 +1031,7 @@ export default function PlayPage() {
           </>
         )}
 
-        {isTraitors && approved && playerName && !needsTraitorsAlias && (
+        {isTraitors && approved && playerName && !needsTraitorsAlias && !needsTraitorsOath && (
           <>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 14, marginBottom: 10 }}>
               <button onClick={() => setShowMemoryWall(!showMemoryWall)} style={{
