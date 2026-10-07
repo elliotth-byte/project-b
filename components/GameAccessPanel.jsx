@@ -20,7 +20,8 @@ const btnStyle = {
 // of the setup/roster tools already live.
 export default function GameAccessPanel({
   game, players, isPrimaryHost, origin, userId,
-  coHosts, inviteEmail, setInviteEmail, inviteStatus, inviteCoHost, removeCoHost,
+  coHosts, inviteEmail, setInviteEmail, inviteStatus, inviteStatusCode, inviteCoHost, removeCoHost,
+  grantHostAndAdd, grantingHost,
 }) {
   const [showCoHosts, setShowCoHosts] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -128,8 +129,20 @@ export default function GameAccessPanel({
             {inviteStatus && inviteStatus !== "sending" && (
               <p style={{ fontSize: 11.5, color: inviteStatus.startsWith("✅") ? "#00ff9d" : "#ff3860", marginTop: 6 }}>{inviteStatus}</p>
             )}
+            {isPrimaryHost && inviteStatusCode === "not_a_host" && (
+              <button onClick={grantHostAndAdd} disabled={grantingHost} style={{
+                background: "none", border: "1px solid #ff2d9555", borderRadius: 6, color: "#ff2d95",
+                fontSize: 11.5, cursor: grantingHost ? "not-allowed" : "pointer", padding: "5px 10px", marginTop: 4,
+              }}>
+                {grantingHost ? "Granting..." : "👑 Grant host access & add"}
+              </button>
+            )}
             <p style={{ fontSize: 11, color: "#6b4f99", marginTop: 8, fontStyle: "italic" }}>
-              Co-hosts need an existing host account (see README.md) and get full access to run this season — roster, battles, announcements. Only the primary host can add/remove co-hosts or archive/delete the season.
+              A co-host needs a host account first — if theirs isn't one yet, "Grant host access & add" turns their
+              existing account (they just need to have logged in at least once) into a host for this game type and
+              adds them in one step, no dashboard needed. Co-hosts get full access to run this season — roster,
+              missions, announcements. Only the primary host can add/remove co-hosts, grant host access, or
+              archive/delete the season.
             </p>
           </div>
         )}

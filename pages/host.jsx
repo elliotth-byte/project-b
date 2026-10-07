@@ -45,6 +45,11 @@ export default function HostPage() {
   const [coHosts, setCoHosts] = useState([]);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteStatus, setInviteStatus] = useState(null); // null | "sending" | message string
+  // The raw RPC status code behind inviteStatus's human message — GameAccessPanel
+  // needs this (not just the message string) to know specifically when to show
+  // the "Grant host access & add" follow-up button (see grantHostAndAdd below).
+  const [inviteStatusCode, setInviteStatusCode] = useState(null);
+  const [grantingHost, setGrantingHost] = useState(false);
 
   // Declared here (rather than down with visibleGames/archivedGames
   // below, where it conceptually belongs) so useRoundWatcher, right
@@ -210,21 +215,64 @@ export default function HostPage() {
     e.preventDefault();
     if (!inviteEmail.trim()) return;
     setInviteStatus("sending");
+    setInviteStatusCode(null);
     const { data, error: err } = await supabase.rpc("invite_co_host", { p_game_id: game.id, p_email: inviteEmail.trim() });
     if (err) { setInviteStatus(err.message); return; }
     const messages = {
       ok: "✅ Added as co-host.",
       not_found: "No account found with that email.",
-      not_a_host: "That account exists but isn't a host account.",
+      not_a_host: "That account exists but isn't a host account yet.",
       already_host: "That's already the primary host.",
       not_authorized: "Only the primary host can add co-hosts.",
     };
+    setInviteStatusCode(data);
     setInviteStatus(messages[data] || "Something went wrong.");
     if (data === "ok") {
       setInviteEmail("");
       loadCoHosts(game.id);
     }
-    window.setTimeout(() => setInviteStatus(null), 4000);
+    // Left showing (no auto-clear) for not_a_host specifically — that's
+    // what cues GameAccessPanel to offer "Grant host access & add" right
+    // below it; clearing it after 4s would yank that button away before
+    // anyone has a chance to click it.
+    if (data !== "not_a_host") {
+      window.setTimeout(() => { setInviteStatus(null); setInviteStatusCode(null); }, 4000);
+    }
+  };
+
+  // Self-serve follow-up for exactly the "not_a_host" case above — turns
+  // the target account into a host scoped to THIS game's own game_type
+  // (see sql/add-grant-host-access.sql for why it's scoped, not
+  // unrestricted), then immediately retries the actual co-host invite,
+  // so granting access and adding them as a co-host reads as one single
+  // action from the host's side rather than two separate steps.
+  const grantHostAndAdd = async () => {
+    if (!inviteEmail.trim()) return;
+    setGrantingHost(true);
+    const { data, error: err } = await supabase.rpc("grant_host_access", { p_game_id: game.id, p_email: inviteEmail.trim() });
+    if (err) { setGrantingHost(false); setInviteStatus(err.message); setInviteStatusCode(null); return; }
+    if (data !== "ok" && data !== "already_host") {
+      setGrantingHost(false);
+      const grantMessages = {
+        not_found: "No account found with that email.",
+        not_authorized: "Only the primary host can grant host access.",
+      };
+      setInviteStatus(grantMessages[data] || "Something went wrong.");
+      setInviteStatusCode(null);
+      window.setTimeout(() => { setInviteStatus(null); setInviteStatusCode(null); }, 4000);
+      return;
+    }
+    const { data: addData, error: addErr } = await supabase.rpc("invite_co_host", { p_game_id: game.id, p_email: inviteEmail.trim() });
+    setGrantingHost(false);
+    if (addErr) { setInviteStatus(addErr.message); setInviteStatusCode(null); return; }
+    const messages = { ok: "✅ Granted host access and added as co-host.", already_host: "That's already the primary host." };
+    setInviteStatusCode(addData);
+    setInviteStatus(messages[addData] || "Granted host access, but couldn't add as co-host — try Add again.");
+    if (addData === "ok") {
+      setInviteEmail("");
+      loadCoHosts(game.id);
+    }
+    window.setTimeout(() => { setInviteStatus(null); setInviteStatusCode(null); }, 4000);
   };
 
   const removeCoHost = async (userId) => {
@@ -668,8 +716,11 @@ export default function HostPage() {
                 inviteEmail={inviteEmail}
                 setInviteEmail={setInviteEmail}
                 inviteStatus={inviteStatus}
+                inviteStatusCode={inviteStatusCode}
                 inviteCoHost={inviteCoHost}
                 removeCoHost={removeCoHost}
+                grantHostAndAdd={grantHostAndAdd}
+                grantingHost={grantingHost}
               />
             }
           />
@@ -692,8 +743,11 @@ export default function HostPage() {
                   inviteEmail={inviteEmail}
                   setInviteEmail={setInviteEmail}
                   inviteStatus={inviteStatus}
+                  inviteStatusCode={inviteStatusCode}
                   inviteCoHost={inviteCoHost}
                   removeCoHost={removeCoHost}
+                  grantHostAndAdd={grantHostAndAdd}
+                  grantingHost={grantingHost}
                 />
                 {/* The music player's actual controls (see MusicPlayer.jsx)
                     get portaled into this div — MusicPlayer itself stays
@@ -724,8 +778,11 @@ export default function HostPage() {
                   inviteEmail={inviteEmail}
                   setInviteEmail={setInviteEmail}
                   inviteStatus={inviteStatus}
+                  inviteStatusCode={inviteStatusCode}
                   inviteCoHost={inviteCoHost}
                   removeCoHost={removeCoHost}
+                  grantHostAndAdd={grantHostAndAdd}
+                  grantingHost={grantingHost}
                 />
               }
             />
