@@ -7,6 +7,8 @@ import ColorPicker from "../components/ColorPicker";
 import TraitorsAliasPicker from "../components/TraitorsAliasPicker";
 import TraitorsOathGate from "../components/TraitorsOathGate";
 import { STORAGE_KEY_MASQUERADE } from "../lib/masqueradeData";
+import TraitorsMasqueradeReveal from "../components/TraitorsMasqueradeReveal";
+import TraitorsEliminatedScreen from "../components/TraitorsEliminatedScreen";
 import { AVATAR_COLLECTIONS } from "../lib/avatarCollections";
 import ChallengePlayer from "../components/ChallengePlayer";
 import FatesPlayer from "../components/FatesPlayer";
@@ -136,16 +138,32 @@ export default function PlayPage() {
   // wall's real names/photos open during it would hand players a shortcut
   // past the actual guessing game. Forced shut the moment it goes active,
   // and the toggle itself is disabled for the duration rather than just
-  // closed once, so a player can't reopen it mid-round.
+  // closed once, so a player can't reopen it mid-round. Reopens the
+  // instant the mission is DECIDED (enough houses eliminated to hit
+  // loseTarget — same "done" check MasqueradeHost/Player already compute
+  // internally), not only once the host gets around to clicking Clear —
+  // the guessing is over at that point, so there's nothing left to spoil.
   const [masqueradeActive, setMasqueradeActive] = useState(false);
   useEffect(() => {
     if (!isTraitors || !gameId) return;
-    const unsubscribe = subscribeGameState(gameId, STORAGE_KEY_MASQUERADE, (st) => setMasqueradeActive(!!st?.active));
+    const unsubscribe = subscribeGameState(gameId, STORAGE_KEY_MASQUERADE, (st) => {
+      const eliminatedCount = st?.houses?.filter((h) => h.status === "eliminated").length || 0;
+      const stillGuessing = !!st?.active && eliminatedCount < (st?.loseTarget ?? Infinity);
+      setMasqueradeActive(stillGuessing);
+    });
     return unsubscribe;
   }, [isTraitors, gameId]);
   useEffect(() => {
     if (masqueradeActive) setShowMemoryWall(false);
   }, [masqueradeActive]);
+  // Host kill-switch (TraitorsAdminHost.jsx's "Memory Wall" card,
+  // settings.memoryWallEnabled) — independent of, and on top of, the
+  // Masquerade auto-hide above. Forces it shut the instant a host turns
+  // it off, same as the Masquerade effect does.
+  const memoryWallEnabled = settings?.memoryWallEnabled !== false;
+  useEffect(() => {
+    if (!memoryWallEnabled) setShowMemoryWall(false);
+  }, [memoryWallEnabled]);
   // paddingTop uses max() rather than replacing the flat 24 outright —
   // on a non-notch device env(safe-area-inset-top) is 0, and this
   // still keeps the original spacing there; on a notched/Dynamic-
@@ -608,13 +626,18 @@ export default function PlayPage() {
   // "waiting for host approval" screen, once, right after joining.
   const needsTraitorsAlias = isTraitors && joined && myPlayer && !traitorsIdentityComplete(myPlayer, settings);
   // The Traitors' Oath — a mandatory per-season confidentiality/
-  // participation agreement, see components/TraitorsOathGate.jsx. Gated
-  // on !myPlayer.approved (not just "haven't signed"), same reasoning as
-  // needsOnboardingPrefs above: once a host has approved someone into a
-  // season, this must never retroactively trap an already-playing person
-  // who joined before the oath existed. Resolved after the alias step,
-  // still before the "waiting for host approval" screen.
-  const needsTraitorsOath = isTraitors && joined && myPlayer && !needsTraitorsAlias && !myPlayer.approved && !myPlayer.gamePrefs?.oathSigned;
+  // participation agreement, see components/TraitorsOathGate.jsx.
+  // Deliberately NOT also gated on !myPlayer.approved — that was tried
+  // first, but a host approving a pending player (one fast click) before
+  // that player's own screen got through this gate let `approved` flip
+  // true first and the requirement just evaporate, so "won't enter the
+  // game until they sign" didn't actually hold. Blocks purely on
+  // oathSigned now, regardless of approval state. Already-approved
+  // players from before this gate existed are grandfathered via a
+  // one-time backfill (see sql/grandfather-traitors-oath.sql) that
+  // stamps oathSigned true for them, so they're never asked
+  // retroactively — run that backfill before/alongside shipping this.
+  const needsTraitorsOath = isTraitors && joined && myPlayer && !needsTraitorsAlias && !myPlayer.gamePrefs?.oathSigned;
   // Stereo Types' own identity step — boombox color (reusing
   // players.color as-is) plus an optional sticker, see
   // components/StereoTypesIdentityPicker.jsx. Same placement in the
@@ -1050,52 +1073,68 @@ export default function PlayPage() {
 
         {isTraitors && approved && playerName && !needsTraitorsAlias && !needsTraitorsOath && (
           <>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 14, marginBottom: 10 }}>
-              <button
-                onClick={() => !masqueradeActive && setShowMemoryWall(!showMemoryWall)}
-                disabled={masqueradeActive}
-                title={masqueradeActive ? "Hidden for the duration of Masquerade Houses" : undefined}
-                style={{
-                  background: showMemoryWall ? `${theme.accent}22` : "transparent",
-                  border: `1px solid ${showMemoryWall ? theme.accent : theme.border}`,
-                  color: showMemoryWall ? theme.accent : theme.textMuted, fontSize: 12,
-                  cursor: masqueradeActive ? "not-allowed" : "pointer", opacity: masqueradeActive ? 0.5 : 1,
-                  borderRadius: 6, padding: "4px 10px",
-                }}>
-                🖼 {masqueradeActive ? "Hidden during Masquerade" : showMemoryWall ? "Hide" : "Show"} memory wall
-              </button>
-              {myPlayer.alive !== false && (
-                <button onClick={handleQuit} disabled={quitBusy} style={{
-                  background: "none", border: "none", color: theme.danger, fontSize: 12,
-                  cursor: quitBusy ? "not-allowed" : "pointer", opacity: quitBusy ? 0.5 : 1,
-                }}>
-                  {quitBusy ? "Leaving..." : "✕ Leave Game"}
-                </button>
-              )}
-            </div>
+            {/* Shown regardless of alive status — a player eliminated BY
+                the Masquerade still needs to watch their own Roulette of
+                Mercy spin resolve before settling into the eliminated
+                screen below. Self-gates on applied/acked, so it quietly
+                disappears for everyone else. */}
+            <TraitorsMasqueradeReveal gameId={gameId} player={{ id: myPlayer.id, name: effectivePlayerName }} />
 
-            {/* winnerIds/nomineeIds passed empty — Traitors has no direct
-                equivalent of Project B's computeWinnerAndNomineeIds
-                (challenge-history-derived MemoryWall glow) readily
-                available; the wall still shows everyone's photo/status
-                without it, just without that particular highlight. Must
-                be Sets, not arrays — PlayerMemoryWall calls .has() on
-                both. */}
-            {showMemoryWall && !masqueradeActive && (
-              <div style={{ marginBottom: 20 }}>
-                <PlayerMemoryWall players={identityAllPlayers.filter((p) => p.approved)} winnerIds={new Set()} nomineeIds={new Set()} traitorsMode />
-              </div>
-            )}
-
-            <ChallengeErrorBoundary label="Traitors">
-              <TraitorsPlayerPanels
+            {myPlayer.alive === false ? (
+              <TraitorsEliminatedScreen
                 gameId={gameId}
-                player={{ id: myPlayer.id, name: effectivePlayerName, realName: playerName, alive: myPlayer.alive, avatarUrl: myPlayer.avatarUrl }}
-                players={identityAllPlayers}
-                settings={settings}
-                onAvatarChanged={(url) => setMyPlayer((p) => p && ({ ...p, avatarUrl: url }))}
+                player={{ id: myPlayer.id, name: effectivePlayerName, eliminationType: myPlayer.eliminationType }}
               />
-            </ChallengeErrorBoundary>
+            ) : (
+              <>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 14, marginBottom: 10 }}>
+                  {memoryWallEnabled && (
+                    <button
+                      onClick={() => !masqueradeActive && setShowMemoryWall(!showMemoryWall)}
+                      disabled={masqueradeActive}
+                      title={masqueradeActive ? "Hidden for the duration of Masquerade Houses" : undefined}
+                      style={{
+                        background: showMemoryWall ? `${theme.accent}22` : "transparent",
+                        border: `1px solid ${showMemoryWall ? theme.accent : theme.border}`,
+                        color: showMemoryWall ? theme.accent : theme.textMuted, fontSize: 12,
+                        cursor: masqueradeActive ? "not-allowed" : "pointer", opacity: masqueradeActive ? 0.5 : 1,
+                        borderRadius: 6, padding: "4px 10px",
+                      }}>
+                      🖼 {masqueradeActive ? "Hidden during Masquerade" : showMemoryWall ? "Hide" : "Show"} memory wall
+                    </button>
+                  )}
+                  <button onClick={handleQuit} disabled={quitBusy} style={{
+                    background: "none", border: "none", color: theme.danger, fontSize: 12,
+                    cursor: quitBusy ? "not-allowed" : "pointer", opacity: quitBusy ? 0.5 : 1,
+                  }}>
+                    {quitBusy ? "Leaving..." : "✕ Leave Game"}
+                  </button>
+                </div>
+
+                {/* winnerIds/nomineeIds passed empty — Traitors has no direct
+                    equivalent of Project B's computeWinnerAndNomineeIds
+                    (challenge-history-derived MemoryWall glow) readily
+                    available; the wall still shows everyone's photo/status
+                    without it, just without that particular highlight. Must
+                    be Sets, not arrays — PlayerMemoryWall calls .has() on
+                    both. */}
+                {showMemoryWall && !masqueradeActive && memoryWallEnabled && (
+                  <div style={{ marginBottom: 20 }}>
+                    <PlayerMemoryWall players={identityAllPlayers.filter((p) => p.approved)} winnerIds={new Set()} nomineeIds={new Set()} traitorsMode />
+                  </div>
+                )}
+
+                <ChallengeErrorBoundary label="Traitors">
+                  <TraitorsPlayerPanels
+                    gameId={gameId}
+                    player={{ id: myPlayer.id, name: effectivePlayerName, realName: playerName, alive: myPlayer.alive, avatarUrl: myPlayer.avatarUrl }}
+                    players={identityAllPlayers}
+                    settings={settings}
+                    onAvatarChanged={(url) => setMyPlayer((p) => p && ({ ...p, avatarUrl: url }))}
+                  />
+                </ChallengeErrorBoundary>
+              </>
+            )}
           </>
         )}
 

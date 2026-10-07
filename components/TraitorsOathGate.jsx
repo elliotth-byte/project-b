@@ -14,14 +14,16 @@ import { setGamePrefs } from "../lib/gamePrefs";
 // OnboardingPreferences.jsx already uses for its own one-time
 // "completed this step" flag.
 //
-// Deliberately gated on `!myPlayer.approved` at the call site in pages/
-// play.jsx (see needsTraitorsOath there), not just "haven't signed yet"
-// — matching the exact reasoning needsOnboardingPrefs already uses one
-// variable above it in that same file: once a host has approved someone
-// into a season, a later rule like this one must never retroactively
-// trap an already-playing person who joined before it existed. Only
-// players going through the join flow for the first time (not yet
-// approved) are required to sign.
+// Gated purely on `!myPlayer.gamePrefs?.oathSigned` at the call site in
+// pages/play.jsx (see needsTraitorsOath there) — NOT also on approval
+// state. That was tried first, on the same reasoning needsOnboardingPrefs
+// uses one variable above it in that file, but it backfired here: a host
+// approving a pending player (one fast click) before that player's own
+// screen got through this gate let `approved` flip true first and the
+// requirement just evaporate. Already-approved players from before this
+// gate existed are grandfathered instead, via a one-time SQL backfill
+// (sql/grandfather-traitors-oath.sql) that stamps oathSigned true for
+// them directly, so they're never asked retroactively.
 //
 // Text is the real, host-provided oath verbatim — the 6 checkbox items
 // especially must not be reworded, since this is what a player is

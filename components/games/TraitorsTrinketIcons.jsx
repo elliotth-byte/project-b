@@ -37,12 +37,20 @@ export function DaggerIcon({ color, size = 40 }) {
 }
 
 export function VeilIcon({ color, size = 40 }) {
+  // A plain oval read as an indistinct blob next to the other four
+  // trinkets' crisp silhouettes (a ring, a blade, a coin, a goblet) — a
+  // veil's actual visual identity is its draped, SCALLOPED hem, so that's
+  // drawn explicitly here (five overlapping circles along the bottom
+  // edge) rather than a smooth rounded bottom.
+  const hemY = 58;
+  const hemXs = [24, 37, 50, 63, 76];
   return (
     <IconBase size={size}>
-      <path d="M50,14 C30,14 20,34 20,54 C20,70 32,86 50,86 C68,86 80,70 80,54 C80,34 70,14 50,14 Z" fill={color} opacity="0.85" />
-      <path d="M50,14 C30,14 20,34 20,54 C32,48 68,48 80,54 C80,34 70,14 50,14 Z" fill={color} />
-      <circle cx="38" cy="50" r="3" fill="#1a1a2e" opacity="0.6" />
-      <circle cx="62" cy="50" r="3" fill="#1a1a2e" opacity="0.6" />
+      <path d="M50,12 C30,12 16,30 16,52 L16,58 L84,58 L84,52 C84,30 70,12 50,12 Z" fill={color} />
+      {hemXs.map((x) => <circle key={x} cx={x} cy={hemY} r="7" fill={color} />)}
+      <path d="M50,12 C30,12 16,30 16,50 C30,44 70,44 84,50 C84,30 70,12 50,12 Z" fill={color} opacity="0.5" />
+      <circle cx="37" cy="34" r="3.5" fill="#1a1a2e" opacity="0.6" />
+      <circle cx="63" cy="34" r="3.5" fill="#1a1a2e" opacity="0.6" />
     </IconBase>
   );
 }

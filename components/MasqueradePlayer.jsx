@@ -68,12 +68,19 @@ export default function MasqueradePlayer({ gameId, playerName }) {
   };
 
   const submitShield = async () => {
-    if (shieldSel.length !== st.houseSize || myGuess.shieldGuess || done) return;
+    // shieldSel only ever holds OTHER members (see PickGrid below, which
+    // picks from `others` — a player can't select themselves there), but
+    // the SHIELD guess is "name every member of your own house", which
+    // trivially always includes the guesser. Without adding playerName
+    // back in here, the submitted set could never equal house.members
+    // (resolveGuess's exact-match check) no matter who was picked — the
+    // shield guess would be unwinnable by construction.
+    if (shieldSel.length !== st.houseSize - 1 || myGuess.shieldGuess || done) return;
     const res = await storageUpdate(gameId, STORAGE_KEY_MASQUERADE, (fresh) => {
       if (!fresh || fresh.guesses[playerName]?.shieldGuess) return null;
       const house = fresh.houses.find((h) => h.members.includes(playerName));
       if (!house) return null;
-      fresh.guesses[playerName] = { ...(fresh.guesses[playerName] || {}), shieldGuess: resolveGuess(fresh, "shield", shieldSel, house.id) };
+      fresh.guesses[playerName] = { ...(fresh.guesses[playerName] || {}), shieldGuess: resolveGuess(fresh, "shield", [...shieldSel, playerName], house.id) };
       return fresh;
     });
     if (res.ok) setSt(res.value);
@@ -91,16 +98,16 @@ export default function MasqueradePlayer({ gameId, playerName }) {
     if (res.ok) setSt(res.value);
   };
 
-  const PickGrid = ({ sel, setSel, submit, existing, label, color }) => (
+  const PickGrid = ({ sel, setSel, submit, existing, label, color, pickCount, note }) => (
     <div style={{ marginBottom: 12 }}>
-      <p style={{ fontSize: 13, fontWeight: 600, color, margin: "0 0 4px" }}>{label} — pick exactly {st.houseSize}</p>
+      <p style={{ fontSize: 13, fontWeight: 600, color, margin: "0 0 4px" }}>{label} — pick exactly {pickCount}{note ? ` (${note})` : ""}</p>
       {existing ? (
         <p style={{ fontSize: 12, color: existing.correct ? "#7a9a5c" : "#c45c3c" }}>Submitted: {existing.correct ? "Correct!" : "Incorrect."}</p>
       ) : (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 6 }}>
             {others.map((p) => (
-              <button key={p.id} onClick={() => toggle(sel, setSel, p.name, st.houseSize)} style={{
+              <button key={p.id} onClick={() => toggle(sel, setSel, p.name, pickCount)} style={{
                 fontSize: 12, padding: "6px 8px", borderRadius: 6, textAlign: "left", cursor: "pointer",
                 background: sel.includes(p.name) ? "rgba(201,168,76,0.15)" : "#0a1020",
                 border: `1px solid ${sel.includes(p.name) ? "#c9a84c" : "#253550"}`,
@@ -108,7 +115,7 @@ export default function MasqueradePlayer({ gameId, playerName }) {
               }}>{sel.includes(p.name) ? "✓ " : ""}{p.name}</button>
             ))}
           </div>
-          <Btn small onClick={submit} disabled={sel.length !== st.houseSize || done}>Submit {label}</Btn>
+          <Btn small onClick={submit} disabled={sel.length !== pickCount || done}>Submit {label}</Btn>
         </>
       )}
     </div>
@@ -130,8 +137,8 @@ export default function MasqueradePlayer({ gameId, playerName }) {
       {done && <p style={{ fontSize: 12, color: "#c45c3c", marginBottom: 8 }}>Mission ended — {st.loseTarget} house{st.loseTarget === 1 ? "" : "s"} eliminated, every other house is safe.</p>}
       {myHouse && (
         <>
-          <PickGrid sel={shieldSel} setSel={setShieldSel} submit={submitShield} existing={myGuess.shieldGuess} label="🛡️ SHIELD guess (your house)" color="#7a9a5c" />
-          <PickGrid sel={killerSel} setSel={setKillerSel} submit={submitKiller} existing={myGuess.killerGuess} label="🗡️ KILLER guess (a rival house)" color="#c45c3c" />
+          <PickGrid sel={shieldSel} setSel={setShieldSel} submit={submitShield} existing={myGuess.shieldGuess} label="🛡️ SHIELD guess (your house)" color="#7a9a5c" pickCount={st.houseSize - 1} note="you're already counted" />
+          <PickGrid sel={killerSel} setSel={setKillerSel} submit={submitKiller} existing={myGuess.killerGuess} label="🗡️ KILLER guess (a rival house)" color="#c45c3c" pickCount={st.houseSize} />
         </>
       )}
       <div style={{ fontSize: 11, color: "#706050" }}>

@@ -290,7 +290,7 @@ export default function CasinoPlayer({ gameId, playerName }) {
                 borderTop: "12px solid #c9a84c", zIndex: 2,
               }} />
               <div style={{
-                width: 160, height: 160, borderRadius: "50%", border: "4px solid #c9a84c",
+                position: "relative", width: 160, height: 160, borderRadius: "50%", border: "4px solid #c9a84c",
                 background: `conic-gradient(${ROULETTE_WHEEL_ORDER.map((num, i) => {
                   const col = num === 0 ? "#2a7a4c" : ROULETTE_REDS.includes(num) ? "#c45c3c" : "#1a1a1a";
                   const step = 100 / ROULETTE_WHEEL_ORDER.length;
@@ -299,7 +299,27 @@ export default function CasinoPlayer({ gameId, playerName }) {
                 transform: `rotate(${wheelRotation}deg)`,
                 transition: spinning ? "transform 3.1s cubic-bezier(0.15, 0.85, 0.25, 1)" : "none",
                 boxShadow: "0 0 16px rgba(201,168,76,0.25) inset",
-              }} />
+              }}>
+                {/* Children of the rotating div itself, not a separate
+                    overlay — a plain CSS transform on a parent carries its
+                    children along for free, so these labels spin with the
+                    wheel with no extra animation logic, same trick
+                    MasqueradeRouletteWheel.jsx uses for its name labels. */}
+                {ROULETTE_WHEEL_ORDER.map((num, i) => {
+                  const step = 360 / ROULETTE_WHEEL_ORDER.length;
+                  const angle = i * step + step / 2;
+                  return (
+                    <div key={num} style={{
+                      position: "absolute", left: "50%", top: "50%", width: 16,
+                      transform: `rotate(${angle}deg) translate(0, -68px) rotate(${-angle}deg) translateX(-50%)`,
+                      textAlign: "center", fontSize: 8, fontWeight: 700, color: "#f0e6d3",
+                      textShadow: "0 0 2px #000, 0 0 2px #000", pointerEvents: "none",
+                    }}>
+                      {num}
+                    </div>
+                  );
+                })}
+              </div>
               <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
                 <div style={{
                   width: 46, height: 46, borderRadius: "50%", background: "#0a1020", border: "2px solid #c9a84c",

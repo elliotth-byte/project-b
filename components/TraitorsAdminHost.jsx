@@ -433,6 +433,23 @@ export default function AdminHost({ gameId, players }) {
       </Card>
 
       <Card>
+        <h3 style={{ color: "#f0e6d3", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🖼 Memory Wall</h3>
+        <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+          On by default — lets players show/hide a photo wall of the roster from their own screen. Turning this off
+          here removes the toggle entirely on every player's screen, regardless of what Masquerade Houses is doing.
+          Safe to flip mid-season.
+        </p>
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12.5, color: "#a09080", cursor: "pointer" }}>
+          <input
+            type="checkbox" checked={settings.memoryWallEnabled !== false}
+            onChange={(e) => saveSettings({ memoryWallEnabled: e.target.checked })}
+            style={{ marginTop: 2 }}
+          />
+          <span><strong style={{ color: "#f0e6d3" }}>Enable Memory Wall</strong> — players can show/hide it from their own screen.</span>
+        </label>
+      </Card>
+
+      <Card>
         <h3 style={{ color: "#f0e6d3", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🎭 Alias Mode</h3>
         <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
           Each player picks their own alias (typed freely, not a fixed list) — it replaces their real name

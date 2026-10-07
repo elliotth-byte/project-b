@@ -70,7 +70,7 @@ export default function MasqueradeHost({ gameId, alive, allPlayers = [], shielde
       <ChallengeSetupCard
         icon="🎭" title="Masquerade Houses" onStart={start} startLabel="Split Houses & Start"
         disabled={numHouses < 2}
-        blurb="Players are split into secret Italian houses for the masquerade. Each gets one SHIELD guess (name your own house) and one KILLER guess (name a rival house). The host sets how many houses must be eliminated — every other house is automatically safe once that target is hit."
+        blurb="Players are split into secret animal houses for the masquerade. Each gets one SHIELD guess (name your own housemates) and one KILLER guess (name a rival house). The host sets how many houses must be eliminated — every other house is automatically safe once that target is hit."
       >
         <ParticipantPicker
           alive={alive} allPlayers={allPlayers} shieldedNames={shieldedNames} returnedNames={returnedNames}
