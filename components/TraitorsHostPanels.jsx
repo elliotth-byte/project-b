@@ -41,8 +41,6 @@ import CoffinHost from "./CoffinHost";
 import IcebreakerHost from "./IcebreakerHost";
 import EyesVillaHost from "./EyesVillaHost";
 import PickpocketGraspHost from "./PickpocketGraspHost";
-import StereoTypesSpotifyWidget from "./StereoTypesSpotifyWidget";
-import { isSpotifyConfigured } from "../lib/spotify/auth";
 import ChallengeTestLab from "./ChallengeTestLab";
 import TraitorsTestLab from "./TraitorsTestLab";
 
@@ -293,15 +291,9 @@ export default function HostPanels({ gameId, players, adminExtra }) {
       {tab === "admin" && (
         <div style={{ display: "grid", gap: 16 }}>
           {adminExtra}
-          {/* Same generic Boombox control added to HostPanels.jsx (Project
-              B) — see that file's own comment above its matching mount.
-              Reuses StereoTypesSpotifyWidget.jsx as-is; silently absent
-              when Spotify isn't configured for this deployment. */}
-          {isSpotifyConfigured() && (
-            <ChallengeErrorBoundary label="Boombox">
-              <StereoTypesSpotifyWidget gameId={gameId} />
-            </ChallengeErrorBoundary>
-          )}
+          {/* The Boombox/Spotify control moved into AdminHost.jsx's own
+              "Advanced" section (see that file) — buried behind one extra
+              click there now, rather than rendered unconditionally here. */}
           <ChallengeErrorBoundary label="Scheduled Slack Posts"><ScheduledPostsList gameId={gameId} /></ChallengeErrorBoundary>
           <ChallengeErrorBoundary label="Admin"><AdminHost gameId={gameId} players={players} /></ChallengeErrorBoundary>
         </div>

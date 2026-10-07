@@ -28,6 +28,9 @@ import { STORAGE_KEY_CHALLENGE_HISTORY } from "../lib/challengeHistory";
 import { STORAGE_KEY_TRAITOR_ROLES } from "../lib/traitorData";
 import TraitorsScheduleBuilder from "./TraitorsScheduleBuilder";
 import TraitorsWorkDayToggle from "./TraitorsWorkDayToggle";
+import StereoTypesSpotifyWidget from "./StereoTypesSpotifyWidget";
+import { isSpotifyConfigured } from "../lib/spotify/auth";
+import ChallengeErrorBoundary from "./ChallengeErrorBoundary";
 
 // All 14 "mission"/"challenge" keys — this is the one place that list
 // needs to be kept in sync when a new mini-game gets added.
@@ -46,6 +49,12 @@ export default function AdminHost({ gameId, players }) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [showFeedback, setShowFeedback] = useState(false);
+  // Secondary admin tab — buries the handful of settings that basically
+  // never get touched once a season's running (Spotify, renaming players,
+  // Chat, Alias mode, Inactivity strikes) behind one extra click, so the
+  // main Admin screen stays focused on what a host actually opens this
+  // tab for day to day (approvals, the schedule, declaring a winner...).
+  const [adminSection, setAdminSection] = useState("main");
   const [feedbackEntries, setFeedbackEntries] = useState([]);
   useEffect(() => {
     const unsubscribe = subscribeFeedback(gameId, (v) => setFeedbackEntries(v || []));
@@ -338,38 +347,124 @@ export default function AdminHost({ gameId, players }) {
         </Card>
       )}
 
-      <Card>
-        <h3 style={{ color: "#f0e6d3", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🛠 Player Names</h3>
-        <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
-          Renaming here updates the name everywhere — the host console, every mini-game, and the player's own
-          screen. One real limitation worth knowing: any game already in progress that recorded data under
-          the OLD name (a vote already cast, a Voodoo doll's eulogy, a Zombie status) keeps referencing the
-          old name — it won't retroactively relink to the new one. Renaming before a season starts, or between
-          missions, avoids that entirely.
-        </p>
-        <div style={{ display: "grid", gap: 6 }}>
-          {players.filter((p) => p.approved).map((p) => (
-            <div key={p.id} style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <input
-                value={nameFor(p)}
-                onChange={(e) => setNames({ ...names, [p.id]: e.target.value })}
-                style={{ flex: 1, background: "#0a1020", border: "1px solid #253550", borderRadius: 6, padding: "6px 10px", color: "#f0e6d3", fontSize: 13 }}
-              />
-              <Btn small onClick={() => saveName(p)} disabled={saving[p.id] || nameFor(p) === p.display_name}>
-                {saving[p.id] ? "Saving..." : "Save"}
-              </Btn>
-              {!p.alive && (
-                <>
-                  <span style={{ fontSize: 11, color: "#706050" }}>({p.elimination_type || "out"})</span>
-                  <Btn small variant="success" onClick={() => revivePlayer(p)}>Revive</Btn>
-                </>
-              )}
-            </div>
-          ))}
-          {players.length === 0 && <p style={{ color: "#706050", fontSize: 12, fontStyle: "italic" }}>No players have joined yet.</p>}
-        </div>
-      </Card>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={() => setAdminSection("main")} style={{
+          flex: 1, padding: "8px 0", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer",
+          background: adminSection === "main" ? "rgba(201,168,76,0.15)" : "#0a1020",
+          border: `1px solid ${adminSection === "main" ? "#c9a84c" : "#253550"}`,
+          color: adminSection === "main" ? "#c9a84c" : "#a09080",
+        }}>🛠 Admin</button>
+        <button onClick={() => setAdminSection("advanced")} style={{
+          flex: 1, padding: "8px 0", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer",
+          background: adminSection === "advanced" ? "rgba(201,168,76,0.15)" : "#0a1020",
+          border: `1px solid ${adminSection === "advanced" ? "#c9a84c" : "#253550"}`,
+          color: adminSection === "advanced" ? "#c9a84c" : "#a09080",
+        }}>⚙️ Advanced</button>
+      </div>
 
+      {adminSection === "advanced" && (
+        <>
+          {/* Same generic Boombox control HostPanels.jsx (Project B) and
+              TraitorsHostPanels.jsx's own admin tab add — moved here,
+              behind Advanced, rather than rendered unconditionally above
+              every other Traitors admin card the way it used to be.
+              Reuses StereoTypesSpotifyWidget.jsx as-is; silently absent
+              when Spotify isn't configured for this deployment. */}
+          {isSpotifyConfigured() && (
+            <ChallengeErrorBoundary label="Boombox">
+              <StereoTypesSpotifyWidget gameId={gameId} />
+            </ChallengeErrorBoundary>
+          )}
+
+          <Card>
+            <h3 style={{ color: "#f0e6d3", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🛠 Player Names</h3>
+            <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+              Renaming here updates the name everywhere — the host console, every mini-game, and the player's own
+              screen. One real limitation worth knowing: any game already in progress that recorded data under
+              the OLD name (a vote already cast, a Voodoo doll's eulogy, a Zombie status) keeps referencing the
+              old name — it won't retroactively relink to the new one. Renaming before a season starts, or between
+              missions, avoids that entirely.
+            </p>
+            <div style={{ display: "grid", gap: 6 }}>
+              {players.filter((p) => p.approved).map((p) => (
+                <div key={p.id} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <input
+                    value={nameFor(p)}
+                    onChange={(e) => setNames({ ...names, [p.id]: e.target.value })}
+                    style={{ flex: 1, background: "#0a1020", border: "1px solid #253550", borderRadius: 6, padding: "6px 10px", color: "#f0e6d3", fontSize: 13 }}
+                  />
+                  <Btn small onClick={() => saveName(p)} disabled={saving[p.id] || nameFor(p) === p.display_name}>
+                    {saving[p.id] ? "Saving..." : "Save"}
+                  </Btn>
+                  {!p.alive && (
+                    <>
+                      <span style={{ fontSize: 11, color: "#706050" }}>({p.elimination_type || "out"})</span>
+                      <Btn small variant="success" onClick={() => revivePlayer(p)}>Revive</Btn>
+                    </>
+                  )}
+                </div>
+              ))}
+              {players.length === 0 && <p style={{ color: "#706050", fontSize: 12, fontStyle: "italic" }}>No players have joined yet.</p>}
+            </div>
+          </Card>
+
+          <Card>
+            <h3 style={{ color: "#f0e6d3", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>💬 Chat</h3>
+            <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+              Off by default — an existing season doesn't suddenly grow a Chat tab underneath it. Adds a group chat, an
+              Exile-equivalent room for anyone murdered/banished, and DMs, the same as Panopticon's own Chat. Safe to
+              switch on or off mid-season.
+            </p>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12.5, color: "#a09080", cursor: "pointer" }}>
+              <input
+                type="checkbox" checked={!!settings.chatEnabled}
+                onChange={(e) => saveSettings({ chatEnabled: e.target.checked })}
+                style={{ marginTop: 2 }}
+              />
+              <span><strong style={{ color: "#f0e6d3" }}>Turn on Chat</strong> — group chat, DMs, and (once someone's out) an Exile room, for this season.</span>
+            </label>
+          </Card>
+
+          <Card>
+            <h3 style={{ color: "#f0e6d3", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🎭 Alias Mode</h3>
+            <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+              Each player picks their own alias (typed freely, not a fixed list) — it replaces their real name
+              everywhere other players see them until you declare a winner. You'll always see both, everywhere.{" "}
+              <strong>{seasonStarted ? "Locked — traitor roles have already been assigned for this season." : "Only changeable now, before you assign traitor roles."}</strong>
+            </p>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12.5, color: seasonStarted ? "#3d1f5c" : "#a09080", cursor: seasonStarted ? "not-allowed" : "pointer" }}>
+              <input
+                type="checkbox" checked={!!settings.aliasEnabled} disabled={seasonStarted}
+                onChange={(e) => saveSettings({ aliasEnabled: e.target.checked })}
+                style={{ marginTop: 2 }}
+              />
+              <span><strong style={{ color: seasonStarted ? "#3d1f5c" : "#f0e6d3" }}>Turn on Alias mode</strong> — players pick a codename that stands in for their real name.</span>
+            </label>
+          </Card>
+
+          <Card>
+            <h3 style={{ color: "#f0e6d3", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>⏳ Inactivity Strikes</h3>
+            <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+              Off by default. When on: starting round 2, anyone who neither votes at the Roundtable nor (if Chat is on)
+              sends a chat message that round gets a strike; 3 strikes removes them from the game. Strikes go down by 1
+              every 3rd round for everyone who has any. Unlike Panopticon (which always tracks votes AND mini-game
+              participation), this only checks Roundtable votes and chat — Traitors' 11 separate mini-games have no
+              single, uniform way to tell whether someone played.
+            </p>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12.5, color: "#a09080", cursor: "pointer" }}>
+              <input
+                type="checkbox" checked={!!settings.inactivityEnabled}
+                onChange={(e) => saveSettings({ inactivityEnabled: e.target.checked })}
+                style={{ marginTop: 2 }}
+              />
+              <span><strong style={{ color: "#f0e6d3" }}>Turn on inactivity strikes</strong> — auto-remove players who go quiet at the Roundtable.</span>
+            </label>
+          </Card>
+        </>
+      )}
+
+      {adminSection === "main" && (
+      <>
       <Card>
         <h3 style={{ color: "#f0e6d3", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🖼 Avatars</h3>
         <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
@@ -439,23 +534,6 @@ export default function AdminHost({ gameId, players }) {
       </Card>
 
       <Card>
-        <h3 style={{ color: "#f0e6d3", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>💬 Chat</h3>
-        <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
-          Off by default — an existing season doesn't suddenly grow a Chat tab underneath it. Adds a group chat, an
-          Exile-equivalent room for anyone murdered/banished, and DMs, the same as Panopticon's own Chat. Safe to
-          switch on or off mid-season.
-        </p>
-        <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12.5, color: "#a09080", cursor: "pointer" }}>
-          <input
-            type="checkbox" checked={!!settings.chatEnabled}
-            onChange={(e) => saveSettings({ chatEnabled: e.target.checked })}
-            style={{ marginTop: 2 }}
-          />
-          <span><strong style={{ color: "#f0e6d3" }}>Turn on Chat</strong> — group chat, DMs, and (once someone's out) an Exile room, for this season.</span>
-        </label>
-      </Card>
-
-      <Card>
         <h3 style={{ color: "#f0e6d3", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🖼 Memory Wall</h3>
         <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
           On by default — lets players show/hide a photo wall of the roster from their own screen. Turning this off
@@ -471,43 +549,11 @@ export default function AdminHost({ gameId, players }) {
           <span><strong style={{ color: "#f0e6d3" }}>Enable Memory Wall</strong> — players can show/hide it from their own screen.</span>
         </label>
       </Card>
+      </>
+      )}
 
-      <Card>
-        <h3 style={{ color: "#f0e6d3", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🎭 Alias Mode</h3>
-        <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
-          Each player picks their own alias (typed freely, not a fixed list) — it replaces their real name
-          everywhere other players see them until you declare a winner. You'll always see both, everywhere.{" "}
-          <strong>{seasonStarted ? "Locked — traitor roles have already been assigned for this season." : "Only changeable now, before you assign traitor roles."}</strong>
-        </p>
-        <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12.5, color: seasonStarted ? "#3d1f5c" : "#a09080", cursor: seasonStarted ? "not-allowed" : "pointer" }}>
-          <input
-            type="checkbox" checked={!!settings.aliasEnabled} disabled={seasonStarted}
-            onChange={(e) => saveSettings({ aliasEnabled: e.target.checked })}
-            style={{ marginTop: 2 }}
-          />
-          <span><strong style={{ color: seasonStarted ? "#3d1f5c" : "#f0e6d3" }}>Turn on Alias mode</strong> — players pick a codename that stands in for their real name.</span>
-        </label>
-      </Card>
-
-      <Card>
-        <h3 style={{ color: "#f0e6d3", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>⏳ Inactivity Strikes</h3>
-        <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
-          Off by default. When on: starting round 2, anyone who neither votes at the Roundtable nor (if Chat is on)
-          sends a chat message that round gets a strike; 3 strikes removes them from the game. Strikes go down by 1
-          every 3rd round for everyone who has any. Unlike Panopticon (which always tracks votes AND mini-game
-          participation), this only checks Roundtable votes and chat — Traitors' 11 separate mini-games have no
-          single, uniform way to tell whether someone played.
-        </p>
-        <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12.5, color: "#a09080", cursor: "pointer" }}>
-          <input
-            type="checkbox" checked={!!settings.inactivityEnabled}
-            onChange={(e) => saveSettings({ inactivityEnabled: e.target.checked })}
-            style={{ marginTop: 2 }}
-          />
-          <span><strong style={{ color: "#f0e6d3" }}>Turn on inactivity strikes</strong> — auto-remove players who go quiet at the Roundtable.</span>
-        </label>
-      </Card>
-
+      {/* Declare Winner and Reset stay visible regardless of which admin
+          section is open — too important to bury behind an extra click. */}
       {/* Traitors never had a jury vote or finale mechanic at all (see
           lib/traitorsFinale.js) — this is just the host directly
           recording the outcome, so season history (profile.jsx,
