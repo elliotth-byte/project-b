@@ -9,6 +9,7 @@ import TraitorsOathGate from "../components/TraitorsOathGate";
 import { STORAGE_KEY_MASQUERADE } from "../lib/masqueradeData";
 import TraitorsMasqueradeReveal from "../components/TraitorsMasqueradeReveal";
 import TraitorsEliminatedScreen from "../components/TraitorsEliminatedScreen";
+import TraitorsPreseasonLock from "../components/TraitorsPreseasonLock";
 import { AVATAR_COLLECTIONS } from "../lib/avatarCollections";
 import ChallengePlayer from "../components/ChallengePlayer";
 import FatesPlayer from "../components/FatesPlayer";
@@ -643,6 +644,14 @@ export default function PlayPage() {
   // components/StereoTypesIdentityPicker.jsx. Same placement in the
   // season as the other two identity gates above.
   const needsStereoTypesIdentity = isStereoTypes && joined && myPlayer && !myPlayer.color;
+  // Pre-season holding screen (TraitorsAdminHost.jsx's "Pre-Season Lock"
+  // toggle) — see components/TraitorsPreseasonLock.jsx. Sits AFTER every
+  // onboarding gate above (identity, the Oath) so sign-ups starting days
+  // ahead of the real season can still get all of that done now, but
+  // BEFORE the approved check — this replaces both "waiting for host
+  // approval" and the live game for every Traitors player, approved or
+  // not, for as long as the host leaves it on.
+  const preseasonLocked = isTraitors && joined && myPlayer && !needsTraitorsAlias && !needsTraitorsOath && !!settings?.preseasonLockEnabled;
   // Once the game's over, the whole point of keeping exiled players
   // separated from the main chat (protecting the still-competing
   // players from anything an exiled player might reveal or pressure
@@ -802,7 +811,11 @@ export default function PlayPage() {
           />
         )}
 
-        {joined && myPlayer && !needsIdentity && !needsOnboardingPrefs && !needsTraitorsAlias && !needsTraitorsOath && !needsStereoTypesIdentity && !myPlayer.approved && (
+        {joined && myPlayer && preseasonLocked && (
+          <TraitorsPreseasonLock message={settings?.preseasonLockMessage} />
+        )}
+
+        {joined && myPlayer && !needsIdentity && !needsOnboardingPrefs && !needsTraitorsAlias && !needsTraitorsOath && !needsStereoTypesIdentity && !preseasonLocked && !myPlayer.approved && (
           <div style={{
             marginBottom: 20, textAlign: "center", padding: "28px 20px",
             background: theme.cardBg,
@@ -1071,7 +1084,7 @@ export default function PlayPage() {
           </>
         )}
 
-        {isTraitors && approved && playerName && !needsTraitorsAlias && !needsTraitorsOath && (
+        {isTraitors && approved && playerName && !needsTraitorsAlias && !needsTraitorsOath && !preseasonLocked && (
           <>
             {/* Shown regardless of alive status — a player eliminated BY
                 the Masquerade still needs to watch their own Roulette of

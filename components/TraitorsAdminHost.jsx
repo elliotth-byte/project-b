@@ -269,6 +269,29 @@ export default function AdminHost({ gameId, players }) {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
+      <Card style={{ borderColor: settings.preseasonLockEnabled ? "rgba(201,168,76,0.5)" : undefined }}>
+        <h3 style={{ color: "#f0e6d3", margin: "0 0 6px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🏰 Pre-Season Lock</h3>
+        <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+          Turn this on before opening sign-ups ahead of the season actually starting. Players can still join, pick
+          an identity, and sign the Oath — but instead of "waiting for host approval" or the live game, every
+          player (approved or not) sees the message below until you turn this back off.
+        </p>
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12.5, color: "#a09080", cursor: "pointer", marginBottom: 10 }}>
+          <input
+            type="checkbox" checked={!!settings.preseasonLockEnabled}
+            onChange={(e) => saveSettings({ preseasonLockEnabled: e.target.checked })}
+            style={{ marginTop: 2 }}
+          />
+          <span><strong style={{ color: "#f0e6d3" }}>Lock the Villa</strong> — show the holding message instead of the game.</span>
+        </label>
+        <input
+          value={settings.preseasonLockMessage ?? ""}
+          onChange={(e) => saveSettings({ preseasonLockMessage: e.target.value })}
+          placeholder="The Villa opens soon... see you Friday."
+          style={{ width: "100%", boxSizing: "border-box", background: "#0a1020", border: "1px solid #253550", borderRadius: 6, padding: "6px 10px", color: "#f0e6d3", fontSize: 13 }}
+        />
+      </Card>
+
       <TraitorsScheduleBuilder gameId={gameId} />
       <TraitorsWorkDayToggle gameId={gameId} />
       <Card style={{ borderColor: unreadFeedbackCount > 0 ? "#c9a84c" : undefined }}>
