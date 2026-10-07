@@ -207,6 +207,19 @@ export default function PlayPage() {
 
   useEffect(() => {
     if (!gameId) return;
+    // Re-runs once `joined` flips true, not just on gameId — this read is
+    // subject to games' own RLS ("is_game_host(id) or is_game_player(id)",
+    // see sql/schema.sql), and is_game_player needs a `players` row that,
+    // for a brand-new first-time joiner, doesn't exist yet the instant
+    // this effect first fires (that insert is a separate, slower effect
+    // below). RLS doesn't error on a blocked SELECT, it just returns zero
+    // rows — so without this retry, a new player's very first load can
+    // silently stick gameInfo at null forever, which (via isTraitors
+    // below) misrenders the whole page as Panopticon, ColorPicker and
+    // all, for a Traitors or Stereo Types player. `ignore` guards against
+    // that doomed first request resolving AFTER this retry and clobbering
+    // the correct result with null again.
+    let ignore = false;
     (async () => {
       // .limit(1) + data?.[0] instead of .maybeSingle() — .maybeSingle()
       // depends on a special "return one object, not an array" Accept
@@ -219,9 +232,10 @@ export default function PlayPage() {
       // `error`. A plain array response works everywhere regardless.
       const { data, error } = await supabase.from("games").select("name, subtitle, game_type").eq("id", gameId).limit(1);
       if (error) console.error("Failed to load game info:", error);
-      setGameInfo(data?.[0] || null);
+      if (!ignore) setGameInfo(data?.[0] || null);
     })();
-  }, [gameId]);
+    return () => { ignore = true; };
+  }, [gameId, joined]);
 
   useEffect(() => {
     if (!gameId) return;
