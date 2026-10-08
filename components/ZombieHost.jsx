@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Btn, Card, Badge, ChallengeSetupCard, PauseResumeControls } from "./traitorsUi";
+import { Btn, Card, Badge, ChallengeSetupCard, PauseResumeControls, PlayerTag } from "./traitorsUi";
 import { storageSet, storageUpdate, storageDelete, subscribeGameState } from "../lib/gameStorage";
 import { pauseChallenge, resumeChallenge } from "../lib/pauseResume";
 import { zombieCounts, STORAGE_KEY_ZOMBIE } from "../lib/zombieData";
@@ -60,7 +60,7 @@ export default function ZombieHost({ gameId, alive, allPlayers = [], shieldedNam
     });
     const state = {
       active: true, createdAt: Date.now(), phase: "active",
-      players: participants.map((p) => ({ id: p.id, name: p.name })),
+      players: participants.map((p) => ({ id: p.id, name: p.name, avatarUrl: p.avatarUrl })),
       participants: names, spectators: spectators.map((p) => p.name),
       originalZombies, statuses, scores, antidoteUsed, infectionTimes: {},
       touches: [], pending: [], round: 1, maxRounds: 3, winner: null, roundSummaries: [],
@@ -170,9 +170,11 @@ export default function ZombieHost({ gameId, alive, allPlayers = [], shieldedNam
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 10 }}>
         {st.players.map((p) => (
           <div key={p.id} style={{ fontSize: 12, display: "flex", justifyContent: "space-between", padding: "3px 8px", background: "#0a1020", borderRadius: 6 }}>
-            <span style={{ color: st.statuses?.[p.name] === "zombie" ? "#c45c3c" : "#7a9a5c" }}>
-              {st.statuses?.[p.name] === "zombie" ? "🧟" : "🙂"} {p.name}{st.originalZombies.includes(p.name) ? "*" : ""}
-            </span>
+            <PlayerTag
+              name={`${st.statuses?.[p.name] === "zombie" ? "🧟" : "🙂"} ${p.name}${st.originalZombies.includes(p.name) ? "*" : ""}`}
+              avatarUrl={p.avatarUrl} size={16}
+              textStyle={{ color: st.statuses?.[p.name] === "zombie" ? "#c45c3c" : "#7a9a5c" }}
+            />
             <span style={{ color: "#a09080" }}>{st.scores?.[p.name] ?? 0}p{st.antidoteUsed?.[p.name] ? " 💊" : ""}</span>
           </div>
         ))}

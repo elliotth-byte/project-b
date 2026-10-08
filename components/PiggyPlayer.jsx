@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Btn, Card, PausedBanner } from "./traitorsUi";
+import { Btn, Card, PausedBanner, PlayerTag } from "./traitorsUi";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { STORAGE_KEY_PIGGY } from "../lib/piggyData";
 import { TRAITORS_GAME_REGISTRY } from "../lib/traitorsMiniGames";
@@ -63,7 +63,7 @@ export default function PiggyPlayer({ gameId, playerName }) {
           <div style={{ display: "grid", gap: 6, marginBottom: 8 }}>
             {targets.map((p) => (
               <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a1020", borderRadius: 6, padding: "6px 10px" }}>
-                <span style={{ fontSize: 13, color: "#f0e6d3" }}>{p.name}{p.name === playerName ? " (you)" : ""}</span>
+                <PlayerTag name={`${p.name}${p.name === playerName ? " (you)" : ""}`} avatarUrl={p.avatarUrl} size={20} textStyle={{ fontSize: 13, color: "#f0e6d3" }} />
                 <input
                   type="number" min={0} max={13} value={alloc[p.name] || 0}
                   onChange={(e) => setAlloc({ ...alloc, [p.name]: Math.max(0, Math.min(13, Number(e.target.value) || 0)) })}

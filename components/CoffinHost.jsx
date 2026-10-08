@@ -27,7 +27,7 @@ export default function CoffinHost({ gameId, alive, allPlayers = [], shieldedNam
     const { participants, spectators } = computeParticipants(participation, { alive, allPlayers, shieldedNames, returnedNames });
     const state = {
       active: true, createdAt: Date.now(), times: {}, difficulty,
-      players: participants.map((p) => ({ id: p.id, name: p.name })),
+      players: participants.map((p) => ({ id: p.id, name: p.name, avatarUrl: p.avatarUrl })),
       participants: participants.map((p) => p.name), spectators: spectators.map((p) => p.name),
     };
     await storageSet(gameId, STORAGE_KEY_COFFIN, state);

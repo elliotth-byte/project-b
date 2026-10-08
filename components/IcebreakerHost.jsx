@@ -35,7 +35,7 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
     const { participants, spectators } = computeParticipants(participation, { alive, allPlayers, shieldedNames, returnedNames });
     const state = {
       active: true, createdAt: Date.now(), phase: "questions",
-      players: participants.map((p) => ({ id: p.id, name: p.name })),
+      players: participants.map((p) => ({ id: p.id, name: p.name, avatarUrl: p.avatarUrl })),
       participants: participants.map((p) => p.name), spectators: spectators.map((p) => p.name),
       questions: {}, answers: {}, anonymousSets: [], revealedQuestions: [],
       eliminated: [], guesses: {}, lastRevealAt: {}, winner: null,

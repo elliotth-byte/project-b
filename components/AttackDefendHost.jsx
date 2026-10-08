@@ -45,7 +45,7 @@ export default function AttackDefendHost({ gameId, alive, allPlayers = [], shiel
     }
     const state = {
       active: true, createdAt: Date.now(), phase: "active",
-      players: participants.map((p) => ({ id: p.id, name: p.name })),
+      players: participants.map((p) => ({ id: p.id, name: p.name, avatarUrl: p.avatarUrl })),
       participants: participants.map((p) => p.name), spectators: spectators.map((p) => p.name),
       teams: { red, blue }, scores: { red: 0, blue: 0 },
       usedAttack: {}, usedDefend: {}, activeAttack: null, logs: [], winner: null,

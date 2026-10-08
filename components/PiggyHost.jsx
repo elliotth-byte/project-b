@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Btn, Card, ChallengeSetupCard, PauseResumeControls } from "./traitorsUi";
+import { Btn, Card, ChallengeSetupCard, PauseResumeControls, PlayerTag } from "./traitorsUi";
 import { storageSet, storageUpdate, storageDelete, subscribeGameState } from "../lib/gameStorage";
 import { pauseChallenge, resumeChallenge } from "../lib/pauseResume";
 import { STORAGE_KEY_PIGGY } from "../lib/piggyData";
@@ -28,7 +28,7 @@ export default function PiggyHost({ gameId, alive, allPlayers = [], shieldedName
     const { participants, spectators } = computeParticipants(participation, { alive, allPlayers, shieldedNames, returnedNames });
     const state = {
       active: true, createdAt: Date.now(), phase: "active",
-      players: participants.map((p) => ({ id: p.id, name: p.name })),
+      players: participants.map((p) => ({ id: p.id, name: p.name, avatarUrl: p.avatarUrl })),
       participants: participants.map((p) => p.name), spectators: spectators.map((p) => p.name),
       allocations: {}, submitted: [], revealed: false, totals: {}, overfed: [], winners: [], numWinners,
     };
@@ -112,10 +112,14 @@ export default function PiggyHost({ gameId, alive, allPlayers = [], shieldedName
           {Object.entries(st.totals).sort((a, b) => b[1] - a[1]).map(([n, t]) => {
             const over = st.overfed.includes(n), win = st.winners.includes(n);
             const givers = st.contributors?.[n] || [];
+            const avatarUrl = st.players.find((p) => p.name === n)?.avatarUrl;
             return (
               <div key={n} style={{ padding: "6px 0", borderBottom: "1px solid #1a2845" }}>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 13, color: win ? "#c9a84c" : over ? "#c45c3c" : "#f0e6d3" }}>{win ? "🏆 " : over ? "💥 " : ""}{n}</span>
+                  <PlayerTag
+                    name={`${win ? "🏆 " : over ? "💥 " : ""}${n}`} avatarUrl={avatarUrl} size={16}
+                    textStyle={{ fontSize: 13, color: win ? "#c9a84c" : over ? "#c45c3c" : "#f0e6d3" }}
+                  />
                   <span style={{ fontSize: 13, color: "#a09080" }}>{t} coins {over ? "(overfed)" : ""}</span>
                 </div>
                 {givers.length > 0 && (

@@ -49,7 +49,7 @@ export default function VoodooHost({ gameId, alive, allPlayers = [], shieldedNam
     const spectators = [...pickerSpectators, ...noEulogy].map((p) => p.name);
     const state = {
       active: true, createdAt: Date.now(), phase: "active",
-      players: filled.map((p) => ({ id: p.id, name: p.name })),
+      players: filled.map((p) => ({ id: p.id, name: p.name, avatarUrl: p.avatarUrl })),
       participants: filled.map((p) => p.name), spectators,
       dolls, eliminated: [], guesses: {}, guessCooldownUntil: {}, lastRevealAt: {},
       winner: null, numWinners,

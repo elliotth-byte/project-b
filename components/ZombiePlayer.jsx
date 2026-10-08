@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Btn, Card, Badge } from "./traitorsUi";
+import { Btn, Card, Badge, PlayerTag } from "./traitorsUi";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { ANTIDOTE_WINDOW, STORAGE_KEY_ZOMBIE, haveTouched, resolveTouch } from "../lib/zombieData";
 import { TRAITORS_GAME_REGISTRY } from "../lib/traitorsMiniGames";
@@ -67,6 +67,7 @@ export default function ZombiePlayer({ gameId, playerName }) {
 
   const isOriginalZombie = st.originalZombies.includes(playerName);
   const others = st.players.filter((p) => p.name !== playerName);
+  const avatarByName = Object.fromEntries(st.players.map((p) => [p.name, p.avatarUrl]));
   const myOutgoing = (st.pending || []).find((p) => p.from === playerName);
   const myIncoming = (st.pending || []).filter((p) => p.to === playerName);
 
@@ -167,7 +168,7 @@ export default function ZombiePlayer({ gameId, playerName }) {
               <div style={{ fontSize: 11, color: "#a09080", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Wants to touch you</div>
               {myIncoming.map((req) => (
                 <div key={req.from} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#132038", border: "1px solid #c9a84c55", borderRadius: 8, padding: "8px 12px", marginBottom: 4 }}>
-                  <span style={{ fontSize: 14, color: "#f0e6d3" }}>{req.from}</span>
+                  <PlayerTag name={req.from} avatarUrl={avatarByName[req.from]} size={18} textStyle={{ fontSize: 14, color: "#f0e6d3" }} />
                   <div style={{ display: "flex", gap: 6 }}>
                     <Btn small onClick={() => acceptRequest(req.from)}>Accept</Btn>
                     <Btn small variant="ghost" onClick={() => declineRequest(req.from)}>Decline</Btn>
@@ -186,26 +187,29 @@ export default function ZombiePlayer({ gameId, playerName }) {
               const requestedByMe = myOutgoing?.to === p.name;
               if (touched) {
                 return (
-                  <div key={p.id} style={{ padding: "10px 14px", borderRadius: 8, background: "#0a1020", border: "1px solid #253550", color: "#706050", fontSize: 14 }}>
-                    ✓ {p.name} — already touched
+                  <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 14px", borderRadius: 8, background: "#0a1020", border: "1px solid #253550", color: "#706050", fontSize: 14 }}>
+                    ✓ <PlayerTag name={p.name} avatarUrl={p.avatarUrl} size={18} textStyle={{ fontSize: 14, color: "#706050" }} /> — already touched
                   </div>
                 );
               }
               if (requestedByMe) {
                 return (
                   <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderRadius: 8, background: "#132038", border: "1px solid #c9a84c55" }}>
-                    <span style={{ fontSize: 14, color: "#c9a84c" }}>Waiting on {p.name}...</span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, color: "#c9a84c" }}>
+                      Waiting on <PlayerTag name={p.name} avatarUrl={p.avatarUrl} size={18} textStyle={{ fontSize: 14, color: "#c9a84c" }} />...
+                    </span>
                     <Btn small variant="ghost" onClick={cancelMyRequest}>Cancel</Btn>
                   </div>
                 );
               }
               return (
                 <button key={p.id} onClick={() => requestTouch(p.name)} disabled={!!myOutgoing} style={{
+                  display: "flex", alignItems: "center", gap: 6,
                   padding: "10px 14px", borderRadius: 8, textAlign: "left",
                   background: "#132038", border: "1px solid #c9a84c55",
                   color: myOutgoing ? "#706050" : "#f0e6d3", cursor: myOutgoing ? "not-allowed" : "pointer", fontSize: 14,
                 }}>
-                  ✋ Request touch: {p.name}
+                  ✋ Request touch: <PlayerTag name={p.name} avatarUrl={p.avatarUrl} size={18} textStyle={{ fontSize: 14, color: myOutgoing ? "#706050" : "#f0e6d3" }} />
                 </button>
               );
             })}

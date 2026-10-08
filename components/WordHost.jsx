@@ -17,7 +17,7 @@ export async function startWordScrambleRound(gameId, participantPlayers, spectat
     createdAt: Date.now(),
     seed: Date.now(),
     times: {},
-    players: participantPlayers.map((p) => ({ id: p.id, name: p.name })),
+    players: participantPlayers.map((p) => ({ id: p.id, name: p.name, avatarUrl: p.avatarUrl })),
     participants: participantPlayers.map((p) => p.name),
     spectators: spectatorPlayers.map((p) => p.name),
   };

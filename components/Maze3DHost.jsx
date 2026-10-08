@@ -29,7 +29,7 @@ export default function Maze3DHost({ gameId, alive, allPlayers = [], shieldedNam
     const state = {
       active: true, createdAt: Date.now(), phase: "active",
       seed: Math.floor(Math.random() * 100000), rows: size, cols: size,
-      players: participants.map((p) => ({ id: p.id, name: p.name })),
+      players: participants.map((p) => ({ id: p.id, name: p.name, avatarUrl: p.avatarUrl })),
       participants: participants.map((p) => p.name), spectators: spectators.map((p) => p.name),
       times: {}, winner: null,
     };

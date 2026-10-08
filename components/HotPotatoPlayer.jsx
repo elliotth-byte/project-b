@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, PausedBanner } from "./traitorsUi";
+import { Card, PausedBanner, PlayerTag } from "./traitorsUi";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { fmtTime, tickHotPotato, STORAGE_KEY_HOT_POTATO } from "../lib/hotPotatoData";
 import { TRAITORS_GAME_REGISTRY } from "../lib/traitorsMiniGames";
@@ -88,7 +88,9 @@ export default function HotPotatoPlayer({ gameId, playerName }) {
                     <button key={p.id} onClick={() => pass(pot.id, p.name)} style={{
                       fontSize: 11, padding: "4px 8px", borderRadius: 5, background: "#132038",
                       border: "1px solid #c9a84c55", color: "#f0e6d3", cursor: "pointer",
-                    }}>{p.name}</button>
+                    }}>
+                      <PlayerTag name={p.name} avatarUrl={p.avatarUrl} size={14} textStyle={{ fontSize: 11 }} />
+                    </button>
                   ))}
                 </div>
               )}

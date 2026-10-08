@@ -28,7 +28,7 @@ export default function CasinoHost({ gameId, alive, allPlayers = [], shieldedNam
     participants.forEach((p) => balances[p.name] = 100);
     const state = {
       active: true, createdAt: Date.now(), phase: "active",
-      players: participants.map((p) => ({ id: p.id, name: p.name })),
+      players: participants.map((p) => ({ id: p.id, name: p.name, avatarUrl: p.avatarUrl })),
       participants: participants.map((p) => p.name), spectators: spectators.map((p) => p.name),
       balances, logs: [],
     };

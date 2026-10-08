@@ -63,7 +63,7 @@ export default function HotPotatoHost({ gameId, alive, allPlayers = [], shielded
     };
     const state = {
       active: true, createdAt: Date.now(), phase: "active",
-      players: participants.map((p) => ({ id: p.id, name: p.name })),
+      players: participants.map((p) => ({ id: p.id, name: p.name, avatarUrl: p.avatarUrl })),
       participants: names, spectators: spectators.map((p) => p.name),
       potatoes: [mk("A", shuffled[0]), mk("B", shuffled[1] || shuffled[0])],
       eliminated: [], winner: null, numWinners,

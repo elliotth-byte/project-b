@@ -32,7 +32,27 @@ export default function PlayerMemoryWall({ players, hideNameLabels = false, winn
         const color = colorFor(players, p.id);
         const avatarUrl = p.effectiveAvatarUrl;
         const eliminated = !p.alive;
-        const grayscale = eliminated ? "grayscale(1) brightness(0.6)" : "none";
+        // Traitors wants a stamped red X instead of Panopticon's classic
+        // black-and-white treatment (see eliminatedXOverlay below) — kept
+        // in full color/brightness so the X actually reads as a deliberate
+        // mark over a real photo, not just one more dimming effect piled
+        // on top of an already-grayscale one.
+        const dimmed = eliminated && !traitorsMode;
+        const grayscale = dimmed ? "grayscale(1) brightness(0.6)" : "none";
+        const eliminatedXOverlay = (eliminated && traitorsMode) ? (
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 2 }}>
+            <div style={{
+              position: "absolute", top: "50%", left: "50%", width: "145%", height: "12%", minHeight: 8,
+              background: "#e8231a", transform: "translate(-50%, -50%) rotate(45deg)",
+              boxShadow: "0 0 8px rgba(0,0,0,0.7)", borderRadius: 3,
+            }} />
+            <div style={{
+              position: "absolute", top: "50%", left: "50%", width: "145%", height: "12%", minHeight: 8,
+              background: "#e8231a", transform: "translate(-50%, -50%) rotate(-45deg)",
+              boxShadow: "0 0 8px rgba(0,0,0,0.7)", borderRadius: 3,
+            }} />
+          </div>
+        ) : null;
 
         // Gold: has won at least one battle this season (cumulative —
         // see lib/memoryWallGlow.js for why this has to be cumulative
@@ -72,7 +92,7 @@ export default function PlayerMemoryWall({ players, hideNameLabels = false, winn
               style={{
                 aspectRatio: "1", borderRadius: 14,
                 border: `4px solid ${borderColor}`,
-                opacity: eliminated ? 0.75 : 1,
+                opacity: dimmed ? 0.75 : 1,
                 position: "relative", overflow: "hidden", background: "#0d0618",
                 cursor: "pointer",
               }}
@@ -106,6 +126,7 @@ export default function PlayerMemoryWall({ players, hideNameLabels = false, winn
                 </div>
               )}
               {glowOverlay}
+              {eliminatedXOverlay}
             </div>
           );
         }
@@ -119,7 +140,7 @@ export default function PlayerMemoryWall({ players, hideNameLabels = false, winn
               background: "#0d0618",
               border: `4px solid ${borderColor}`,
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8,
-              opacity: eliminated ? 0.55 : 1,
+              opacity: dimmed ? 0.55 : 1,
               padding: 8,
               position: "relative",
               cursor: "pointer",
@@ -127,7 +148,7 @@ export default function PlayerMemoryWall({ players, hideNameLabels = false, winn
           >
             <div style={{
               width: 40, height: 40, borderRadius: "50%", background: color,
-              boxShadow: eliminated ? "none" : `0 0 14px ${color}cc`, border: "2px solid rgba(255,255,255,0.5)",
+              boxShadow: eliminated && !traitorsMode ? "none" : `0 0 14px ${color}cc`, border: "2px solid rgba(255,255,255,0.5)",
               filter: grayscale,
             }} />
             <span style={{
@@ -138,6 +159,7 @@ export default function PlayerMemoryWall({ players, hideNameLabels = false, winn
               {p.display_name}
             </span>
             {glowOverlay}
+            {eliminatedXOverlay}
           </div>
         );
       })}
