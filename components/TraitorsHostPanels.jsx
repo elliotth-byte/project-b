@@ -110,8 +110,8 @@ export default function HostPanels({ gameId, players, adminExtra }) {
 
   const approvedPlayers = players.filter((p) => p.approved);
   const alive = approvedPlayers.filter((p) => p.alive);
-  const aliveMapped = alive.map((p) => ({ id: p.id, name: p.display_name }));
-  const allMapped = approvedPlayers.map((p) => ({ id: p.id, name: p.display_name }));
+  const aliveMapped = alive.map((p) => ({ id: p.id, name: p.display_name, avatarUrl: p.avatar_url }));
+  const allMapped = approvedPlayers.map((p) => ({ id: p.id, name: p.display_name, avatarUrl: p.avatar_url }));
   // Feeds ParticipantPicker's "exclude shielded" / "include returned"
   // toggles — see lib/challengeParticipants.js.
   const shieldedNames = tr ? Object.keys(tr.shielded || {}).filter((n) => tr.shielded[n]) : [];

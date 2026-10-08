@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Btn, Card, PausedBanner } from "./traitorsUi";
+import { Btn, Card, PausedBanner, PlayerTag } from "./traitorsUi";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { STORAGE_KEY_MASQUERADE } from "../lib/masqueradeData";
 import { TRAITORS_GAME_REGISTRY } from "../lib/traitorsMiniGames";
@@ -112,7 +112,13 @@ export default function MasqueradePlayer({ gameId, playerName }) {
                 background: sel.includes(p.name) ? "rgba(201,168,76,0.15)" : "#0a1020",
                 border: `1px solid ${sel.includes(p.name) ? "#c9a84c" : "#253550"}`,
                 color: sel.includes(p.name) ? "#c9a84c" : "#f0e6d3",
-              }}>{sel.includes(p.name) ? "✓ " : ""}{p.name}</button>
+              }}>
+                <PlayerTag
+                  name={`${sel.includes(p.name) ? "✓ " : ""}${p.name}`}
+                  avatarUrl={p.avatarUrl} size={16}
+                  textStyle={{ color: sel.includes(p.name) ? "#c9a84c" : "#f0e6d3" }}
+                />
+              </button>
             ))}
           </div>
           <Btn small onClick={submit} disabled={sel.length !== pickCount || done}>Submit {label}</Btn>

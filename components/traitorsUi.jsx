@@ -80,6 +80,44 @@ export function Badge({ children, color = "#c9a84c" }) {
   );
 }
 
+// A small circular avatar — falls back to a colored initial when no photo
+// is set (avatarMode off, or this specific player never uploaded one), so
+// a name tag never looks broken either way. Reusable anywhere a mini-game
+// shows a player by name.
+export function PlayerAvatar({ name, avatarUrl, size = 22 }) {
+  if (avatarUrl) {
+    return (
+      <img src={avatarUrl} alt="" style={{
+        width: size, height: size, borderRadius: "50%", objectFit: "cover",
+        flexShrink: 0, border: "1px solid #253550",
+      }} />
+    );
+  }
+  return (
+    <span style={{
+      width: size, height: size, borderRadius: "50%", flexShrink: 0,
+      background: "#132038", border: "1px solid #253550", color: "#706050",
+      display: "inline-flex", alignItems: "center", justifyContent: "center",
+      fontSize: Math.max(9, Math.round(size * 0.45)), fontWeight: 700, textTransform: "uppercase",
+    }}>
+      {(name || "?").trim()[0] || "?"}
+    </span>
+  );
+}
+
+// Avatar + name, inline — the common case: everywhere a mini-game lists a
+// player by name, this is a drop-in replacement for just printing
+// {name}. Caller's own text styling (color/fontSize/weight) still applies
+// via `textStyle`, same as it did on the plain string before.
+export function PlayerTag({ name, avatarUrl, size = 18, style = {}, textStyle = {} }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, ...style }}>
+      <PlayerAvatar name={name} avatarUrl={avatarUrl} size={size} />
+      <span style={textStyle}>{name}</span>
+    </span>
+  );
+}
+
 // A playing card face — used by Casino, reusable by anything else with cards.
 export function CardFace({ c }) {
   return (

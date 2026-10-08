@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Btn, Card, ChallengeSetupCard, PauseResumeControls } from "./traitorsUi";
+import { Btn, Card, ChallengeSetupCard, PauseResumeControls, PlayerTag } from "./traitorsUi";
 import { storageSet, storageDelete, subscribeGameState } from "../lib/gameStorage";
 import { pauseChallenge, resumeChallenge } from "../lib/pauseResume";
 import { HOUSE_NAMES, STORAGE_KEY_MASQUERADE } from "../lib/masqueradeData";
@@ -51,7 +51,7 @@ export default function MasqueradeHost({ gameId, alive, allPlayers = [], shielde
     const spectators = [...names.filter((n) => !assigned.has(n)), ...pickerSpectators.map((p) => p.name)];
     const state = {
       active: true, createdAt: Date.now(), phase: "active",
-      players: pool.map((p) => ({ id: p.id, name: p.name })),
+      players: pool.map((p) => ({ id: p.id, name: p.name, avatarUrl: p.avatarUrl })),
       participants: [...assigned], spectators,
       houseSize, houses, guesses: {}, resolvedOrder: [], loseTarget,
     };
@@ -108,6 +108,10 @@ export default function MasqueradeHost({ gameId, alive, allPlayers = [], shielde
 
   const eliminatedCount = st.houses.filter((h) => h.status === "eliminated").length;
   const done = eliminatedCount >= st.loseTarget;
+  // st.houses only ever stores membership as plain names (see this
+  // component's own start() above) — this is the one lookup that lets
+  // the member list below show each one's photo instead of just text.
+  const avatarByName = Object.fromEntries((st.players || []).map((p) => [p.name, p.avatarUrl]));
 
   return (
     <Card style={{ borderColor: "rgba(124,58,237,0.3)" }}>
@@ -119,7 +123,11 @@ export default function MasqueradeHost({ gameId, alive, allPlayers = [], shielde
           <div style={{ fontSize: 13, color: h.status === "shielded" ? "#7a9a5c" : h.status === "eliminated" ? "#c45c3c" : "#f0e6d3" }}>
             {h.status === "shielded" ? "🛡️ " : h.status === "eliminated" ? "💀 " : ""}House {h.name} — {h.status}
           </div>
-          <div style={{ fontSize: 11, color: "#a09080" }}>{h.members.join(", ")}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px", marginTop: 3 }}>
+            {h.members.map((name) => (
+              <PlayerTag key={name} name={name} avatarUrl={avatarByName[name]} size={16} textStyle={{ fontSize: 11, color: "#a09080" }} />
+            ))}
+          </div>
         </div>
       ))}
       <p style={{ fontSize: 12, color: "#a09080", margin: "8px 0" }}>
