@@ -43,6 +43,7 @@ import EyesVillaHost from "./EyesVillaHost";
 import PickpocketGraspHost from "./PickpocketGraspHost";
 import ChallengeTestLab from "./ChallengeTestLab";
 import TraitorsTestLab from "./TraitorsTestLab";
+import PlayerMemoryWall from "./PlayerMemoryWall";
 
 const BASE_TABS = [
   { key: "today", label: "📅 Today" },
@@ -53,6 +54,7 @@ const BASE_TABS = [
   { key: "testlab", label: "🧪 Test Lab" },
   { key: "confessionals", label: "🎥 Confessionals" },
   { key: "chat", label: "💬 Chat" },
+  { key: "gallery", label: "🖼 Portrait Gallery" },
   { key: "history", label: "📜 History & Log" },
   { key: "admin", label: "🛠 Admin" },
 ];
@@ -131,7 +133,7 @@ export default function HostPanels({ gameId, players, adminExtra }) {
   const hostApprovedRoster = hostRoster.filter((p) => p.approved);
 
   const TABS = BASE_TABS
-    .filter((t) => t.key !== "chat" || settings?.chatEnabled)
+    .filter((t) => (t.key !== "chat" || settings?.chatEnabled) && (t.key !== "gallery" || settings?.memoryWallEnabled !== false))
     .map((t) => {
       if (t.key === "confessionals" && unreadConfessionals > 0) return { ...t, label: `${t.label} (${unreadConfessionals})` };
       if (t.key === "admin" && pendingCount > 0) return { ...t, label: `${t.label} (${pendingCount})` };
@@ -279,6 +281,19 @@ export default function HostPanels({ gameId, players, adminExtra }) {
       {tab === "chat" && settings?.chatEnabled && (
         <ChallengeErrorBoundary label="Chat">
           <ChatHostPanel gameId={gameId} players={hostApprovedRoster} />
+        </ChallengeErrorBoundary>
+      )}
+
+      {tab === "gallery" && settings?.memoryWallEnabled !== false && (
+        <ChallengeErrorBoundary label="Portrait Gallery">
+          {/* Same roster the rest of this host console already uses
+              (hostApprovedRoster — alias/avatar-resolved, see above), so
+              the host sees exactly what the player-facing Portrait
+              Gallery tab shows, with their own alias-aware naming on
+              top. winnerIds/nomineeIds empty for the same reason as the
+              player-side copy in TraitorsPlayerPanels.jsx — no
+              challenge-history-derived glow concept in Traitors. */}
+          <PlayerMemoryWall players={hostApprovedRoster} winnerIds={new Set()} nomineeIds={new Set()} settings={settings} traitorsMode />
         </ChallengeErrorBoundary>
       )}
 
