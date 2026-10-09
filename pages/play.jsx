@@ -6,7 +6,6 @@ import { removePendingPlayer, quitOrRemoveApprovedPlayer } from "../lib/playerRe
 import ColorPicker from "../components/ColorPicker";
 import TraitorsAliasPicker from "../components/TraitorsAliasPicker";
 import TraitorsOathGate from "../components/TraitorsOathGate";
-import { STORAGE_KEY_MASQUERADE } from "../lib/masqueradeData";
 import TraitorsMasqueradeReveal from "../components/TraitorsMasqueradeReveal";
 import TraitorsEliminatedScreen from "../components/TraitorsEliminatedScreen";
 import TraitorsPreseasonLock from "../components/TraitorsPreseasonLock";
@@ -134,37 +133,6 @@ export default function PlayPage() {
   const isStereoTypes = gameInfo?.game_type === "stereo_types";
   const theme = themeFor(gameInfo?.game_type);
 
-  // Masquerade Houses hides everyone inside anonymous Houses (see
-  // lib/masqueradeData.js / MasqueradePlayer.jsx) — leaving the memory
-  // wall's real names/photos open during it would hand players a shortcut
-  // past the actual guessing game. Forced shut the moment it goes active,
-  // and the toggle itself is disabled for the duration rather than just
-  // closed once, so a player can't reopen it mid-round. Reopens the
-  // instant the mission is DECIDED (enough houses eliminated to hit
-  // loseTarget — same "done" check MasqueradeHost/Player already compute
-  // internally), not only once the host gets around to clicking Clear —
-  // the guessing is over at that point, so there's nothing left to spoil.
-  const [masqueradeActive, setMasqueradeActive] = useState(false);
-  useEffect(() => {
-    if (!isTraitors || !gameId) return;
-    const unsubscribe = subscribeGameState(gameId, STORAGE_KEY_MASQUERADE, (st) => {
-      const eliminatedCount = st?.houses?.filter((h) => h.status === "eliminated").length || 0;
-      const stillGuessing = !!st?.active && eliminatedCount < (st?.loseTarget ?? Infinity);
-      setMasqueradeActive(stillGuessing);
-    });
-    return unsubscribe;
-  }, [isTraitors, gameId]);
-  useEffect(() => {
-    if (masqueradeActive) setShowMemoryWall(false);
-  }, [masqueradeActive]);
-  // Host kill-switch (TraitorsAdminHost.jsx's "Memory Wall" card,
-  // settings.memoryWallEnabled) — independent of, and on top of, the
-  // Masquerade auto-hide above. Forces it shut the instant a host turns
-  // it off, same as the Masquerade effect does.
-  const memoryWallEnabled = settings?.memoryWallEnabled !== false;
-  useEffect(() => {
-    if (!memoryWallEnabled) setShowMemoryWall(false);
-  }, [memoryWallEnabled]);
   // paddingTop uses max() rather than replacing the flat 24 outright —
   // on a non-notch device env(safe-area-inset-top) is 0, and this
   // still keeps the original spacing there; on a notched/Dynamic-
@@ -1114,22 +1082,7 @@ export default function PlayPage() {
               />
             ) : (
               <>
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: 14, marginBottom: 10 }}>
-                  {memoryWallEnabled && (
-                    <button
-                      onClick={() => !masqueradeActive && setShowMemoryWall(!showMemoryWall)}
-                      disabled={masqueradeActive}
-                      title={masqueradeActive ? "Hidden for the duration of Masquerade Houses" : undefined}
-                      style={{
-                        background: showMemoryWall ? `${theme.accent}22` : "transparent",
-                        border: `1px solid ${showMemoryWall ? theme.accent : theme.border}`,
-                        color: showMemoryWall ? theme.accent : theme.textMuted, fontSize: 12,
-                        cursor: masqueradeActive ? "not-allowed" : "pointer", opacity: masqueradeActive ? 0.5 : 1,
-                        borderRadius: 6, padding: "4px 10px",
-                      }}>
-                      🖼 {masqueradeActive ? "Hidden during Masquerade" : showMemoryWall ? "Hide" : "Show"} memory wall
-                    </button>
-                  )}
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
                   <button onClick={handleQuit} disabled={quitBusy} style={{
                     background: "none", border: "none", color: theme.danger, fontSize: 12,
                     cursor: quitBusy ? "not-allowed" : "pointer", opacity: quitBusy ? 0.5 : 1,
@@ -1137,19 +1090,6 @@ export default function PlayPage() {
                     {quitBusy ? "Leaving..." : "✕ Leave Game"}
                   </button>
                 </div>
-
-                {/* winnerIds/nomineeIds passed empty — Traitors has no direct
-                    equivalent of Project B's computeWinnerAndNomineeIds
-                    (challenge-history-derived MemoryWall glow) readily
-                    available; the wall still shows everyone's photo/status
-                    without it, just without that particular highlight. Must
-                    be Sets, not arrays — PlayerMemoryWall calls .has() on
-                    both. */}
-                {showMemoryWall && !masqueradeActive && memoryWallEnabled && (
-                  <div style={{ marginBottom: 20 }}>
-                    <PlayerMemoryWall players={identityAllPlayers.filter((p) => p.approved)} winnerIds={new Set()} nomineeIds={new Set()} traitorsMode />
-                  </div>
-                )}
 
                 <ChallengeErrorBoundary label="Traitors">
                   <TraitorsPlayerPanels

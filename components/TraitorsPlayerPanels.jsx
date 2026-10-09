@@ -30,14 +30,18 @@ import ConfessionalPlayer from "./TraitorsConfessionalPlayer";
 import MurderVotePlayer from "./MurderVotePlayer";
 import ChatPanel from "./ChatPanel";
 import TraitorsAvatarUpload from "./TraitorsAvatarUpload";
+import PlayerMemoryWall from "./PlayerMemoryWall";
+import TraitorsOathReview from "./TraitorsOathReview";
 import { useMissionTabStatus, useRoundtableTabStatus } from "../lib/traitorsNeedsAction";
 
 const TABS = [
   { key: "mission", label: "🎯 Mission" },
   { key: "roundtable", label: "⚖️ Roundtable" },
+  { key: "gallery", label: "🖼 Portrait Gallery" },
   { key: "confessional", label: "🎥 Confessional" },
   { key: "chat", label: "💬 Chat" },
   { key: "photo", label: "📷 Photo" },
+  { key: "help", label: "❓ Help" },
 ];
 
 // Small fixed red dot — top-right corner of whichever tab button it's
@@ -110,7 +114,11 @@ export default function PlayerPanels({ gameId, player, players, settings, onAvat
       <ChallengeErrorBoundary label="Pandora's Box"><PandoraBoxPlayer gameId={gameId} player={player} /></ChallengeErrorBoundary>
 
       <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #253550" }}>
-        {TABS.filter((t) => (t.key !== "chat" || settings?.chatEnabled) && (t.key !== "photo" || settings?.avatarMode === "player_upload")).map((t) => (
+        {TABS.filter((t) =>
+          (t.key !== "chat" || settings?.chatEnabled) &&
+          (t.key !== "photo" || settings?.avatarMode === "player_upload") &&
+          (t.key !== "gallery" || settings?.memoryWallEnabled !== false)
+        ).map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)} style={{
             position: "relative", flex: 1, background: tab === t.key ? "rgba(201,168,76,0.13)" : "transparent",
             color: tab === t.key ? "#c9a84c" : "#a09080",
@@ -189,6 +197,20 @@ export default function PlayerPanels({ gameId, player, players, settings, onAvat
         </TraitorsWorkDayGate>
       )}
 
+      {tab === "gallery" && settings?.memoryWallEnabled !== false && (
+        <ChallengeErrorBoundary label="Portrait Gallery">
+          {/* winnerIds/nomineeIds passed empty — Traitors has no direct
+              equivalent of Project B's computeWinnerAndNomineeIds
+              (challenge-history-derived MemoryWall glow) readily
+              available; the wall still shows everyone's photo/status
+              without it, just without that particular highlight. Must
+              be Sets, not arrays — PlayerMemoryWall calls .has() on
+              both. Only the admin toggle gates this tab now — it no
+              longer hides itself during Masquerade Houses. */}
+          <PlayerMemoryWall players={(players || []).filter((p) => p.approved)} winnerIds={new Set()} nomineeIds={new Set()} traitorsMode />
+        </ChallengeErrorBoundary>
+      )}
+
       {tab === "confessional" && (
         <ChallengeErrorBoundary label="Confessional">
           <ConfessionalPlayer gameId={gameId} player={player} round={roundInfo?.round} />
@@ -212,6 +234,12 @@ export default function PlayerPanels({ gameId, player, players, settings, onAvat
       {tab === "photo" && settings?.avatarMode === "player_upload" && (
         <ChallengeErrorBoundary label="Photo">
           <TraitorsAvatarUpload player={player} avatarUrl={player.avatarUrl} onChanged={onAvatarChanged} />
+        </ChallengeErrorBoundary>
+      )}
+
+      {tab === "help" && (
+        <ChallengeErrorBoundary label="Help">
+          <TraitorsOathReview player={player} />
         </ChallengeErrorBoundary>
       )}
     </div>

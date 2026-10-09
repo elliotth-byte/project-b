@@ -31,7 +31,7 @@ import { setGamePrefs } from "../lib/gamePrefs";
 // the app already knows (this player's own name, today's date) rather
 // than free-text fields, per explicit instruction — the only thing a
 // player fills in themselves is ticking each box.
-const OATH_ITEMS = [
+export const OATH_ITEMS = [
   "When eliminated, I fall silent. Until the host declares the game over, I will not discuss it with active or eliminated players—including roles, suspicions, strategy, or past conversations.",
   "No whispers from beyond the grave. I will not influence the game through messages, posts, screenshots, hints, gestures, or another person. After elimination, game questions go only to the host.",
   "I protect the secrets. I will not share private role assignments or host messages as proof, seek unauthorized information, or ask eliminated players for help.",
@@ -41,6 +41,68 @@ const OATH_ITEMS = [
 ];
 
 const today = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+
+// Shared with components/TraitorsOathReview.jsx (the read-only "review
+// what I signed" copy in the player Help tab) so the game overview/rules
+// prose can't drift between the two — only the signing controls below
+// (checkboxes, submit button, "Signed by ___ on ___" line) are specific
+// to this gate and live only here.
+export function OathIntro() {
+  return (
+    <>
+      <p>
+        Welcome to the castle. $1,000 is on the line. Bring your charm, your cunning, and your most convincing
+        declaration of innocence.
+      </p>
+
+      <h4 style={sectionHeading}>The Game at a Glance</h4>
+      <p style={{ fontStyle: "italic", color: "#706050" }}>October 9–November 6 · Monday–Friday</p>
+      <p>
+        Players are secretly assigned as Faithful or Traitors. The Faithful must uncover the Traitors. The
+        Traitors must escape detection while eliminating the Faithful. If the Faithful uncover all remaining
+        Traitors, they win. If a Traitor remains undetected at the end, the Traitors win.
+      </p>
+      <p>
+        <strong style={{ color: "#c9a84c" }}>The $1,000 Prize.</strong> If the Faithful identify and banish every
+        Traitor, the remaining Faithful split the $1,000 prize equally. If even one Traitor remains at the end,
+        the surviving Traitors split the entire prize equally—and the Faithful leave empty-handed.
+      </p>
+
+      <h4 style={sectionHeading}>Life in the Castle</h4>
+      <p>
+        The game generally alternates between murder days and mission/Roundtable days. Follow the game Slack
+        channel for instructions and deadlines.
+      </p>
+      <ol style={{ paddingLeft: 18, margin: "0 0 10px" }}>
+        <li style={{ marginBottom: 8 }}>
+          <strong style={{ color: "#c9a84c" }}>Murder.</strong> On murder days, the Traitors secretly choose a
+          player to eliminate. Unlike banishment, there is no public vote.
+        </li>
+        <li style={{ marginBottom: 8 }}>
+          <strong style={{ color: "#c9a84c" }}>Afternoon Tea.</strong> After a murder, the host announces the
+          survivors through Afternoon Tea invitations in Slack. If your name is missing, you've been murdered.
+          You leave the game channel, and your oath of silence begins.
+        </li>
+        <li style={{ marginBottom: 8 }}>
+          <strong style={{ color: "#c9a84c" }}>Missions &amp; Shields.</strong> On mission days, remaining
+          players compete in a challenge, with shields available as announced. Shields protect against the next
+          murder—not Roundtable banishment.
+        </li>
+        <li style={{ marginBottom: 8 }}>
+          <strong style={{ color: "#c9a84c" }}>The Roundtable.</strong> Players discuss suspicions and defend
+          their innocence, often alongside a mission. Submit your vote privately to the host by the deadline:
+          Player Name — "Reason." Votes and reasons become public. The player with the most votes is banished,
+          reveals their role, and leaves the game channel. Ties are settled by a game of luck.
+        </li>
+        <li>
+          <strong style={{ color: "#c9a84c" }}>Repeat—Until the End.</strong> Play continues through November 6.
+          Whether murdered or banished, eliminated players must not discuss the game with active or eliminated
+          players until the host declares it over.
+        </li>
+      </ol>
+    </>
+  );
+}
 
 export default function TraitorsOathGate({ player, onComplete }) {
   const [checked, setChecked] = useState(Array(OATH_ITEMS.length).fill(false));
@@ -75,56 +137,7 @@ export default function TraitorsOathGate({ player, onComplete }) {
         background: "#0a1020", border: "1px solid #253550", borderRadius: 10,
         color: "#a09080", fontSize: 13, lineHeight: 1.6,
       }}>
-        <p>
-          Welcome to the castle. $1,000 is on the line. Bring your charm, your cunning, and your most convincing
-          declaration of innocence.
-        </p>
-
-        <h4 style={sectionHeading}>The Game at a Glance</h4>
-        <p style={{ fontStyle: "italic", color: "#706050" }}>October 9–November 6 · Monday–Friday</p>
-        <p>
-          Players are secretly assigned as Faithful or Traitors. The Faithful must uncover the Traitors. The
-          Traitors must escape detection while eliminating the Faithful. If the Faithful uncover all remaining
-          Traitors, they win. If a Traitor remains undetected at the end, the Traitors win.
-        </p>
-        <p>
-          <strong style={{ color: "#c9a84c" }}>The $1,000 Prize.</strong> If the Faithful identify and banish every
-          Traitor, the remaining Faithful split the $1,000 prize equally. If even one Traitor remains at the end,
-          the surviving Traitors split the entire prize equally—and the Faithful leave empty-handed.
-        </p>
-
-        <h4 style={sectionHeading}>Life in the Castle</h4>
-        <p>
-          The game generally alternates between murder days and mission/Roundtable days. Follow the game Slack
-          channel for instructions and deadlines.
-        </p>
-        <ol style={{ paddingLeft: 18, margin: "0 0 10px" }}>
-          <li style={{ marginBottom: 8 }}>
-            <strong style={{ color: "#c9a84c" }}>Murder.</strong> On murder days, the Traitors secretly choose a
-            player to eliminate. Unlike banishment, there is no public vote.
-          </li>
-          <li style={{ marginBottom: 8 }}>
-            <strong style={{ color: "#c9a84c" }}>Afternoon Tea.</strong> After a murder, the host announces the
-            survivors through Afternoon Tea invitations in Slack. If your name is missing, you've been murdered.
-            You leave the game channel, and your oath of silence begins.
-          </li>
-          <li style={{ marginBottom: 8 }}>
-            <strong style={{ color: "#c9a84c" }}>Missions &amp; Shields.</strong> On mission days, remaining
-            players compete in a challenge, with shields available as announced. Shields protect against the next
-            murder—not Roundtable banishment.
-          </li>
-          <li style={{ marginBottom: 8 }}>
-            <strong style={{ color: "#c9a84c" }}>The Roundtable.</strong> Players discuss suspicions and defend
-            their innocence, often alongside a mission. Submit your vote privately to the host by the deadline:
-            Player Name — "Reason." Votes and reasons become public. The player with the most votes is banished,
-            reveals their role, and leaves the game channel. Ties are settled by a game of luck.
-          </li>
-          <li>
-            <strong style={{ color: "#c9a84c" }}>Repeat—Until the End.</strong> Play continues through November 6.
-            Whether murdered or banished, eliminated players must not discuss the game with active or eliminated
-            players until the host declares it over.
-          </li>
-        </ol>
+        <OathIntro />
       </div>
 
       <h3 style={{ color: "#f0e6d3", margin: "0 0 4px", fontSize: 16, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif", textAlign: "center" }}>
