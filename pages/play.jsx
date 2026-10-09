@@ -9,6 +9,7 @@ import TraitorsOathGate from "../components/TraitorsOathGate";
 import TraitorsMasqueradeReveal from "../components/TraitorsMasqueradeReveal";
 import TraitorsEliminatedScreen from "../components/TraitorsEliminatedScreen";
 import TraitorsPreseasonLock from "../components/TraitorsPreseasonLock";
+import ChangePasswordModal from "../components/ChangePasswordModal";
 import { AVATAR_COLLECTIONS } from "../lib/avatarCollections";
 import ChallengePlayer from "../components/ChallengePlayer";
 import FatesPlayer from "../components/FatesPlayer";
@@ -113,6 +114,7 @@ export default function PlayPage() {
   const [gameInfo, setGameInfo] = useState(null);
   const [quitBusy, setQuitBusy] = useState(false);
   const [showMyProfile, setShowMyProfile] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const [exileHistory, setExileHistory] = useState([]);
   const [revealAck, setRevealAck] = useState({});
   const [finalWordsResolved, setFinalWordsResolved] = useState(true); // defaults true so the prompt never flashes on screen before the check below completes
@@ -716,9 +718,14 @@ export default function PlayPage() {
               {quitBusy ? "Leaving..." : "✕ Cancel"}
             </button>
           )}
+          <button onClick={() => setShowChangePassword(true)} style={{ background: "none", border: "none", color: theme.textDim, fontSize: 12, cursor: "pointer" }}>🔒 Password</button>
           <button onClick={signOut} style={{ background: "none", border: "none", color: theme.textDim, fontSize: 12, cursor: "pointer" }}>Log out</button>
         </div>
       </div>
+
+      {showChangePassword && user?.email && (
+        <ChangePasswordModal email={user.email} theme={theme} onClose={() => setShowChangePassword(false)} />
+      )}
 
       {showMyProfile && myPlayer && (() => {
         const myIdentity = identityAllPlayers?.find((p) => p.id === myPlayer.id) || { ...myPlayer, display_name: effectivePlayerName };
