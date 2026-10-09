@@ -55,6 +55,9 @@ export default function AdminHost({ gameId, players }) {
   // main Admin screen stays focused on what a host actually opens this
   // tab for day to day (approvals, the schedule, declaring a winner...).
   const [adminSection, setAdminSection] = useState("main");
+  const [resettingId, setResettingId] = useState(null);
+  const [resetResult, setResetResult] = useState(null); // { playerId, username, newPassword } | null
+  const [resetError, setResetError] = useState("");
   const [feedbackEntries, setFeedbackEntries] = useState([]);
   useEffect(() => {
     const unsubscribe = subscribeFeedback(gameId, (v) => setFeedbackEntries(v || []));
@@ -229,6 +232,35 @@ export default function AdminHost({ gameId, players }) {
     if (error) alert("Couldn't rename: " + error.message);
   };
 
+  // Same host-mediated recovery AdminHost.jsx (Project B) already offers
+  // — no email involved, just a fresh random password the host relays
+  // to the player however they like. pages/api/host-reset-player-
+  // password.js is already game-type-agnostic (it only checks that the
+  // caller hosts THIS gameId and that the player belongs to it), so this
+  // reuses it as-is rather than needing a Traitors-specific endpoint.
+  const resetPassword = async (p) => {
+    if (!confirm(`Reset ${p.display_name}'s password? Their current password stops working immediately.`)) return;
+    setResettingId(p.id);
+    setResetError("");
+    setResetResult(null);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (!token) { setResetError("You're not logged in — try refreshing the page."); setResettingId(null); return; }
+    try {
+      const res = await fetch("/api/host-reset-player-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ gameId, playerId: p.id }),
+      });
+      const body = await res.json();
+      if (!res.ok) { setResetError(body.error || "Something went wrong."); setResettingId(null); return; }
+      setResetResult({ playerId: p.id, username: body.username, newPassword: body.newPassword });
+    } catch (e) {
+      setResetError("Something went wrong — try again.");
+    }
+    setResettingId(null);
+  };
+
   // Deletes every mission/challenge's saved state but leaves the roster,
   // roles, and roundtable/vote history untouched — for re-running
   // challenges without restarting the whole season.
@@ -387,23 +419,42 @@ export default function AdminHost({ gameId, players }) {
             </p>
             <div style={{ display: "grid", gap: 6 }}>
               {players.filter((p) => p.approved).map((p) => (
-                <div key={p.id} style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  <input
-                    value={nameFor(p)}
-                    onChange={(e) => setNames({ ...names, [p.id]: e.target.value })}
-                    style={{ flex: 1, background: "#0a1020", border: "1px solid #253550", borderRadius: 6, padding: "6px 10px", color: "#f0e6d3", fontSize: 13 }}
-                  />
-                  <Btn small onClick={() => saveName(p)} disabled={saving[p.id] || nameFor(p) === p.display_name}>
-                    {saving[p.id] ? "Saving..." : "Save"}
-                  </Btn>
-                  {!p.alive && (
-                    <>
-                      <span style={{ fontSize: 11, color: "#706050" }}>({p.elimination_type || "out"})</span>
-                      <Btn small variant="success" onClick={() => revivePlayer(p)}>Revive</Btn>
-                    </>
+                <div key={p.id}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <input
+                      value={nameFor(p)}
+                      onChange={(e) => setNames({ ...names, [p.id]: e.target.value })}
+                      style={{ flex: 1, background: "#0a1020", border: "1px solid #253550", borderRadius: 6, padding: "6px 10px", color: "#f0e6d3", fontSize: 13 }}
+                    />
+                    <Btn small onClick={() => saveName(p)} disabled={saving[p.id] || nameFor(p) === p.display_name}>
+                      {saving[p.id] ? "Saving..." : "Save"}
+                    </Btn>
+                    <Btn small variant="ghost" onClick={() => resetPassword(p)} disabled={resettingId === p.id}>
+                      {resettingId === p.id ? "..." : "🔑 Reset PW"}
+                    </Btn>
+                    {!p.alive && (
+                      <>
+                        <span style={{ fontSize: 11, color: "#706050" }}>({p.elimination_type || "out"})</span>
+                        <Btn small variant="success" onClick={() => revivePlayer(p)}>Revive</Btn>
+                      </>
+                    )}
+                  </div>
+                  {resetResult?.playerId === p.id && (
+                    <div style={{ background: "rgba(122,154,92,0.1)", border: "1px solid rgba(122,154,92,0.3)", borderRadius: 6, padding: "8px 10px", marginTop: 4, fontSize: 12 }}>
+                      <p style={{ margin: "0 0 4px", color: "#7a9a5c" }}>
+                        Password reset — relay these to {p.display_name} however you like (chat, verbally, etc.):
+                      </p>
+                      <p style={{ margin: 0, color: "#f0e6d3", fontFamily: "monospace" }}>
+                        Username: <strong>{resetResult.username}</strong> · New password: <strong>{resetResult.newPassword}</strong>
+                      </p>
+                      <button onClick={() => setResetResult(null)} style={{ background: "none", border: "none", color: "#706050", fontSize: 11, cursor: "pointer", padding: 0, marginTop: 4 }}>Dismiss</button>
+                    </div>
                   )}
                 </div>
               ))}
+              {resetError && (
+                <p style={{ color: "#c45c3c", fontSize: 12, margin: "4px 0 0" }}>{resetError}</p>
+              )}
               {players.length === 0 && <p style={{ color: "#706050", fontSize: 12, fontStyle: "italic" }}>No players have joined yet.</p>}
             </div>
           </Card>
