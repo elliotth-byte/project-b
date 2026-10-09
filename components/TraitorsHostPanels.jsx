@@ -293,7 +293,11 @@ export default function HostPanels({ gameId, players, adminExtra }) {
               top. winnerIds/nomineeIds empty for the same reason as the
               player-side copy in TraitorsPlayerPanels.jsx — no
               challenge-history-derived glow concept in Traitors. */}
-          <PlayerMemoryWall players={hostApprovedRoster} winnerIds={new Set()} nomineeIds={new Set()} settings={settings} traitorsMode />
+          {/* elimination_type "quit" covers both a self-quit AND a host
+              removal (lib/playerRemoval.js's quitOrRemoveApprovedPlayer) —
+              left off the wall entirely rather than shown eliminated,
+              same as the player-facing copy in TraitorsPlayerPanels.jsx. */}
+          <PlayerMemoryWall players={hostApprovedRoster.filter((p) => p.elimination_type !== "quit")} winnerIds={new Set()} nomineeIds={new Set()} settings={settings} traitorsMode />
         </ChallengeErrorBoundary>
       )}
 

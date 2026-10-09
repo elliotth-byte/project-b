@@ -19,6 +19,17 @@ import PlayerPowerModal from "./PlayerPowerModal";
 // each name baked into the portrait itself), never on the color-swatch
 // fallback, and never the \"OUT\" badge, which is separate information
 // the photo doesn't carry.
+// Traitors has no real "player color" concept (ColorPicker.jsx is
+// Panopticon-only) — a handful of Traitors players ended up with a real
+// stored players.color anyway, from a now-fixed race condition that
+// briefly showed them Panopticon's own onboarding (see pages/play.jsx's
+// gameInfo-fetch fix). Hardcoding one shared neutral color for
+// traitorsMode, rather than trusting whatever's actually in the
+// database, means that leftover bad data can't resurface as an
+// inconsistent "some players have colors, most don't" wall — every
+// Traitors tile reads the same regardless of what's stored.
+const TRAITORS_NEUTRAL_COLOR = "#c9a84c";
+
 export default function PlayerMemoryWall({ players, hideNameLabels = false, winnerIds, nomineeIds, settings, fatesHolderId, traitorsMode = false }) {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const roster = [...(players || [])].sort((a, b) => {
@@ -29,7 +40,7 @@ export default function PlayerMemoryWall({ players, hideNameLabels = false, winn
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
       {roster.map((p) => {
-        const color = colorFor(players, p.id);
+        const color = traitorsMode ? TRAITORS_NEUTRAL_COLOR : colorFor(players, p.id);
         const avatarUrl = p.effectiveAvatarUrl;
         const eliminated = !p.alive;
         // Traitors wants a stamped red X instead of Panopticon's classic

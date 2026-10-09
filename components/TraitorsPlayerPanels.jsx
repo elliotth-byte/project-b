@@ -207,7 +207,13 @@ export default function PlayerPanels({ gameId, player, players, settings, onAvat
               be Sets, not arrays — PlayerMemoryWall calls .has() on
               both. Only the admin toggle gates this tab now — it no
               longer hides itself during Masquerade Houses. */}
-          <PlayerMemoryWall players={(players || []).filter((p) => p.approved)} winnerIds={new Set()} nomineeIds={new Set()} traitorsMode />
+          {/* elimination_type "quit" covers both a self-quit AND a host
+              removal (see lib/playerRemoval.js's quitOrRemoveApprovedPlayer)
+              — unlike an actual murder/banishment, there's no re-entry and
+              no in-game "moment" players witnessed, so they're left off
+              the wall entirely rather than shown with the eliminated-X
+              treatment. */}
+          <PlayerMemoryWall players={(players || []).filter((p) => p.approved && p.elimination_type !== "quit")} winnerIds={new Set()} nomineeIds={new Set()} traitorsMode />
         </ChallengeErrorBoundary>
       )}
 
