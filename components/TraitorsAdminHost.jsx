@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Btn, Card } from "./traitorsUi";
 import { supabase } from "../lib/supabaseClient";
+import { quitOrRemoveApprovedPlayer } from "../lib/playerRemoval";
 import { storageDelete, storageGet } from "../lib/gameStorage";
 import { hostStorageDelete, hostStorageUpdate, subscribeHostState } from "../lib/hostStorage";
 import { declareWinner, subscribeTraitorsFinale, KEY_TRAITORS_FINALE } from "../lib/traitorsFinale";
@@ -221,6 +222,20 @@ export default function AdminHost({ gameId, players }) {
     if (error) alert("Couldn't revive: " + error.message);
   };
 
+  // Same "mark out, don't delete" removal Project B's AdminHost.jsx uses
+  // (lib/playerRemoval.js's quitOrRemoveApprovedPlayer) — sets alive:
+  // false, elimination_type: "quit", and assigns them the next
+  // elimination_order via the same shared lib/seasonPlacement.js choke
+  // point MurderVoteHost.jsx/RoundtableHost.jsx already call through, so
+  // this reads consistently with an actual murder/banishment rather than
+  // inventing a Traitors-specific removal path. No eliminationRound to
+  // pass — Traitors has no round-phase engine, unlike Project B.
+  const removeApprovedPlayer = async (p) => {
+    if (!confirm(`Remove ${p.display_name} from this game? They'll be marked out (like a murder/banishment, but with no re-entry attempt) rather than deleted, so past rounds and votes still show their name correctly.`)) return;
+    const { error } = await quitOrRemoveApprovedPlayer(gameId, p.id, null);
+    if (error) alert("Couldn't remove: " + error.message);
+  };
+
   const nameFor = (p) => names[p.id] ?? p.display_name;
 
   const saveName = async (p) => {
@@ -432,7 +447,9 @@ export default function AdminHost({ gameId, players }) {
                     <Btn small variant="ghost" onClick={() => resetPassword(p)} disabled={resettingId === p.id}>
                       {resettingId === p.id ? "..." : "🔑 Reset PW"}
                     </Btn>
-                    {!p.alive && (
+                    {p.alive ? (
+                      <Btn small variant="ghost" onClick={() => removeApprovedPlayer(p)}>Remove</Btn>
+                    ) : (
                       <>
                         <span style={{ fontSize: 11, color: "#706050" }}>({p.elimination_type || "out"})</span>
                         <Btn small variant="success" onClick={() => revivePlayer(p)}>Revive</Btn>
