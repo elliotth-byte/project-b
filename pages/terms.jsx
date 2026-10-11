@@ -43,7 +43,7 @@ export default function TermsPage() {
         </Section>
 
         <Section title="5. Account & data">
-          <p>Creating an account requires a username and password; hosts may additionally collect a real name and other season-specific information directly from you as part of running their season. Photos you upload are visible to other players in the same season. You can request your account and its data be deleted at any time by contacting us below.</p>
+          <p>Creating an account requires a username and password; hosts may additionally collect a real name and other season-specific information directly from you as part of running their season. Photos you upload are visible to other players in the same season. You can delete your account and its data at any time from the bottom of <a href="/profile#delete-account" style={{ color: "#ff2d95" }}>your profile</a>, or by contacting us below. See our <a href="/privacy" style={{ color: "#ff2d95" }}>Privacy Policy</a> for the details of what we collect and why.</p>
         </Section>
 
         <Section title="6. Contact">

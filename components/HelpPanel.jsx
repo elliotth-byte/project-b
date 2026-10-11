@@ -4,6 +4,7 @@ import { RULES_SECTIONS, battleList } from "../lib/rulesContent";
 import { subscribeUnlockedGames } from "../lib/unlockedGames";
 import RulesAccordion from "./RulesAccordion";
 import PracticeMode from "./PracticeMode";
+import { isNativeApp } from "../lib/nativePush";
 
 // ─── Player help ───
 // The full rules, in-app (see lib/rulesContent.js — kept as data
@@ -23,6 +24,8 @@ export default function HelpPanel({ gameId, player, onReplayTour, readOnly = fal
   // own `unlockedTypes` param treats as "nothing unlocked yet" rather
   // than "no filter" (that's only for callers passing null outright).
   const [unlockedTypes, setUnlockedTypes] = useState(new Set());
+  const [native, setNative] = useState(false);
+  useEffect(() => { setNative(isNativeApp()); }, []);
   useEffect(() => {
     if (!gameId) return;
     return subscribeUnlockedGames(gameId, (types) => setUnlockedTypes(new Set(types)));
@@ -95,6 +98,9 @@ export default function HelpPanel({ gameId, player, onReplayTour, readOnly = fal
         </Card>
       )}
 
+      {/* Install-to-home-screen steps only make sense in a browser — inside the
+          App Store app they'd be confusing (and App Review flags them). */}
+      {!native && (<>
       <Card>
         <div style={{ fontSize: 12, color: "#a68fd6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
           📱 Add to Home Screen (iPhone/iPad)
@@ -124,6 +130,7 @@ export default function HelpPanel({ gameId, player, onReplayTour, readOnly = fal
           Same convenience as above — an icon that opens straight to the game. Unlike iPhone/iPad, this step is optional on Android: Notifications (see the Options tab) already work from a regular Chrome tab without it.
         </p>
       </Card>
+      </>)}
 
       <p style={{ fontSize: 10, color: "#3d1f5c", textAlign: "center", margin: 0 }}>
         Version {process.env.NEXT_PUBLIC_APP_VERSION || "dev"} — include this if you're reporting a problem, in case you're on an older version than expected.
@@ -133,6 +140,10 @@ export default function HelpPanel({ gameId, player, onReplayTour, readOnly = fal
         <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: "#6b4f99" }}>Terms & Community Guidelines</a>
         {" · "}
         <a href="/patch-notes" target="_blank" rel="noopener noreferrer" style={{ color: "#6b4f99" }}>What's New</a>
+        {" · "}
+        <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: "#6b4f99" }}>Privacy</a>
+        {" · "}
+        <a href="/profile#delete-account" style={{ color: "#6b4f99" }}>Delete Account</a>
       </p>
     </div>
   );

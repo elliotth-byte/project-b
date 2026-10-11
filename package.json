@@ -8,11 +8,12 @@
     "start": "next start"
   },
   "dependencies": {
+    "@capacitor-firebase/messaging": "^8.5.2",
     "@capacitor/android": "^8.5.1",
+    "@capacitor/browser": "^8.0.5",
     "@capacitor/cli": "^8.5.1",
     "@capacitor/core": "^8.5.1",
     "@capacitor/ios": "^8.5.1",
-    "@capacitor/push-notifications": "^8.1.2",
     "@supabase/supabase-js": "^2.45.0",
     "firebase-admin": "^14.4.0",
     "next": "^14.2.0",

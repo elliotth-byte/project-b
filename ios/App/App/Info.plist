@@ -22,6 +22,18 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>Take a photo to use as your player portrait.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose a photo from your library to use as your player portrait.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Some mini-games (like Pan's Panic) react to how loud you shout. Audio is only measured on your device and is never recorded or uploaded.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
@@ -49,7 +61,7 @@
 	<string>Main</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
+		<string>arm64</string>
 	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>

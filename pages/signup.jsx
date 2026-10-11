@@ -78,7 +78,7 @@ export default function Signup() {
         <label style={{ display: "flex", alignItems: "flex-start", gap: 8, textAlign: "left", fontSize: 12, color: theme.textDim, margin: "4px 0 12px", cursor: "pointer" }}>
           <input type="checkbox" checked={agreedToTerms} onChange={(e) => setAgreedToTerms(e.target.checked)} style={{ marginTop: 2 }} />
           <span>
-            I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: theme.accent }}>Terms & Community Guidelines</a>, including no tolerance for harassment, threats, or hateful content.
+            I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: theme.accent }}>Terms & Community Guidelines</a>, including no tolerance for harassment, threats, or hateful content, and have read the <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: theme.accent }}>Privacy Policy</a>.
           </span>
         </label>
         {error && <p style={{ color: theme.danger, fontSize: 13, margin: "6px 0" }}>{error}</p>}

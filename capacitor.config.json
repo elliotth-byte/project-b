@@ -1,10 +1,11 @@
 {
   "appId": "com.panopticon.app",
   "appName": "Panopticon",
-  "webDir": "public",
+  "webDir": "native-shell",
   "server": {
     "url": "https://project-b-pink.vercel.app",
-    "cleartext": false
+    "cleartext": false,
+    "errorPath": "offline.html"
   },
   "ios": {
     "contentInset": "never",
@@ -12,5 +13,21 @@
   },
   "android": {
     "backgroundColor": "#05010f"
+  },
+  "plugins": {
+    "FirebaseMessaging": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  },
+  "experimental": {
+    "ios": {
+      "spm": {
+        "packageOptions": {
+          "@capacitor-firebase/messaging": {
+            "symlink": true
+          }
+        }
+      }
+    }
   }
 }

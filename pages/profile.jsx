@@ -8,6 +8,7 @@ import { searchPeopleToDm } from "../lib/profileDms";
 import { uploadProfilePhoto, removeProfilePhoto } from "../lib/profilePhotoUpload";
 import { fetchFriendedUserIds, addFriend, removeFriend } from "../lib/friendships";
 import RelationshipWeb from "../components/RelationshipWeb";
+import DeleteAccountSection from "../components/DeleteAccountSection";
 
 // ─── Profile ───
 // The first page in this app that isn't scoped to any one season — no
@@ -414,6 +415,8 @@ export default function ProfilePage() {
             <RelationshipWeb userId={viewingUserId} />
           </div>
         )}
+
+        {isOwnProfile && <DeleteAccountSection />}
       </div>
     </div>
   );

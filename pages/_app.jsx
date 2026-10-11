@@ -1,6 +1,15 @@
 import Head from "next/head";
+import { useEffect } from "react";
+import { useRouter } from "next/router";
 
 export default function App({ Component, pageProps }) {
+  const router = useRouter();
+  // Native-app-only setup (in-app link handling, push notification taps).
+  // Only loaded inside the wrapped app, so browser players don't download it.
+  useEffect(() => {
+    if (!window.Capacitor?.isNativePlatform?.()) return;
+    import("../lib/nativeApp").then((m) => m.initNativeApp(router));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
       <Head>

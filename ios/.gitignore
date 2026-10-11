@@ -11,3 +11,6 @@ capacitor-cordova-ios-plugins
 # Generated Config files
 App/App/capacitor.config.json
 App/App/config.xml
+
+# Created by `npx cap sync ios` (absolute links into node_modules)
+App/CapApp-SPM/symlinks

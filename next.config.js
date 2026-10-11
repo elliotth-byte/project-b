@@ -22,4 +22,13 @@ module.exports = {
   env: {
     NEXT_PUBLIC_APP_VERSION: commitSha.slice(0, 7),
   },
+  // @capacitor-firebase/messaging (native push in the iOS/Android app,
+  // see lib/nativePush.js) ships an optional web fallback that imports
+  // the Firebase web SDK. We never use that fallback — browsers get Web
+  // Push via lib/pushNotifications.js instead — so stub it out rather
+  // than installing the whole Firebase web SDK just to satisfy the build.
+  webpack: (config) => {
+    config.resolve.alias = { ...config.resolve.alias, "firebase/messaging": false };
+    return config;
+  },
 };
