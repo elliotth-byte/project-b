@@ -44,9 +44,18 @@ export default function MasqueradePlayer({ gameId, playerName }) {
       }
       return { correct, members, time: Date.now() };
     } else {
-      const target = fresh.houses.find((x) => x.id !== myHouseId && x.status === "active" && [...x.members].sort().join() === [...members].sort().join());
+      // Correctness is a pure name match against ANY rival house —
+      // active, already eliminated, or already shielded — never gated on
+      // its current status. Two housemates can independently name the
+      // same correct rival house; without this, whichever one's guess
+      // got written second would find that house no longer "active" (the
+      // first guess already flipped it) and be told "Incorrect" for
+      // naming the exact right answer, purely due to submission order.
+      // The actual elimination effect below still only ever applies
+      // once, same as the shield branch above.
+      const target = fresh.houses.find((x) => x.id !== myHouseId && [...x.members].sort().join() === [...members].sort().join());
       const correct = !!target;
-      if (correct) {
+      if (correct && target.status === "active") {
         target.status = "eliminated";
         target.resolvedAt = Date.now();
         fresh.resolvedOrder.push({ houseId: target.id, result: "eliminated", by: playerName, time: Date.now() });
