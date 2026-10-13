@@ -23,7 +23,15 @@ export default function MasqueradePlayer({ gameId, playerName }) {
   const myGuess = st.guesses?.[playerName] || {};
   const eliminatedCount = st.houses.filter((h) => h.status === "eliminated").length;
   const done = eliminatedCount >= st.loseTarget;
-  const others = st.players.filter((p) => p.name !== playerName);
+  const myHouseResolved = !!myHouse && myHouse.status !== "active";
+  // Once a house is shielded or eliminated, its fate is locked in — no
+  // further guess (anyone's) can change that, so its members are dropped
+  // from BOTH pick grids entirely rather than left sitting there as
+  // dead options. Recomputed live off `st.houses`, so a house resolving
+  // mid-pick (another player's guess landing while you're still
+  // choosing) clears its members out from under you immediately.
+  const resolvedNames = new Set(st.houses.filter((h) => h.status !== "active").flatMap((h) => h.members));
+  const others = st.players.filter((p) => p.name !== playerName && !resolvedNames.has(p.name));
 
   const toggle = (list, setList, name, max) => {
     if (list.includes(name)) setList(list.filter((n) => n !== name));
@@ -152,13 +160,24 @@ export default function MasqueradePlayer({ gameId, playerName }) {
       {done && <p style={{ fontSize: 12, color: "#c45c3c", marginBottom: 8 }}>Mission ended — {st.loseTarget} house{st.loseTarget === 1 ? "" : "s"} eliminated, every other house is safe.</p>}
       {myHouse && (
         <>
-          <PickGrid sel={shieldSel} setSel={setShieldSel} submit={submitShield} existing={myGuess.shieldGuess} label="🛡️ SHIELD guess (your house)" color="#7a9a5c" pickCount={st.houseSize - 1} note="you're already counted" />
+          {myHouseResolved && !myGuess.shieldGuess ? (
+            <p style={{ fontSize: 12, color: myHouse.status === "shielded" ? "#7a9a5c" : "#c45c3c", margin: "0 0 12px" }}>
+              {myHouse.status === "shielded" ? "🛡️ Your house has already been shielded — no guess needed." : "💀 Your house has already been eliminated."}
+            </p>
+          ) : (
+            <PickGrid sel={shieldSel} setSel={setShieldSel} submit={submitShield} existing={myGuess.shieldGuess} label="🛡️ SHIELD guess (your house)" color="#7a9a5c" pickCount={st.houseSize - 1} note="you're already counted" />
+          )}
           <PickGrid sel={killerSel} setSel={setKillerSel} submit={submitKiller} existing={myGuess.killerGuess} label="🗡️ KILLER guess (a rival house)" color="#c45c3c" pickCount={st.houseSize} />
         </>
       )}
+      {/* Visible to every player, not just each house's own members —
+          once a house's fate is decided, there's nothing left to spoil by
+          naming it outright. */}
       <div style={{ fontSize: 11, color: "#706050" }}>
         {st.houses.filter((h) => h.status !== "active").map((h) => (
-          <div key={h.id}>{h.status === "shielded" ? "🛡️" : "💀"} A house was {h.status}.</div>
+          <div key={h.id}>
+            {h.status === "shielded" ? "🛡️" : "💀"} House {h.name} was {h.status} — {h.members.join(", ")}
+          </div>
         ))}
       </div>
     </Card>
