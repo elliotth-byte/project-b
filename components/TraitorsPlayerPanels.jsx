@@ -26,6 +26,7 @@ import IcebreakerPlayer from "./IcebreakerPlayer";
 import EyesVillaPlayer from "./EyesVillaPlayer";
 import PickpocketGraspPlayer from "./PickpocketGraspPlayer";
 import PandoraBoxPlayer from "./PandoraBoxPlayer";
+import IcebreakerPresubmitPrompt from "./IcebreakerPresubmitPrompt";
 import ConfessionalPlayer from "./TraitorsConfessionalPlayer";
 import MurderVotePlayer from "./MurderVotePlayer";
 import ChatPanel from "./ChatPanel";
@@ -112,6 +113,12 @@ export default function PlayerPanels({ gameId, player, players, settings, onAvat
       {/* Pandora's Box is a surprise "twist" banner — kept visible
           regardless of which tab a player is on, so nobody misses it. */}
       <ChallengeErrorBoundary label="Pandora's Box"><PandoraBoxPlayer gameId={gameId} player={player} /></ChallengeErrorBoundary>
+
+      {/* Same "visible regardless of tab" treatment as Pandora's Box
+          above, for the opposite reason — this one's meant to be easy to
+          miss and forget about, not a twist to notice. See
+          components/IcebreakerPresubmitPrompt.jsx. */}
+      <ChallengeErrorBoundary label="Pre-submit"><IcebreakerPresubmitPrompt gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
 
       <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #253550" }}>
         {TABS.filter((t) =>

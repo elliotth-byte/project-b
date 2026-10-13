@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import { Btn, Card, Badge, ChallengeSetupCard, PauseResumeControls } from "./traitorsUi";
 import { storageSet, storageUpdate, storageDelete, subscribeGameState } from "../lib/gameStorage";
 import { pauseChallenge, resumeChallenge } from "../lib/pauseResume";
-import { STORAGE_KEY_ICEBREAKER } from "../lib/icebreakerData";
+import {
+  STORAGE_KEY_ICEBREAKER, subscribeIcebreakerPresubmit, setIcebreakerPresubmitOpen,
+} from "../lib/icebreakerData";
 import { DEFAULT_PARTICIPATION, computeParticipants } from "../lib/challengeParticipants";
 import ParticipantPicker from "./ParticipantPicker";
 import ArchiveResultsButton from "./ArchiveResultsButton";
@@ -21,6 +23,7 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
   const [qDraft, setQDraft] = useState("");
   const [editingA, setEditingA] = useState(null); // `${owner}::${questionOwner}` currently being edited
   const [aDraft, setADraft] = useState("");
+  const [presubmit, setPresubmit] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -31,17 +34,34 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
     return unsubscribe;
   }, [gameId]);
 
+  useEffect(() => {
+    const unsubscribe = subscribeIcebreakerPresubmit(gameId, setPresubmit);
+    return unsubscribe;
+  }, [gameId]);
+
   const start = async () => {
     const { participants, spectators } = computeParticipants(participation, { alive, allPlayers, shieldedNames, returnedNames });
+    // Fold in whatever was collected through the disguised pre-submit
+    // prompt (see lib/icebreakerData.js) — only for whoever actually
+    // ended up a participant in THIS run, never spectators. Anyone who
+    // didn't pre-submit just answers live, same as before this existed.
+    const preseeded = {};
+    participants.forEach((p) => {
+      const q = presubmit?.questions?.[p.name];
+      if (q) preseeded[p.name] = q;
+    });
     const state = {
       active: true, createdAt: Date.now(), phase: "questions",
       players: participants.map((p) => ({ id: p.id, name: p.name, avatarUrl: p.avatarUrl })),
       participants: participants.map((p) => p.name), spectators: spectators.map((p) => p.name),
-      questions: {}, answers: {}, anonymousSets: [], revealedQuestions: [],
+      questions: preseeded, answers: {}, anonymousSets: [], revealedQuestions: [],
       eliminated: [], guesses: {}, lastRevealAt: {}, winner: null,
     };
     await storageSet(gameId, STORAGE_KEY_ICEBREAKER, state);
     setSt(state);
+    // Done its job — closes the disguised prompt so it stops showing up
+    // for players once the real (now-visible) mission has absorbed it.
+    if (presubmit?.open) await setIcebreakerPresubmitOpen(gameId, false);
   };
 
   const openAnswers = async () => {
@@ -123,6 +143,16 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
           alive={alive} allPlayers={allPlayers} shieldedNames={shieldedNames} returnedNames={returnedNames}
           value={participation} onChange={setParticipation}
         />
+        <div style={{ borderTop: "1px solid #253550", paddingTop: 10, marginTop: 4 }}>
+          <Btn small variant={presubmit?.open ? "danger" : "ghost"} onClick={() => setIcebreakerPresubmitOpen(gameId, !presubmit?.open)}>
+            {presubmit?.open ? "Close disguised pre-submit" : "Open disguised pre-submit"}
+          </Btn>
+          <p style={{ fontSize: 11, color: "#706050", margin: "6px 0 0", fontStyle: "italic" }}>
+            {presubmit?.open
+              ? `Collecting now, ahead of time, through a plain unbranded prompt that never mentions Icebreaker — ${Object.keys(presubmit?.questions || {}).length} submitted so far. Whoever's already in by the time you start gets skipped straight past the questions phase.`
+              : `${Object.keys(presubmit?.questions || {}).length} already collected from an earlier open window, if any.`}
+          </p>
+        </div>
       </ChallengeSetupCard>
     );
   }
