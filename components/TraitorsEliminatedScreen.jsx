@@ -18,7 +18,7 @@ const ELIMINATION_BANNERS = {
 // no longer part of. The one deliberate exception is their own
 // Confessional, which stays open so the host can still hear from them
 // after the fact.
-export default function TraitorsEliminatedScreen({ gameId, player }) {
+export default function TraitorsEliminatedScreen({ gameId, player, readOnly = false }) {
   const banner = ELIMINATION_BANNERS[player.eliminationType] || { icon: "🕯️", text: "You are no longer in the game." };
   return (
     <>
@@ -31,7 +31,7 @@ export default function TraitorsEliminatedScreen({ gameId, player }) {
           Your silence begins now — no mission, no roundtable, no roster. The confessional below is still yours.
         </p>
       </Card>
-      <ConfessionalPlayer gameId={gameId} player={player} round={null} />
+      <ConfessionalPlayer gameId={gameId} player={player} round={null} readOnly={readOnly} />
     </>
   );
 }

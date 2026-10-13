@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
+import { Card } from "./traitorsUi";
 import { subscribeHostState } from "../lib/hostStorage";
 import { STORAGE_KEY_TRAITOR_ROLES } from "../lib/traitorData";
 import { fetchAllConfessionals, subscribeConfessionalsTable } from "../lib/confessionalsData";
 import { subscribeChallengeArchive } from "../lib/challengeArchive";
 import { fetchGloballyDisabledChallenges } from "../lib/platformSettings";
 import { DEFAULT_SETTINGS, subscribeSettings } from "../lib/gameState";
-import { resolveIdentitiesForHost } from "../lib/playerIdentity";
+import { resolveIdentities, resolveIdentitiesForHost } from "../lib/playerIdentity";
 import { resolveAvatars } from "../lib/avatarIdentity";
+import { subscribeTraitorsFinale } from "../lib/traitorsFinale";
 import ChatHostPanel from "./ChatHostPanel";
 import {
   STORAGE_KEY_WORDS, STORAGE_KEY_CASINO, STORAGE_KEY_HOT_POTATO, STORAGE_KEY_ZOMBIE,
@@ -44,6 +46,7 @@ import PickpocketGraspHost from "./PickpocketGraspHost";
 import ChallengeTestLab from "./ChallengeTestLab";
 import TraitorsTestLab from "./TraitorsTestLab";
 import PlayerMemoryWall from "./PlayerMemoryWall";
+import TraitorsPlayerViewer from "./TraitorsPlayerViewer";
 
 const BASE_TABS = [
   { key: "today", label: "📅 Today" },
@@ -55,6 +58,7 @@ const BASE_TABS = [
   { key: "confessionals", label: "🎥 Confessionals" },
   { key: "chat", label: "💬 Chat" },
   { key: "gallery", label: "🖼 Portrait Gallery" },
+  { key: "viewas", label: "👁️ View as Player" },
   { key: "history", label: "📜 History & Log" },
   { key: "admin", label: "🛠 Admin" },
 ];
@@ -75,10 +79,20 @@ export default function HostPanels({ gameId, players, adminExtra }) {
   // chatEnabled tab gate below and to thread inactivityEnabled/
   // aliasEnabled/chatEnabled down into RoundtableHost.
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [viewAsPlayerId, setViewAsPlayerId] = useState("");
+  const [traitorsFinale, setTraitorsFinale] = useState(null);
 
   useEffect(() => {
     fetchGloballyDisabledChallenges().then(setGloballyDisabled);
   }, []);
+
+  // Same reveal condition pages/play.jsx uses for identityAllPlayers —
+  // Traitors has no round-phase engine, so "the season ended" has to come
+  // from the finale declaration instead of round?.phase === PHASES.ENDED.
+  useEffect(() => {
+    const unsubscribe = subscribeTraitorsFinale(gameId, setTraitorsFinale);
+    return unsubscribe;
+  }, [gameId]);
 
   useEffect(() => {
     const unsubscribe = subscribeSettings(gameId, setSettings);
@@ -131,6 +145,12 @@ export default function HostPanels({ gameId, players, adminExtra }) {
   // once aliasEnabled is on; a no-op list transform otherwise.
   const hostRoster = resolveAvatars(resolveIdentitiesForHost(players, { settings }), settings);
   const hostApprovedRoster = hostRoster.filter((p) => p.approved);
+
+  // "View as Player" needs to show exactly what that player sees — their
+  // OWN alias standing in for their own name too, not the host's "always
+  // see both" version above. Same resolveIdentities() pages/play.jsx
+  // itself runs for identityAllPlayers.
+  const playerViewRoster = resolveAvatars(resolveIdentities(players, { settings, revealed: !!traitorsFinale }), settings);
 
   const TABS = BASE_TABS
     .filter((t) => (t.key !== "chat" || settings?.chatEnabled) && (t.key !== "gallery" || settings?.memoryWallEnabled !== false))
@@ -298,6 +318,43 @@ export default function HostPanels({ gameId, players, adminExtra }) {
               left off the wall entirely rather than shown eliminated,
               same as the player-facing copy in TraitorsPlayerPanels.jsx. */}
           <PlayerMemoryWall players={hostApprovedRoster.filter((p) => p.elimination_type !== "quit")} winnerIds={new Set()} nomineeIds={new Set()} settings={settings} traitorsMode />
+        </ChallengeErrorBoundary>
+      )}
+
+      {tab === "viewas" && (
+        <ChallengeErrorBoundary label="View as Player">
+          <div style={{ display: "grid", gap: 16 }}>
+            <Card style={{ borderColor: "rgba(201,168,76,0.3)" }}>
+              <label style={{ display: "block", fontSize: 11, color: "#a09080", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+                Choose a player
+              </label>
+              <select
+                value={viewAsPlayerId}
+                onChange={(e) => setViewAsPlayerId(e.target.value)}
+                style={{ width: "100%", background: "#0a1020", border: "1px solid #253550", borderRadius: 6, padding: "8px 10px", color: "#f0e6d3", fontSize: 13 }}
+              >
+                <option value="">— select a player —</option>
+                {players.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.display_name}{p.alias ? ` (${p.alias})` : ""}{!p.approved ? " (pending)" : p.alive === false ? " (eliminated)" : ""}
+                  </option>
+                ))}
+              </select>
+              <p style={{ color: "#706050", fontSize: 11, margin: "8px 0 0", fontStyle: "italic" }}>
+                Shows exactly what this player sees right now — including their alias in place of everyone's real name, if the
+                season has that on — read-only, so nothing you do here affects the game.
+              </p>
+            </Card>
+            {viewAsPlayerId && (
+              <TraitorsPlayerViewer
+                gameId={gameId}
+                targetPlayer={playerViewRoster.find((p) => p.id === viewAsPlayerId) || null}
+                allPlayers={playerViewRoster}
+                settings={settings}
+                onExit={() => setViewAsPlayerId("")}
+              />
+            )}
+          </div>
         </ChallengeErrorBoundary>
       )}
 
