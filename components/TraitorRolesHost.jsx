@@ -142,7 +142,9 @@ export default function TraitorRolesHost({ gameId, players }) {
       });
       if (res.ok) {
         setTr(res.value);
-        const elimType = type === "MURDER" ? "murdered" : type === "BANISH" ? "banished" : "walked";
+        // Black Traitor kills get their own elimination_type — see
+        // components/TraitorsEliminatedScreen.jsx's banner map.
+        const elimType = type === "MURDER" ? (faction === "traitor-black" ? "murdered_black" : "murdered") : type === "BANISH" ? "banished" : "walked";
         await setPlayersAlive([id], false, elimType);
         if (type === "MURDER") {
           const shieldedNames = Object.keys(res.value.shielded).filter((n) => res.value.shielded[n] && n !== name);

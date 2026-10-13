@@ -6,6 +6,13 @@ const ELIMINATION_BANNERS = {
   walked: { icon: "🚪", text: "You have chosen to walk away." },
   banished: { icon: "⚖️", text: "You have been banished." },
   murdered: { icon: "🗡️", text: "By order of the Traitors, you have been murdered." },
+  // Black Traitor murders get their own, vaguer banner — "by order of
+  // the Traitors" implies a known, organized faction, which gives away
+  // more than a Black kill is supposed to. See components/
+  // MurderVoteHost.jsx's applyMurder and components/TraitorRolesHost.jsx's
+  // confirmAction, both of which write this specific elimination_type
+  // only when the executing faction is "traitor-black".
+  murdered_black: { icon: "🗡️", text: "Something murdered you in the night." },
   masquerade: { icon: "🎭", text: "Unmasked at the Masquerade — you have been eliminated." },
 };
 

@@ -83,6 +83,9 @@ import { useSiteTheme } from "../lib/siteTheme";
 // this only ever gets consulted when isTraitors below is true.
 const TRAITORS_ELIMINATION_MESSAGES = {
   murdered: "By the order of the Traitors, you have been murdered.",
+  // Black Traitor kills get a vaguer line — see components/
+  // TraitorsEliminatedScreen.jsx's matching banner for the full reasoning.
+  murdered_black: "Something murdered you in the night.",
   banished: "You have been banished from the castle.",
   walked: "You have chosen to walk away from the game.",
 };
@@ -845,7 +848,7 @@ export default function PlayPage() {
           }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>
               {isTraitors
-                ? (myPlayer.eliminationType === "murdered" ? "💀" : myPlayer.eliminationType === "walked" ? "🚪" : "⚖️")
+                ? (["murdered", "murdered_black"].includes(myPlayer.eliminationType) ? "💀" : myPlayer.eliminationType === "walked" ? "🚪" : "⚖️")
                 : (quitByChoice ? "🚪" : removedForInactivity ? "⏳" : "💀")}
             </div>
             <p style={{ color: theme.text, fontSize: 17, fontWeight: 600, margin: 0, fontFamily: theme.font }}>

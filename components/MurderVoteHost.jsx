@@ -131,7 +131,12 @@ function FactionPanel({ gameId, players, tr, faction, factionTraitors }) {
       return fresh;
     });
     if (res.ok && target) {
-      await supabase.from("players").update({ alive: false, elimination_type: "murdered" }).eq("id", target.id);
+      // Black Traitor kills get their own elimination_type — see
+      // components/TraitorsEliminatedScreen.jsx's banner map and pages/
+      // play.jsx's TRAITORS_ELIMINATION_MESSAGES for the vaguer, "no
+      // named faction" message this feeds into.
+      const elimType = faction === "traitor-black" ? "murdered_black" : "murdered";
+      await supabase.from("players").update({ alive: false, elimination_type: elimType }).eq("id", target.id);
       // See lib/seasonPlacement.js — same shared placement pool Project
       // B's own eliminations feed, so "Xth place of Y" means the same
       // thing regardless of game type or which season ended someone's run.
