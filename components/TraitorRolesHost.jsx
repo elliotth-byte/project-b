@@ -55,7 +55,7 @@ export default function TraitorRolesHost({ gameId, players }) {
   const initialize = async () => {
     const state = {
       roles: {}, shielded: {}, daggerStolen: false, round: 1,
-      eliminations: [], returns: [], shieldHistory: {},
+      eliminations: [], returns: [], shieldHistory: {}, ineligible: {},
       log: [{ text: "Traitor tracking started.", round: 1, time: new Date().toLocaleTimeString() }],
     };
     players.forEach((p) => { state.roles[p.display_name] = "faithful"; });
@@ -85,12 +85,32 @@ export default function TraitorRolesHost({ gameId, players }) {
   const blackTraitors = tr ? alive.filter((p) => tr.roles[p.display_name] === "traitor-black") : [];
   const faithfulAlive = tr ? alive.filter((p) => tr.roles[p.display_name] === "faithful" || !tr.roles[p.display_name]) : [];
 
-  const assignTraitors = async () => {
-    if (redCount + blackCount === 0) { alert("Assign at least one traitor."); return; }
-    if (redCount + blackCount > alive.length) { alert("Not enough living players for that many traitors."); return; }
+  // Eligible pool for the RANDOM draw only — a player the host has toggled
+  // ineligible (a co-host playing along, someone who was a Traitor last
+  // season, whatever the reason) stays a completely normal alive Faithful
+  // otherwise; this only keeps them out of the shuffle below. Recruit
+  // (further down) is a deliberate, named choice by the host, not a random
+  // draw, so it's deliberately NOT filtered by this — the host can still
+  // recruit an "ineligible" player by hand later if they want to.
+  const eligible = alive.filter((p) => !tr?.ineligible?.[p.display_name]);
+
+  const toggleEligible = async (name) => {
     const res = await hostStorageUpdate(gameId, STORAGE_KEY_TRAITOR_ROLES, (fresh) => {
       if (!fresh) return null;
-      const shuffled = [...alive].sort(() => Math.random() - 0.5);
+      fresh.ineligible = fresh.ineligible || {};
+      fresh.ineligible[name] = !fresh.ineligible[name];
+      return fresh;
+    });
+    if (res.ok) setTr(res.value);
+  };
+
+  const assignTraitors = async () => {
+    if (redCount + blackCount === 0) { alert("Assign at least one traitor."); return; }
+    if (redCount + blackCount > eligible.length) { alert("Not enough eligible players for that many traitors."); return; }
+    const res = await hostStorageUpdate(gameId, STORAGE_KEY_TRAITOR_ROLES, (fresh) => {
+      if (!fresh) return null;
+      const pool = alive.filter((p) => !fresh.ineligible?.[p.display_name]);
+      const shuffled = [...pool].sort(() => Math.random() - 0.5);
       const redNames = new Set(shuffled.slice(0, redCount).map((p) => p.display_name));
       const blackNames = new Set(shuffled.slice(redCount, redCount + blackCount).map((p) => p.display_name));
       players.forEach((p) => {
@@ -285,7 +305,18 @@ export default function TraitorRolesHost({ gameId, players }) {
       {/* Assign traitors */}
       {redTraitors.length === 0 && blackTraitors.length === 0 && (
         <div style={{ marginBottom: 12, paddingBottom: 12, borderBottom: "1px solid #253550" }}>
-          <div style={{ fontSize: 12, color: "#a09080", marginBottom: 6 }}>Assign traitors from {alive.length} living players:</div>
+          <div style={{ fontSize: 12, color: "#a09080", marginBottom: 6 }}>Eligible for the random draw ({eligible.length} of {alive.length}) — tap to toggle:</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 10 }}>
+            {alive.map((p) => {
+              const isEligible = !tr?.ineligible?.[p.display_name];
+              return (
+                <Btn key={p.id} small variant={isEligible ? "success" : "ghost"} onClick={() => toggleEligible(p.display_name)}>
+                  {p.display_name} {isEligible ? "✓" : "🚫"}
+                </Btn>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 12, color: "#a09080", marginBottom: 6 }}>Assign traitors from {eligible.length} eligible players:</div>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <label style={{ fontSize: 12, color: "#c45c3c" }}>Red: <input type="number" min={0} value={redCount} onChange={(e) => setRedCount(Math.max(0, Number(e.target.value) || 0))} style={{ width: 44, marginLeft: 4, background: "#0a1020", border: "1px solid #253550", borderRadius: 5, color: "#f0e6d3", padding: "2px 6px" }} /></label>
             <label style={{ fontSize: 12, color: "#c9a84c" }}>Black: <input type="number" min={0} value={blackCount} onChange={(e) => setBlackCount(Math.max(0, Number(e.target.value) || 0))} style={{ width: 44, marginLeft: 4, background: "#0a1020", border: "1px solid #253550", borderRadius: 5, color: "#f0e6d3", padding: "2px 6px" }} /></label>
