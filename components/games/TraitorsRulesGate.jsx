@@ -37,7 +37,14 @@ export default function TraitorsRulesGate({ icon, label, blurb, resetKey, childr
       </div>
       <h3 style={{ color: "#f0e6d3", margin: "0 0 8px", fontSize: 16, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>How to play</h3>
       <p style={{ color: "#a09080", fontSize: 13, margin: "0 0 18px", lineHeight: 1.5 }}>{blurb}</p>
-      <Btn onClick={() => setReady(true)}>Go ➜</Btn>
+      {/* pointerEvents: "auto" overrides an ancestor's pointer-events:
+          none (TraitorsPlayerViewer.jsx's "View as Player" wraps every
+          mini-game in exactly that, to keep its preview non-interactive)
+          — this button only ever reveals the host's own read-only rules
+          blurb, never writes anything, so it's safe to keep clickable
+          even there. Everything past it (the actual mini-game) stays
+          inert as intended. */}
+      <Btn onClick={() => setReady(true)} style={{ pointerEvents: "auto" }}>Go ➜</Btn>
     </Card>
   );
 }
