@@ -33,7 +33,7 @@ import CasinoHost from "./CasinoHost";
 import HotPotatoHost from "./HotPotatoHost";
 import ZombieHost from "./ZombieHost";
 import PiggyHost from "./PiggyHost";
-import MasqueradeHost from "./MasqueradeHost";
+import MasqueradeMissionGate from "./MasqueradeMissionGate";
 import AttackDefendHost from "./AttackDefendHost";
 import VoodooHost from "./VoodooHost";
 import Maze3DHost from "./Maze3DHost";
@@ -229,7 +229,7 @@ export default function HostPanels({ gameId, players, adminExtra }) {
             <ChallengeErrorBoundary label="Piggy Bank"><PiggyHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
           )}
           {!globallyDisabled?.includes(STORAGE_KEY_MASQUERADE) && (
-            <ChallengeErrorBoundary label="Masquerade Houses"><MasqueradeHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
+            <ChallengeErrorBoundary label="Masquerade Houses"><MasqueradeMissionGate gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
           )}
           {!globallyDisabled?.includes(STORAGE_KEY_ATTACK_DEFEND) && (
             <ChallengeErrorBoundary label="Attack/Defend"><AttackDefendHost gameId={gameId} alive={aliveMapped} {...participantProps} /></ChallengeErrorBoundary>
