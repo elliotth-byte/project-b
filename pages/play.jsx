@@ -1089,6 +1089,7 @@ export default function PlayPage() {
               <TraitorsEliminatedScreen
                 gameId={gameId}
                 player={{ id: myPlayer.id, name: effectivePlayerName, eliminationType: myPlayer.eliminationType }}
+                players={identityAllPlayers}
               />
             ) : (
               <>

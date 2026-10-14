@@ -5,6 +5,7 @@ import { STORAGE_KEY_VOTE_HISTORY } from "../lib/roundtableData";
 import { STORAGE_KEY_CHALLENGE_HISTORY } from "../lib/challengeHistory";
 import { isTraitor, factionColor, factionLabel, roleDisplay } from "../lib/traitorData";
 import ChallengeArchiveList from "./ChallengeArchiveList";
+import { fetchAllFinalGuesses, subscribeFinalGuessesTable } from "../lib/finalGuessData";
 
 // Was a player eliminated as of `round` and NOT yet returned by then?
 function isOutAtRound(name, eliminations, returns, round) {
@@ -18,11 +19,25 @@ function isOutAtRound(name, eliminations, returns, round) {
 export default function HistoryTab({ gameId, players, tr, challengeArchive = [] }) {
   const [voteHistory, setVoteHistory] = useState([]);
   const [challengeHistory, setChallengeHistory] = useState([]);
+  const [finalGuesses, setFinalGuesses] = useState([]);
 
   useEffect(() => {
     const unsub1 = subscribeGameState(gameId, STORAGE_KEY_VOTE_HISTORY, (v) => setVoteHistory(v || []));
     const unsub2 = subscribeGameState(gameId, STORAGE_KEY_CHALLENGE_HISTORY, (v) => setChallengeHistory(v || []));
     return () => { unsub1(); unsub2(); };
+  }, [gameId]);
+
+  // Host-only view of components/TraitorsFinalGuess.jsx's submissions —
+  // see lib/finalGuessData.js / sql/add-traitor-final-guesses.sql for why
+  // this goes through its own table rather than the shared game_state
+  // blob every other host view here reads from: a player's own RLS can't
+  // see anyone else's guess until the finale is declared, but the host
+  // can always read all of them.
+  useEffect(() => {
+    const load = () => fetchAllFinalGuesses(gameId).then(setFinalGuesses);
+    load();
+    const unsubscribe = subscribeFinalGuessesTable(gameId, load);
+    return unsubscribe;
   }, [gameId]);
 
   const eliminations = tr?.eliminations || [];
@@ -201,6 +216,34 @@ export default function HistoryTab({ gameId, players, tr, challengeArchive = [] 
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+      </Card>
+
+      <Card>
+        <h3 style={{ color: "#f0e6d3", margin: "0 0 4px", fontSize: 14, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>🔮 Final Guesses</h3>
+        <p style={{ color: "#706050", fontSize: 12, margin: "0 0 12px", fontStyle: "italic" }}>
+          Host-only until the finale is declared, at which point every player can see this same list themselves.
+        </p>
+        {finalGuesses.length === 0 ? (
+          <p style={{ color: "#706050", fontSize: 12, fontStyle: "italic" }}>No one has submitted a final guess yet.</p>
+        ) : (
+          <div style={{ display: "grid", gap: 6 }}>
+            {finalGuesses.map((g) => (
+              <div key={g.player_id} style={{ background: "#0a1020", borderRadius: 8, padding: "8px 10px" }}>
+                <span style={{ fontSize: 13, color: "#c9a84c", fontWeight: 700 }}>{g.player_name}</span>
+                <span style={{ fontSize: 13, color: "#a09080" }}> guessed: </span>
+                {(g.guessed_names || []).map((name, i) => {
+                  const correct = isTraitor(tr?.roles?.[name]);
+                  return (
+                    <span key={name}>
+                      {i > 0 && ", "}
+                      <span style={{ color: correct ? "#7a9a5c" : "#f0e6d3" }}>{name}{correct ? " ✓" : ""}</span>
+                    </span>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         )}
       </Card>

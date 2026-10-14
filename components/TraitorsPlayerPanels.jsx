@@ -33,6 +33,8 @@ import ChatPanel from "./ChatPanel";
 import TraitorsAvatarUpload from "./TraitorsAvatarUpload";
 import PlayerMemoryWall from "./PlayerMemoryWall";
 import TraitorsOathReview from "./TraitorsOathReview";
+import TraitorsFinalGuessReveal from "./TraitorsFinalGuessReveal";
+import { subscribeTraitorsFinale } from "../lib/traitorsFinale";
 import { useMissionTabStatus, useRoundtableTabStatus } from "../lib/traitorsNeedsAction";
 
 const TABS = [
@@ -42,6 +44,7 @@ const TABS = [
   { key: "confessional", label: "🎥 Confessional" },
   { key: "chat", label: "💬 Chat" },
   { key: "photo", label: "📷 Photo" },
+  { key: "finalguess", label: "🔮 Final Guesses" },
   { key: "help", label: "❓ Help" },
 ];
 
@@ -79,10 +82,20 @@ export default function PlayerPanels({ gameId, player, players, settings, onAvat
   const [myRole, setMyRole] = useState("faithful");
   const [roundInfo, setRoundInfo] = useState(null);
   const [globallyDisabled, setGloballyDisabled] = useState(null); // null = not loaded yet
+  const [traitorsFinale, setTraitorsFinale] = useState(null);
 
   useEffect(() => {
     fetchGloballyDisabledChallenges().then(setGloballyDisabled);
   }, []);
+
+  // Gates the Final Guesses tab below — stays hidden for still-alive
+  // players until the game's actually over, same moment eliminated
+  // players' own TraitorsEliminatedScreen.jsx switches from the
+  // submission form to the reveal.
+  useEffect(() => {
+    const unsubscribe = subscribeTraitorsFinale(gameId, setTraitorsFinale);
+    return unsubscribe;
+  }, [gameId]);
 
   // Live subscription to my own role — see sql/add-murder-vote.sql for
   // why this can't be read from anywhere else.
@@ -124,7 +137,8 @@ export default function PlayerPanels({ gameId, player, players, settings, onAvat
         {TABS.filter((t) =>
           (t.key !== "chat" || settings?.chatEnabled) &&
           (t.key !== "photo" || settings?.avatarMode === "player_upload") &&
-          (t.key !== "gallery" || settings?.memoryWallEnabled !== false)
+          (t.key !== "gallery" || settings?.memoryWallEnabled !== false) &&
+          (t.key !== "finalguess" || !!traitorsFinale)
         ).map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)} style={{
             position: "relative", flex: 1, background: tab === t.key ? "rgba(201,168,76,0.13)" : "transparent",
@@ -247,6 +261,12 @@ export default function PlayerPanels({ gameId, player, players, settings, onAvat
       {tab === "photo" && settings?.avatarMode === "player_upload" && (
         <ChallengeErrorBoundary label="Photo">
           <TraitorsAvatarUpload player={player} avatarUrl={player.avatarUrl} onChanged={onAvatarChanged} />
+        </ChallengeErrorBoundary>
+      )}
+
+      {tab === "finalguess" && !!traitorsFinale && (
+        <ChallengeErrorBoundary label="Final Guesses">
+          <TraitorsFinalGuessReveal gameId={gameId} />
         </ChallengeErrorBoundary>
       )}
 

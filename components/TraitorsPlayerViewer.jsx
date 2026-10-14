@@ -152,6 +152,7 @@ export default function TraitorsPlayerViewer({ gameId, targetPlayer, allPlayers,
           <TraitorsEliminatedScreen
             gameId={gameId}
             player={{ id: targetPlayer.id, name: targetPlayer.display_name, eliminationType: targetPlayer.elimination_type }}
+            players={allPlayers}
             readOnly
           />
         ) : (

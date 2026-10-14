@@ -1,5 +1,9 @@
+import { useState, useEffect } from "react";
 import { Card } from "./traitorsUi";
 import ConfessionalPlayer from "./TraitorsConfessionalPlayer";
+import TraitorsFinalGuess from "./TraitorsFinalGuess";
+import TraitorsFinalGuessReveal from "./TraitorsFinalGuessReveal";
+import { subscribeTraitorsFinale } from "../lib/traitorsFinale";
 
 const ELIMINATION_BANNERS = {
   quit: { icon: "🚪", text: "You have chosen to walk away." },
@@ -25,8 +29,15 @@ const ELIMINATION_BANNERS = {
 // no longer part of. The one deliberate exception is their own
 // Confessional, which stays open so the host can still hear from them
 // after the fact.
-export default function TraitorsEliminatedScreen({ gameId, player, readOnly = false }) {
+export default function TraitorsEliminatedScreen({ gameId, player, players, readOnly = false }) {
   const banner = ELIMINATION_BANNERS[player.eliminationType] || { icon: "🕯️", text: "You are no longer in the game." };
+  const [traitorsFinale, setTraitorsFinale] = useState(null);
+
+  useEffect(() => {
+    const unsubscribe = subscribeTraitorsFinale(gameId, setTraitorsFinale);
+    return unsubscribe;
+  }, [gameId]);
+
   return (
     <>
       <Card style={{ marginBottom: 20, textAlign: "center", borderColor: "rgba(196,92,60,0.4)" }}>
@@ -38,6 +49,15 @@ export default function TraitorsEliminatedScreen({ gameId, player, readOnly = fa
           Your silence begins now — no mission, no roundtable, no roster. The confessional below is still yours.
         </p>
       </Card>
+      {/* Before the finale: one private shot at guessing who's still
+          hiding among the living. After: everyone's guesses, revealed
+          at once. See lib/finalGuessData.js / sql/add-traitor-final-
+          guesses.sql for how this stays private until that moment. */}
+      {traitorsFinale ? (
+        <TraitorsFinalGuessReveal gameId={gameId} />
+      ) : (
+        <TraitorsFinalGuess gameId={gameId} player={player} players={players} readOnly={readOnly} />
+      )}
       <ConfessionalPlayer gameId={gameId} player={player} round={null} readOnly={readOnly} />
     </>
   );
