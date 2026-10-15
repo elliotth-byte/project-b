@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Btn, Card, ChallengeSetupCard, PauseResumeControls } from "./traitorsUi";
 import { storageSet, storageDelete, subscribeGameState } from "../lib/gameStorage";
 import { pauseChallenge, resumeChallenge } from "../lib/pauseResume";
-import { fmtTime, tickHotPotato, STORAGE_KEY_HOT_POTATO } from "../lib/hotPotatoData";
+import { fmtTime, tickHotPotato, randomPotatoDurationMs, STORAGE_KEY_HOT_POTATO } from "../lib/hotPotatoData";
 import { logChallengeResult } from "../lib/challengeHistory";
 import { DEFAULT_PARTICIPATION, computeParticipants } from "../lib/challengeParticipants";
 import ParticipantPicker from "./ParticipantPicker";
@@ -57,7 +57,7 @@ export default function HotPotatoHost({ gameId, alive, allPlayers = [], shielded
     if (numWinners >= names.length) { alert("Winner count must be less than the number of participants."); return; }
     const shuffled = [...names].sort(() => Math.random() - 0.5);
     const mk = (id, holder) => {
-      const dur = (15 + Math.floor(Math.random() * 46)) * 60 * 1000;
+      const dur = randomPotatoDurationMs();
       const now = Date.now();
       return { id, holder, startedAt: now, durationMs: dur, expiresAt: now + dur, exploded: false, timesReassigned: 0 };
     };
@@ -110,7 +110,7 @@ export default function HotPotatoHost({ gameId, alive, allPlayers = [], shielded
       <ChallengeSetupCard
         icon="🥔" title="Hot Potato" onStart={start} startLabel="Start (2 potatoes)"
         disabled={computeParticipants(participation, { alive, allPlayers, shieldedNames, returnedNames }).participants.length < 3}
-        blurb="Two potatoes with secret 15–60 min timers pass between players. When a timer expires, the holder is eliminated and the potato is reassigned to a random survivor — it keeps going until only your target number of winners remain."
+        blurb="Two potatoes with secret 15–30 min timers pass between players. When a timer expires, the holder is eliminated and the potato is reassigned to a random survivor — it keeps going until only your target number of winners remain."
       >
         <ParticipantPicker
           alive={alive} allPlayers={allPlayers} shieldedNames={shieldedNames} returnedNames={returnedNames}
