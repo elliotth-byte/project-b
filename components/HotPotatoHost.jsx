@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Btn, Card, ChallengeSetupCard, PauseResumeControls } from "./traitorsUi";
-import { storageSet, storageDelete, storageUpdate, subscribeGameState } from "../lib/gameStorage";
+import { storageSet, storageDelete, subscribeGameState } from "../lib/gameStorage";
 import { pauseChallenge, resumeChallenge } from "../lib/pauseResume";
-import { fmtTime, tickHotPotato, randomPotatoDurationMs, readdPotatoPlayer, STORAGE_KEY_HOT_POTATO } from "../lib/hotPotatoData";
+import { fmtTime, tickHotPotato, randomPotatoDurationMs, STORAGE_KEY_HOT_POTATO } from "../lib/hotPotatoData";
 import { logChallengeResult } from "../lib/challengeHistory";
 import { DEFAULT_PARTICIPATION, computeParticipants } from "../lib/challengeParticipants";
 import ParticipantPicker from "./ParticipantPicker";
@@ -15,7 +15,6 @@ export default function HotPotatoHost({ gameId, alive, allPlayers = [], shielded
   const [, forceTick] = useState(0);
   const [numWinners, setNumWinners] = useState(1);
   const [participation, setParticipation] = useState(DEFAULT_PARTICIPATION);
-  const [readdName, setReaddName] = useState("");
   const loggedWinnerRef = useRef(false);
 
   // Log to the shared challenge history exactly once, the first time this
@@ -78,26 +77,6 @@ export default function HotPotatoHost({ gameId, alive, allPlayers = [], shielded
       await storageSet(gameId, STORAGE_KEY_HOT_POTATO, { ...st, active: false, phase: "ended" });
       setSt(null);
     }
-  };
-
-  // Everyone who could be put back in: eliminated players, plus anyone in
-  // the game who is still alive but not in this round (spectators / late joiners).
-  const readdOptions = (() => {
-    if (!st) return [];
-    const inRound = new Set(st.players.map((p) => p.name));
-    const byName = new Map();
-    st.players.filter((p) => st.eliminated.includes(p.name)).forEach((p) => byName.set(p.name, { ...p, label: `${p.name} (eliminated)` }));
-    alive.forEach((p) => {
-      if (p?.name && !inRound.has(p.name) && !byName.has(p.name)) byName.set(p.name, { id: p.id, name: p.name, avatarUrl: p.avatarUrl, label: `${p.name} (not in round)` });
-    });
-    return [...byName.values()];
-  })();
-
-  const readd = async () => {
-    const player = readdOptions.find((p) => p.name === readdName);
-    if (!player) return;
-    const res = await storageUpdate(gameId, STORAGE_KEY_HOT_POTATO, (fresh) => (readdPotatoPlayer(fresh, player) ? fresh : null));
-    if (res.ok) { setSt(res.value); setReaddName(""); }
   };
 
   const clear = async () => { await storageDelete(gameId, STORAGE_KEY_HOT_POTATO); setSt(null); };
@@ -165,19 +144,6 @@ export default function HotPotatoHost({ gameId, alive, allPlayers = [], shielded
         );
       })}
       {st.eliminated.length > 0 && <p style={{ fontSize: 12, color: "#706050", margin: "8px 0" }}>Eliminated: {st.eliminated.join(", ")} · Target winners: {st.numWinners || 1}</p>}
-      {st.active && !st.winner && readdOptions.length > 0 && (
-        <div style={{ display: "flex", gap: 8, alignItems: "center", margin: "8px 0", flexWrap: "wrap" }}>
-          <span style={{ fontSize: 12, color: "#a09080" }}>Re-add player:</span>
-          <select
-            value={readdName} onChange={(e) => setReaddName(e.target.value)}
-            style={{ background: "#0a1020", color: "#f0e6d3", border: "1px solid #253550", borderRadius: 6, padding: "4px 6px", fontSize: 12 }}
-          >
-            <option value="">Choose…</option>
-            {readdOptions.map((p) => <option key={p.name} value={p.name}>{p.label}</option>)}
-          </select>
-          <Btn small onClick={readd} disabled={!readdName}>Re-add</Btn>
-        </div>
-      )}
       <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
         <Btn variant="danger" onClick={end}>End</Btn>
         <Btn variant="ghost" small onClick={clear}>Clear</Btn>
