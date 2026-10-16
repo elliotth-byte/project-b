@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { revealPendingMurders } from "../../../lib/pendingMurders";
 
 // Runs on Vercel's cron schedule (see vercel.json). Vercel signs its own
 // cron requests with `Authorization: Bearer ${CRON_SECRET}` when
@@ -25,7 +26,7 @@ export default async function handler(req, res) {
 
   const { data: due, error: fetchError } = await supabaseAdmin
     .from("scheduled_slack_posts")
-    .select("id, text")
+    .select("id, text, game_id")
     .lte("post_at", new Date().toISOString())
     .is("posted_at", null)
     .eq("cancelled", false)
@@ -54,5 +55,14 @@ export default async function handler(req, res) {
     }
   }
 
-  return res.status(200).json({ posted, checked: due.length });
+  // Scheduled Afternoon Tea: once a game's last arrival post has gone
+  // out, reveal any murder the host was holding back for it (see
+  // lib/pendingMurders.js). onlyIfDue keeps this from firing early.
+  let revealed = 0;
+  for (const gameId of [...new Set(due.map((r) => r.game_id))]) {
+    const r = await revealPendingMurders(supabaseAdmin, gameId, { onlyIfDue: true });
+    revealed += r.revealed.length;
+  }
+
+  return res.status(200).json({ posted, checked: due.length, revealed });
 }

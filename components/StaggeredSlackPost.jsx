@@ -9,7 +9,12 @@ import { scheduleStaggeredPosts } from "../lib/slackScheduling";
 // each; "Schedule All" instead writes every post as a scheduled row, timed
 // `intervalMinutes` apart starting from a chosen time — see
 // pages/api/cron/post-scheduled.js for how those actually go out later.
-export default function StaggeredSlackPost({ gameId, lines, label = "Afternoon Tea Arrivals", icon = "☕", intervalMinutes: defaultInterval = 5 }) {
+// Optional hooks: `onComplete()` fires once every post in a "Post Now"
+// run has gone out successfully (not if cancelled or any failed), and
+// `onScheduled(lastPostAt)` fires once "Schedule All" has saved every
+// post, with the time the last one is due. TraitorRolesHost uses both to
+// hold back a murder until the tea arrivals are out (lib/pendingMurders.js).
+export default function StaggeredSlackPost({ gameId, lines, label = "Afternoon Tea Arrivals", icon = "☕", intervalMinutes: defaultInterval = 5, onComplete, onScheduled }) {
   const [statuses, setStatuses] = useState([]); // "pending" | "sending" | "success" | "error" | "waiting" | "scheduled"
   const [running, setRunning] = useState(false);
   const [countdown, setCountdown] = useState(0);
@@ -44,8 +49,12 @@ export default function StaggeredSlackPost({ gameId, lines, label = "Afternoon T
     if (!scheduleStart) return;
     setRunning(true);
     setStatuses(editedLines.map(() => "sending"));
-    const results = await scheduleStaggeredPosts(gameId, editedLines, parseLocalTime(scheduleStart), interval);
+    const start = parseLocalTime(scheduleStart);
+    const results = await scheduleStaggeredPosts(gameId, editedLines, start, interval);
     setStatuses(results.map((r) => (r.ok ? "scheduled" : "error")));
+    if (results.length > 0 && results.every((r) => r.ok)) {
+      onScheduled?.(new Date(start.getTime() + (editedLines.length - 1) * interval * 60 * 1000));
+    }
     setRunning(false);
     setShowSchedule(false);
   };
@@ -54,6 +63,7 @@ export default function StaggeredSlackPost({ gameId, lines, label = "Afternoon T
     cancelledRef.current = false;
     setRunning(true);
     setStatuses(editedLines.map(() => "pending"));
+    let sent = 0;
 
     for (let i = 0; i < editedLines.length; i++) {
       if (cancelledRef.current) break;
@@ -61,6 +71,7 @@ export default function StaggeredSlackPost({ gameId, lines, label = "Afternoon T
 
       const res = await postToSlack(gameId, editedLines[i]);
       if (cancelledRef.current) break;
+      if (res.ok) sent += 1;
       setStatuses((prev) => prev.map((s, j) => (j === i ? (res.ok ? "success" : "error") : s)));
 
       if (i < editedLines.length - 1 && !cancelledRef.current) {
@@ -83,6 +94,7 @@ export default function StaggeredSlackPost({ gameId, lines, label = "Afternoon T
     }
     setRunning(false);
     setCountdown(0);
+    if (!cancelledRef.current && sent === editedLines.length) onComplete?.();
   };
 
   const formatCountdown = (sec) => `${Math.floor(sec / 60)}:${(sec % 60).toString().padStart(2, "0")}`;

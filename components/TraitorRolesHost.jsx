@@ -7,6 +7,7 @@ import { murderScript, banishScript, walkScript, teaArrivalScripts } from "../li
 import { setPlayerRole } from "../lib/playerRoles";
 import PostToSlack from "./PostToSlack";
 import StaggeredSlackPost from "./StaggeredSlackPost";
+import { hidePendingVictims, revealPendingMurders } from "../lib/pendingMurders";
 
 // ─── Traitor Roles: Host-Only Tracker ───
 //
@@ -30,7 +31,7 @@ import StaggeredSlackPost from "./StaggeredSlackPost";
 //    voting flow, which is strictly better than a second, disconnected
 //    manual one. Likewise, "add a mid-season player with no account" isn't
 //    supported, since every player here is a real signed-up account.
-export default function TraitorRolesHost({ gameId, players }) {
+export default function TraitorRolesHost({ gameId, players: rawPlayers }) {
   const [tr, setTr] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showTea, setShowTea] = useState(false);
@@ -51,6 +52,45 @@ export default function TraitorRolesHost({ gameId, players }) {
     });
     return unsubscribe;
   }, [gameId]);
+
+  // Murders waiting on the Afternoon Tea reveal count as dead in the
+  // host's view (tea arrivals, murder targets, placement) while players
+  // still see them alive — see lib/pendingMurders.js.
+  const players = hidePendingVictims(rawPlayers, tr);
+  const pendingMurders = tr?.pendingMurders || [];
+  const murderRevealAt = tr?.murderRevealAt || null;
+
+  // A pending murder means tea is the next thing to do — open it.
+  useEffect(() => { if (pendingMurders.length > 0) setShowTea(true); }, [pendingMurders.length]);
+
+  // Scheduled tea: reveal once the last arrival post's time has passed.
+  // The cron that sends scheduled posts does this too (pages/api/cron/
+  // post-scheduled.js); whichever gets there first wins, the other no-ops.
+  useEffect(() => {
+    if (!murderRevealAt || pendingMurders.length === 0) return;
+    const check = () => { if (Date.now() >= murderRevealAt) revealPendingMurders(supabase, gameId, { onlyIfDue: true }); };
+    check();
+    const id = window.setInterval(check, 15000);
+    return () => window.clearInterval(id);
+  }, [gameId, murderRevealAt, pendingMurders.length]);
+
+  const revealNow = async () => {
+    if (!confirm(`Reveal ${pendingMurders.map((m) => m.name).join(", ")} as murdered to players now?`)) return;
+    await revealPendingMurders(supabase, gameId);
+  };
+
+  // Neither of these checks the pendingMurders closure value — a staggered
+  // run can take 20+ minutes, so go by the live state instead.
+  const onTeaScheduled = async (lastPostAt) => {
+    const res = await hostStorageUpdate(gameId, STORAGE_KEY_TRAITOR_ROLES, (fresh) => {
+      if (!fresh || !(fresh.pendingMurders || []).length) return null;
+      fresh.murderRevealAt = lastPostAt.getTime();
+      return fresh;
+    });
+    if (res.ok) setTr(res.value);
+  };
+
+  const onTeaPosted = async () => { await revealPendingMurders(supabase, gameId); };
 
   const initialize = async () => {
     const state = {
@@ -130,22 +170,27 @@ export default function TraitorRolesHost({ gameId, players }) {
     const { type, id, name, faction } = pendingAction;
 
     if (type === "MURDER" || type === "BANISH" || type === "WALK") {
+      // Black Traitor kills get their own elimination_type — see
+      // components/TraitorsEliminatedScreen.jsx's banner map.
+      const elimType = type === "MURDER" ? (faction === "traitor-black" ? "murdered_black" : "murdered") : type === "BANISH" ? "banished" : "walked";
       const res = await hostStorageUpdate(gameId, STORAGE_KEY_TRAITOR_ROLES, (fresh) => {
         if (!fresh) return null;
+        // A murder stays hidden from players until Afternoon Tea has
+        // gone out — see lib/pendingMurders.js.
+        if (type === "MURDER" && !(fresh.pendingMurders || []).some((m) => m.name === name)) {
+          fresh.pendingMurders = [...(fresh.pendingMurders || []), { id, name, elimType, recordPlacement: false, at: Date.now() }];
+        }
         const placement = alive.length;
         const label = type === "MURDER" ? "Murdered" : type === "BANISH" ? "Banished" : "Walked";
         fresh.eliminations = [...fresh.eliminations, { name, role: fresh.roles[name], type: label, round: fresh.round, placement, killedBy: faction || null }];
         fresh.shielded[name] = false;
         const icon = type === "MURDER" ? "💀" : type === "BANISH" ? "⚖️" : "🚪";
         const suffix = type === "MURDER" && faction ? ` by ${factionLabel(faction)}` : type === "BANISH" ? ` (${roleDisplay(fresh.roles[name])})` : "";
-        return addLog(fresh, `${icon} ${name} was ${label.toLowerCase()}${suffix}`);
+        return addLog(fresh, `${icon} ${name} was ${label.toLowerCase()}${suffix}${type === "MURDER" ? " (hidden until Afternoon Tea)" : ""}`);
       });
       if (res.ok) {
         setTr(res.value);
-        // Black Traitor kills get their own elimination_type — see
-        // components/TraitorsEliminatedScreen.jsx's banner map.
-        const elimType = type === "MURDER" ? (faction === "traitor-black" ? "murdered_black" : "murdered") : type === "BANISH" ? "banished" : "walked";
-        await setPlayersAlive([id], false, elimType);
+        if (type !== "MURDER") await setPlayersAlive([id], false, elimType);
         if (type === "MURDER") {
           const shieldedNames = Object.keys(res.value.shielded).filter((n) => res.value.shielded[n] && n !== name);
           setLastAnnouncement({ icon: "💀", label: "Murder Announcement", text: murderScript(name, shieldedNames) });
@@ -209,6 +254,12 @@ export default function TraitorRolesHost({ gameId, players }) {
     const res = await hostStorageUpdate(gameId, STORAGE_KEY_TRAITOR_ROLES, (fresh) => {
       if (!fresh) return null;
       fresh.roles[name] = role;
+      // Restoring a murder that hasn't been revealed yet cancels the
+      // reveal too, so it can't kill them again later.
+      if (fresh.pendingMurders?.some((m) => m.name === name)) {
+        fresh.pendingMurders = fresh.pendingMurders.filter((m) => m.name !== name);
+        if (fresh.pendingMurders.length === 0) fresh.murderRevealAt = null;
+      }
       fresh.returns = [...(fresh.returns || []), { name, round: fresh.round, restoredRole: role, time: new Date().toLocaleTimeString() }];
       return addLog(fresh, `🔁 ${name} returned to the game as ${roleDisplay(role)}`);
     });
@@ -283,6 +334,18 @@ export default function TraitorRolesHost({ gameId, players }) {
         </div>
       )}
 
+      {pendingMurders.length > 0 && (
+        <div style={{ background: "rgba(201,168,76,0.08)", border: "1px solid rgba(201,168,76,0.35)", borderRadius: 10, padding: "10px 14px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, color: "#f0e6d3", flex: 1, minWidth: 200 }}>
+            🤫 <strong>{pendingMurders.map((m) => m.name).join(", ")}</strong> {pendingMurders.length === 1 ? "is" : "are"} murdered but still look alive to players.{" "}
+            {murderRevealAt
+              ? `Revealed in the app after the last tea arrival (${new Date(murderRevealAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}).`
+              : "They'll be revealed in the app once the Afternoon Tea arrivals below finish posting."}
+          </span>
+          <Btn small variant="ghost" onClick={revealNow}>Reveal now</Btn>
+        </div>
+      )}
+
       <div style={{ marginBottom: 12 }}>
         <Btn small variant="ghost" onClick={() => setShowTea((v) => !v)}>
           {showTea ? "Hide ☕ Afternoon Tea" : "☕ Afternoon Tea Arrivals"}
@@ -290,7 +353,7 @@ export default function TraitorRolesHost({ gameId, players }) {
         {showTea && (
           <div style={{ marginTop: 8 }}>
             {alive.length > 0 ? (
-              <StaggeredSlackPost gameId={gameId} lines={teaLines} label="Afternoon Tea Arrivals" icon="☕" intervalMinutes={5} />
+              <StaggeredSlackPost gameId={gameId} lines={teaLines} label="Afternoon Tea Arrivals" icon="☕" intervalMinutes={5} onComplete={onTeaPosted} onScheduled={onTeaScheduled} />
             ) : (
               <p style={{ color: "#706050", fontSize: 12, fontStyle: "italic" }}>No living players to stagger arrivals for.</p>
             )}

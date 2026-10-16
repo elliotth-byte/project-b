@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { Btn, Card, Badge } from "./traitorsUi";
-import { supabase } from "../lib/supabaseClient";
 import { traitorStorageSet, traitorStorageUpdate, traitorStorageDelete, subscribeTraitorState } from "../lib/traitorStorage";
 import { hostStorageUpdate } from "../lib/hostStorage";
-import { recordElimination } from "../lib/seasonPlacement";
+import { hidePendingVictims } from "../lib/pendingMurders";
 import { STORAGE_KEY_TRAITOR_ROLES, factionLabel } from "../lib/traitorData";
 import { murderVoteKey, calculateMurderVoteResult, defaultEligibleTargets } from "../lib/murderVoteData";
 import { murderScript } from "../lib/slackScripts";
@@ -17,7 +16,10 @@ import PostToSlack from "./PostToSlack";
 // OTHER faction — cross-faction murder is allowed), and its own apply
 // button. If only one faction currently exists (no merge, or already
 // merged into one alliance), you just get the one panel.
-export default function MurderVoteHost({ gameId, players, tr }) {
+export default function MurderVoteHost({ gameId, players: rawPlayers, tr }) {
+  // Murders waiting on the Afternoon Tea reveal count as dead here, even
+  // though players still see them alive — see lib/pendingMurders.js.
+  const players = hidePendingVictims(rawPlayers, tr);
   if (!tr) return <Card><p style={{ color: "#706050", fontSize: 12, fontStyle: "italic" }}>Start tracking roles first (above) before opening a murder vote.</p></Card>;
 
   const alive = players.filter((p) => p.alive);
@@ -122,25 +124,27 @@ function FactionPanel({ gameId, players, tr, faction, factionTraitors }) {
     if (!confirm(`Apply murder: ${targetName}?`)) return;
 
     const target = players.find((p) => p.display_name === targetName);
+    // Black Traitor kills get their own elimination_type — see
+    // components/TraitorsEliminatedScreen.jsx's banner map and pages/
+    // play.jsx's TRAITORS_ELIMINATION_MESSAGES for the vaguer, "no
+    // named faction" message this feeds into.
+    const elimType = faction === "traitor-black" ? "murdered_black" : "murdered";
+    // Recorded as a PENDING murder only — players.alive isn't touched
+    // until the Afternoon Tea arrivals have gone out (see
+    // lib/pendingMurders.js), so the victim can't find out in-app first.
+    // Placement (lib/seasonPlacement.js) is recorded at reveal time.
     const res = await hostStorageUpdate(gameId, STORAGE_KEY_TRAITOR_ROLES, (fresh) => {
       if (!fresh) return null;
       const placement = alive.length;
       fresh.eliminations = [...fresh.eliminations, { name: targetName, role: fresh.roles[targetName], type: "Murdered", round: fresh.round, placement, killedBy: faction }];
       fresh.shielded[targetName] = false;
-      fresh.log = [{ text: `💀 ${targetName} was murdered by the ${label} Traitors`, round: fresh.round, time: new Date().toLocaleTimeString() }, ...fresh.log];
+      if (target && !(fresh.pendingMurders || []).some((m) => m.name === targetName)) {
+        fresh.pendingMurders = [...(fresh.pendingMurders || []), { id: target.id, name: targetName, elimType, recordPlacement: true, at: Date.now() }];
+      }
+      fresh.log = [{ text: `💀 ${targetName} was murdered by the ${label} Traitors (hidden until Afternoon Tea)`, round: fresh.round, time: new Date().toLocaleTimeString() }, ...fresh.log];
       return fresh;
     });
     if (res.ok && target) {
-      // Black Traitor kills get their own elimination_type — see
-      // components/TraitorsEliminatedScreen.jsx's banner map and pages/
-      // play.jsx's TRAITORS_ELIMINATION_MESSAGES for the vaguer, "no
-      // named faction" message this feeds into.
-      const elimType = faction === "traitor-black" ? "murdered_black" : "murdered";
-      await supabase.from("players").update({ alive: false, elimination_type: elimType }).eq("id", target.id);
-      // See lib/seasonPlacement.js — same shared placement pool Project
-      // B's own eliminations feed, so "Xth place of Y" means the same
-      // thing regardless of game type or which season ended someone's run.
-      await recordElimination(supabase, gameId, target.id);
       const shieldedNames = Object.keys(res.value.shielded).filter((n) => res.value.shielded[n]);
       setAnnouncement(murderScript(targetName, shieldedNames));
     }
@@ -276,6 +280,9 @@ function FactionPanel({ gameId, players, tr, faction, factionTraitors }) {
 
           {mv.status === "applied" && announcement && (
             <div style={{ marginBottom: 10 }}>
+              <p style={{ fontSize: 12, color: "#c9a84c", margin: "0 0 6px", fontStyle: "italic" }}>
+                🤫 Hidden from players until the ☕ Afternoon Tea arrivals finish (Traitor Roles panel). Post this announcement after tea, or it'll spoil the reveal.
+              </p>
               <PostToSlack gameId={gameId} icon="💀" label={`${label} Murder Announcement`} text={announcement} />
             </div>
           )}
