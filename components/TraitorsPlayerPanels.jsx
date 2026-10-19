@@ -29,6 +29,7 @@ import PandoraBoxPlayer from "./PandoraBoxPlayer";
 import IcebreakerPresubmitPrompt from "./IcebreakerPresubmitPrompt";
 import ConfessionalPlayer from "./TraitorsConfessionalPlayer";
 import MurderVotePlayer from "./MurderVotePlayer";
+import TraitorDondPlayer from "./TraitorDondPlayer";
 import ChatPanel from "./ChatPanel";
 import TraitorsAvatarUpload from "./TraitorsAvatarUpload";
 import PlayerMemoryWall from "./PlayerMemoryWall";
@@ -118,7 +119,7 @@ export default function PlayerPanels({ gameId, player, players, settings, onAvat
   // for why each of the 13 mini-games + the two vote mechanisms needs
   // its own completion signal rather than one shared convention.
   const missionStatus = useMissionTabStatus(gameId, player.name, globallyDisabled);
-  const roundtableStatus = useRoundtableTabStatus(gameId, player.name, myRole);
+  const roundtableStatus = useRoundtableTabStatus(gameId, player.name, myRole, player.id);
   const tabStatus = { mission: missionStatus, roundtable: roundtableStatus };
 
   return (
@@ -207,6 +208,11 @@ export default function PlayerPanels({ gameId, player, players, settings, onAvat
         <TraitorsWorkDayGate gameId={gameId}>
           {["traitor-red", "traitor-black"].includes(myRole) && (
             <ChallengeErrorBoundary label="Murder Vote"><MurderVotePlayer gameId={gameId} playerName={player.name} myRole={myRole} /></ChallengeErrorBoundary>
+          )}
+          {/* Secret, Traitor-only — renders nothing (and queries nothing)
+              for a Faithful. See lib/traitorDondData.js. */}
+          {["traitor-red", "traitor-black"].includes(myRole) && (
+            <ChallengeErrorBoundary label="Traitors' Deal"><TraitorDondPlayer gameId={gameId} player={player} myRole={myRole} /></ChallengeErrorBoundary>
           )}
           <ChallengeErrorBoundary label="Roundtable"><RoundtableVoter gameId={gameId} playerName={player.name} /></ChallengeErrorBoundary>
           {!roundtableStatus.active && (

@@ -25,6 +25,7 @@ import TraitorsMasqueradeGate from "./TraitorsMasqueradeGate";
 import TraitorsToday from "./TraitorsToday";
 import TraitorsWorkDayGate from "./TraitorsWorkDayGate";
 import MurderVoteHost from "./MurderVoteHost";
+import TraitorDondHost from "./TraitorDondHost";
 import AdminHost from "./TraitorsAdminHost";
 import HistoryTab from "./TraitorsHistoryTab";
 import ConfessionalsHost from "./TraitorsConfessionalsHost";
@@ -200,6 +201,7 @@ export default function HostPanels({ gameId, players, adminExtra }) {
           <TraitorsWorkDayGate gameId={gameId}>
             <ChallengeErrorBoundary label="Murder Vote"><MurderVoteHost gameId={gameId} players={approvedPlayers} tr={tr} /></ChallengeErrorBoundary>
           </TraitorsWorkDayGate>
+          <ChallengeErrorBoundary label="Secret Deal or No Deal"><TraitorDondHost gameId={gameId} players={approvedPlayers} tr={tr} /></ChallengeErrorBoundary>
         </div>
       )}
 
