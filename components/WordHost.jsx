@@ -42,21 +42,66 @@ export default function WordHost({ gameId, alive, allPlayers = [], shieldedNames
     return unsubscribe;
   }, [gameId]);
 
+  const [showSetup, setShowSetup] = useState(false);
   const startRound = async () => {
+    setShowSetup(false);
     const { participants, spectators } = computeParticipants(participation, { alive, allPlayers, shieldedNames, returnedNames });
     const state = await startWordScrambleRound(gameId, participants, spectators);
     setWordState(state);
   };
 
+  // Ending keeps the round (and everyone's times) in storage — it just
+  // stops it. The ended view below shows those results until the host
+  // deliberately sets up a new round.
   const endRound = async () => {
-    if (wordState) await storageSet(gameId, STORAGE_KEY_WORDS, { ...wordState, active: false });
-    setWordState(null);
+    if (wordState) {
+      const ended = { ...wordState, active: false, endedAt: Date.now() };
+      await storageSet(gameId, STORAGE_KEY_WORDS, ended);
+      setWordState(ended);
+    }
   };
   const clearRound = async () => { await storageDelete(gameId, STORAGE_KEY_WORDS); setWordState(null); };
   const pause = async () => { const r = await pauseChallenge(gameId, STORAGE_KEY_WORDS); if (r.ok) setWordState(r.value); };
   const resume = async () => { const r = await resumeChallenge(gameId, STORAGE_KEY_WORDS); if (r.ok) setWordState(r.value); };
 
   if (loading) return <Card><p style={{ color: "#706050", fontStyle: "italic" }}>Loading...</p></Card>;
+
+  const endedTimes = wordState && !wordState.active ? Object.entries(wordState.times || {}).sort((a, b) => a[1] - b[1]) : [];
+  if (wordState && !wordState.active && !showSetup) {
+    return (
+      <Card style={{ borderColor: "rgba(201,168,76,0.3)" }}>
+        <h3 style={{ color: "#c9a84c", margin: "0 0 10px", fontSize: 15, fontFamily: "'Palatino Linotype', Palatino, Georgia, serif" }}>
+          🔤 Word Scramble — Ended
+        </h3>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#a09080", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
+          Final results ({endedTimes.length}/{(wordState.players || []).length} finished)
+        </div>
+        {endedTimes.length === 0 ? (
+          <p style={{ color: "#706050", fontSize: 12, fontStyle: "italic" }}>Nobody finished.</p>
+        ) : (
+          <div style={{ display: "grid", gap: 3 }}>
+            {endedTimes.map(([name, time], i) => (
+              <div key={name} style={{ fontSize: 12, color: i === 0 ? "#c9a84c" : "#a09080", padding: "3px 0" }}>
+                {i === 0 ? "🏆" : `${i + 1}.`} {name} — {(time / 1000).toFixed(2)}s
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
+          {endedTimes.length > 0 && (
+            <ArchiveResultsButton
+              gameId={gameId} challengeId="word-scramble" challengeName="Word Scramble" round={null}
+              participants={wordState.participants || (wordState.players || []).map((p) => p.name)} spectators={wordState.spectators}
+              winner={endedTimes[0]?.[0]} resultSummary={`Final results — ${endedTimes.length} finished. Fastest: ${endedTimes[0][0]} (${(endedTimes[0][1] / 1000).toFixed(2)}s).`}
+              finalState={wordState} startedAt={wordState.createdAt}
+            />
+          )}
+          <Btn small variant="ghost" onClick={() => setShowSetup(true)}>Set Up New Round</Btn>
+        </div>
+        <p style={{ fontSize: 11, color: "#706050", margin: "8px 0 0" }}>Starting a new round replaces these results — archive them first if you want to keep them.</p>
+      </Card>
+    );
+  }
 
   if (!wordState || !wordState.active) {
     return (
