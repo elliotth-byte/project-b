@@ -30,6 +30,7 @@ import IcebreakerPresubmitPrompt from "./IcebreakerPresubmitPrompt";
 import ConfessionalPlayer from "./TraitorsConfessionalPlayer";
 import MurderVotePlayer from "./MurderVotePlayer";
 import TraitorDondPlayer from "./TraitorDondPlayer";
+import RecruitOfferPrompt from "./RecruitOfferPrompt";
 import ChatPanel from "./ChatPanel";
 import TraitorsAvatarUpload from "./TraitorsAvatarUpload";
 import PlayerMemoryWall from "./PlayerMemoryWall";
@@ -127,6 +128,11 @@ export default function PlayerPanels({ gameId, player, players, settings, onAvat
       {/* Pandora's Box is a surprise "twist" banner — kept visible
           regardless of which tab a player is on, so nobody misses it. */}
       <ChallengeErrorBoundary label="Pandora's Box"><PandoraBoxPlayer gameId={gameId} player={player} /></ChallengeErrorBoundary>
+
+      {/* Secret recruitment offer — only ever appears for the one player
+          it was sent to (see sql/add-recruit-offers.sql). Shown on every
+          tab so they can't miss it. */}
+      <ChallengeErrorBoundary label="Recruit Offer"><RecruitOfferPrompt gameId={gameId} player={player} /></ChallengeErrorBoundary>
 
       {/* Same "visible regardless of tab" treatment as Pandora's Box
           above, for the opposite reason — this one's meant to be easy to

@@ -7,6 +7,7 @@ import { murderScript, banishScript, walkScript, teaArrivalScripts } from "../li
 import { setPlayerRole } from "../lib/playerRoles";
 import PostToSlack from "./PostToSlack";
 import StaggeredSlackPost from "./StaggeredSlackPost";
+import RecruitOfferHost from "./RecruitOfferHost";
 import { hidePendingVictims, revealPendingMurders } from "../lib/pendingMurders";
 
 // ─── Traitor Roles: Host-Only Tracker ───
@@ -448,13 +449,15 @@ export default function TraitorRolesHost({ gameId, players: rawPlayers }) {
           <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
             {faithfulAlive.map((p) => (
               <div key={p.id} style={{ display: "flex" }}>
-                <Btn small style={{ borderRadius: "8px 0 0 8px" }} variant="danger" onClick={() => setPendingAction({ type: "RECRUIT", name: p.display_name, faction: "traitor-red" })}>{p.display_name} →R</Btn>
-                <Btn small style={{ borderRadius: "0 8px 8px 0" }} onClick={() => setPendingAction({ type: "RECRUIT", name: p.display_name, faction: "traitor-black" })}>B</Btn>
+                <Btn small style={{ borderRadius: "8px 0 0 8px" }} variant="danger" onClick={() => setPendingAction({ type: "RECRUIT", id: p.id, name: p.display_name, faction: "traitor-red" })}>{p.display_name} →R</Btn>
+                <Btn small style={{ borderRadius: "0 8px 8px 0" }} onClick={() => setPendingAction({ type: "RECRUIT", id: p.id, name: p.display_name, faction: "traitor-black" })}>B</Btn>
               </div>
             ))}
           </div>
         </div>
       </div>
+
+      <RecruitOfferHost gameId={gameId} players={players} tr={tr} faithfulAlive={faithfulAlive} redCount={redTraitors.length} blackCount={blackTraitors.length} />
 
       {/* Merge / Dagger */}
       <div style={{ display: "flex", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
