@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { notifyHostEvent } from "../lib/hostPushNotifications";
 import { Btn, Card } from "./traitorsUi";
 import { traitorStorageUpdate, subscribeTraitorState } from "../lib/traitorStorage";
 import { murderVoteKey } from "../lib/murderVoteData";
@@ -41,7 +42,13 @@ export default function MurderVotePlayer({ gameId, playerName, myRole }) {
       return fresh;
     });
     setSubmitting(false);
-    if (res.ok) setMv(res.value);
+    if (res.ok) {
+      setMv(res.value);
+      notifyHostEvent(gameId, "murder_vote", {
+        playerName, targetName: selected, factionLabel: myRole === "traitor-black" ? "Black" : "Red",
+        count: Object.keys(res.value.votes || {}).length, total: (res.value.eligibleVoters || []).length,
+      });
+    }
   };
 
   return (

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { notifyHostEvent } from "../lib/hostPushNotifications";
 import { Card } from "./traitorsUi";
 import { subscribeGameState } from "../lib/gameStorage";
 import { fmtTime } from "../lib/hotPotatoData";
@@ -25,6 +26,7 @@ export default function PandoraBoxPlayer({ gameId, player }) {
     const res = await openPandoraBox(gameId, player);
     if (res.ok) {
       setSt(res.value);
+      notifyHostEvent(gameId, "pandora_open", { playerName: player.name });
     } else {
       if (res.reason === "already_opened") setFeedback("Too late. Pandora's Box has already been opened.");
       else if (res.reason === "expired") setFeedback("Pandora's Box closed unopened.");

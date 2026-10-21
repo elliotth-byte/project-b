@@ -34,6 +34,7 @@ export default function GameAccessPanel({
   // uses elsewhere once Stereo Types existed, rather than just negating
   // isTraitors.
   const isStereoTypes = game?.game_type === "stereo_types";
+  const isTraitors = game?.game_type === "traitors";
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [pushSupported] = useState(() => isPushSupported());
@@ -72,6 +73,9 @@ export default function GameAccessPanel({
       notifyPendingPlayer: dbColumn === "notify_pending_player" ? newValue : pushSub.notify_pending_player,
       notifyRoundChanges: dbColumn === "notify_round_changes" ? newValue : pushSub.notify_round_changes,
       notifyChatActivity: dbColumn === "notify_chat_activity" ? newValue : pushSub.notify_chat_activity,
+      notifyTraitorDecisions: dbColumn === "notify_traitor_decisions" ? newValue : pushSub.notify_traitor_decisions,
+      notifyPandora: dbColumn === "notify_pandora" ? newValue : pushSub.notify_pandora,
+      notifyPlayerVotes: dbColumn === "notify_player_votes" ? newValue : pushSub.notify_player_votes,
     });
   };
 
@@ -199,6 +203,22 @@ export default function GameAccessPanel({
                       ? "Chat activity — any new message, group chat or DM. Off by default — you can already read every thread, so this is the noisiest option here."
                       : "Chat activity — any new message, Panopticon or DM. Off by default — you can already read every thread, so this is the noisiest option here."}
                   </label>
+                  {isTraitors && (
+                    <>
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#f5f0ff", cursor: "pointer" }}>
+                        <input type="checkbox" checked={pushSub.notify_traitor_decisions !== false} onChange={() => togglePushPref("notify_traitor_decisions")} />
+                        Traitor decisions — a murder vote cast, a secret recruit offer answered, or a secret Deal or No Deal finished
+                      </label>
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#f5f0ff", cursor: "pointer" }}>
+                        <input type="checkbox" checked={pushSub.notify_pandora !== false} onChange={() => togglePushPref("notify_pandora")} />
+                        Pandora's Box — someone opens it
+                      </label>
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#f5f0ff", cursor: "pointer" }}>
+                        <input type="checkbox" checked={pushSub.notify_player_votes !== false} onChange={() => togglePushPref("notify_player_votes")} />
+                        Player votes — someone casts or changes a Roundtable vote
+                      </label>
+                    </>
+                  )}
                 </div>
                 <button
                   onClick={disablePush}

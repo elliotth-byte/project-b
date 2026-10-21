@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { notifyHostEvent } from "../lib/hostPushNotifications";
 import { Btn, Card, Badge } from "./traitorsUi";
 import { subscribeTraitorState } from "../lib/traitorStorage";
 import { ROUND_OPEN_COUNTS, formatMoney } from "../lib/games/dealOrNoDealData";
@@ -28,8 +29,12 @@ export default function TraitorDondPlayer({ gameId, player, myRole }) {
   const act = async (fn) => {
     if (!isMe || busy) return;
     setBusy(true);
+    const wasDone = !!g.done;
     const next = await fn();
     if (next) setG((prev) => ({ ...prev, ...next }));
+    if (next?.done && next.dealtAt && !wasDone) {
+      notifyHostEvent(gameId, "dond_done", { playerName: g.playerName, amount: next.dealtAt.amount });
+    }
     setBusy(false);
   };
 

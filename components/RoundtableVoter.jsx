@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { notifyHostEvent } from "../lib/hostPushNotifications";
 import { Card } from "./traitorsUi";
 import { storageGet, storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { STORAGE_KEY_ROUND_INFO, VOTES_KEY_PREFIX } from "../lib/roundtableData";
@@ -49,6 +50,10 @@ export default function RoundtableVoter({ gameId, playerName }) {
     if (res.ok) {
       setExistingVote(res.value[playerName]);
       setSubmitted(true);
+      notifyHostEvent(gameId, "player_vote", {
+        playerName, targetName: vote,
+        count: Object.keys(res.value || {}).length, total: (roundInfo.players || []).length,
+      });
     }
   };
 

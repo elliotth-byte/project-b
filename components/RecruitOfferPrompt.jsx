@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { notifyHostEvent } from "../lib/hostPushNotifications";
 import { Btn, Card } from "./traitorsUi";
 import { subscribeRecruitOffers, respondToRecruitOffer } from "../lib/recruitOffers";
 
@@ -30,6 +31,9 @@ export default function RecruitOfferPrompt({ gameId, player }) {
     const res = await respondToRecruitOffer(pending.id, accept);
     setBusy(false);
     if (!res.ok) { setError("Something went wrong — try again."); return; }
+    if (res.status === "accepted" || res.status === "declined") {
+      notifyHostEvent(gameId, "recruit_response", { playerName: player.name, accepted: res.status === "accepted" });
+    }
     if (accept) setJustAccepted(true);
   };
 
