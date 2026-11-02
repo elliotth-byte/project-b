@@ -25,6 +25,7 @@ import TraitorsMasqueradeGate from "./TraitorsMasqueradeGate";
 import TraitorsToday from "./TraitorsToday";
 import TraitorsWorkDayGate from "./TraitorsWorkDayGate";
 import MurderVoteHost from "./MurderVoteHost";
+import MurderVoteSync from "./MurderVoteSync";
 import TraitorDondHost from "./TraitorDondHost";
 import AdminHost from "./TraitorsAdminHost";
 import HistoryTab from "./TraitorsHistoryTab";
@@ -163,6 +164,12 @@ export default function HostPanels({ gameId, players, adminExtra }) {
 
   return (
     <div>
+      {/* Renders nothing. Mounted here, above the tabs, so an open murder
+          vote's target list stays true to the roster (e.g. drops someone just
+          banished on the Roundtable tab) no matter which tab is showing —
+          see components/MurderVoteSync.jsx. */}
+      <MurderVoteSync gameId={gameId} players={approvedPlayers} tr={tr} />
+
       {/* Summary header — visible above every tab, same info the original kept pinned at the top */}
       <div style={{ marginBottom: 12 }}>
         <p style={{ color: "#a09080", fontSize: 13, margin: 0 }}>
