@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Btn } from "./traitorsUi";
 import { assignGoldenDagger, revokeGoldenDagger } from "../lib/goldenDagger";
+import { subscribeHostState } from "../lib/hostStorage";
+import { STORAGE_KEY_TRAITOR_ROLES } from "../lib/traitorData";
+import { hidePendingVictims } from "../lib/pendingMurders";
 
 const GOLD = "#e0b84c";
 
@@ -15,11 +18,22 @@ const GOLD = "#e0b84c";
 // `dagger` is the live golden_daggers row (or null) and is owned by the
 // parent (RoundtableHost) so the vote tally can use it too; `onChange`
 // hands back the new row after assigning/revoking.
-export default function GoldenDaggerHost({ gameId, players, dagger, round, onChange }) {
+export default function GoldenDaggerHost({ gameId, players: rawPlayers, dagger, round, onChange }) {
   const [pick, setPick] = useState("");
   const [busy, setBusy] = useState(false);
   const [shown, setShown] = useState(false);
   const [error, setError] = useState(null);
+  const [tr, setTr] = useState(null);
+
+  // A murdered player still looks alive to everyone until the Afternoon Tea
+  // reveal (see lib/pendingMurders.js), so the raw roster would still offer
+  // them here. Treat pending victims as dead, the same way the Murder Vote
+  // and Traitor Roles panels do.
+  useEffect(() => {
+    const unsubscribe = subscribeHostState(gameId, STORAGE_KEY_TRAITOR_ROLES, setTr);
+    return unsubscribe;
+  }, [gameId]);
+  const players = hidePendingVictims(rawPlayers, tr);
 
   const alive = players.filter((p) => p.alive);
   const holder = dagger ? players.find((p) => p.id === dagger.player_id) : null;
@@ -29,7 +43,7 @@ export default function GoldenDaggerHost({ gameId, players, dagger, round, onCha
   const assign = async () => {
     if (!pick || busy) return;
     const next = players.find((p) => p.id === pick);
-    if (!next) return;
+    if (!next || !next.alive) return;
     if (dagger && !confirm(`Move the Golden Dagger to ${next.display_name}?\n\nAny extra vote the current holder has already cast this round is cleared.`)) return;
     setBusy(true);
     setError(null);
