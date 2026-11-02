@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { Btn, Card, Badge } from "./traitorsUi";
 import { supabase } from "../lib/supabaseClient";
 import { hostStorageSet, hostStorageUpdate, subscribeHostState } from "../lib/hostStorage";
+import { traitorStorageUpdate } from "../lib/traitorStorage";
+import { refreshOpenMurderVotes } from "../lib/murderVoteData";
 import { isTraitor, factionLabel, roleDisplay, STORAGE_KEY_TRAITOR_ROLES } from "../lib/traitorData";
 import { murderScript, banishScript, walkScript, teaArrivalScripts } from "../lib/slackScripts";
 import { setPlayerRole } from "../lib/playerRoles";
@@ -239,7 +241,11 @@ export default function TraitorRolesHost({ gameId, players: rawPlayers }) {
       }
       return addLog(fresh, gaining ? `🛡️ ${name} won a shield` : `🛡️ ${name} lost their shield`);
     });
-    if (res.ok) setTr(res.value);
+    if (res.ok) {
+      setTr(res.value);
+      // Keep any open murder vote's target list in step with the new shields.
+      await refreshOpenMurderVotes(gameId, players, res.value, traitorStorageUpdate);
+    }
   };
 
   const toggleDagger = async () => {
@@ -274,7 +280,11 @@ export default function TraitorRolesHost({ gameId, players: rawPlayers }) {
       fresh.round += 1;
       return addLog(fresh, `— Round ${fresh.round} begins —`);
     });
-    if (res.ok) setTr(res.value);
+    if (res.ok) {
+      setTr(res.value);
+      // Next Round clears every shield, so refresh any open murder vote too.
+      await refreshOpenMurderVotes(gameId, players, res.value, traitorStorageUpdate);
+    }
   };
 
   if (loading) return <Card><p style={{ color: "#706050", fontStyle: "italic" }}>Loading...</p></Card>;
