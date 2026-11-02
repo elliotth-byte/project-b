@@ -4,7 +4,10 @@ import { traitorStorageSet, traitorStorageUpdate, traitorStorageDelete, subscrib
 import { hostStorageUpdate } from "../lib/hostStorage";
 import { hidePendingVictims } from "../lib/pendingMurders";
 import { STORAGE_KEY_TRAITOR_ROLES, factionLabel } from "../lib/traitorData";
-import { murderVoteKey, calculateMurderVoteResult, calculateScarletDaggerResult, defaultEligibleTargets, withdrawScarletDagger } from "../lib/murderVoteData";
+import {
+  murderVoteKey, calculateMurderVoteResult, calculateScarletDaggerResult, defaultEligibleTargets,
+  withdrawScarletDagger, reconcileEligibleTargets, reconcileOpenMurderVote, sameNameSet,
+} from "../lib/murderVoteData";
 import { murderScript, doubleMurderScript } from "../lib/slackScripts";
 import { notifyPlayersRoundChange } from "../lib/pushNotifications";
 import PostToSlack from "./PostToSlack";
@@ -63,16 +66,37 @@ function FactionPanel({ gameId, players, tr, faction, factionTraitors }) {
     return unsubscribe;
   }, [gameId, storageKey]);
 
+  // Keep an OPEN vote's target list true to the live roster. The list is a
+  // snapshot taken when the vote opened, so a murder, banish, walk, restore,
+  // recruit, merge or shield change since then would otherwise leave Traitors
+  // looking at dead players, or missing/including the wrong people. Runs on
+  // every roster/role/shield change this panel sees — including ones made
+  // from other tabs (e.g. a Roundtable banish) — and only writes when the
+  // list actually differs, so it settles after one write. See
+  // reconcileEligibleTargets in lib/murderVoteData.js.
+  useEffect(() => {
+    if (!mv || mv.status !== "open") return;
+    const wanted = reconcileEligibleTargets(mv, players, tr.roles, tr.shielded, faction);
+    if (sameNameSet(wanted, mv.eligibleTargets)) return;
+    reconcileOpenMurderVote(gameId, faction, players, tr, traitorStorageUpdate);
+  }, [mv, players, tr, faction, gameId]);
+
   if (loading) return <Card><p style={{ color: "#706050", fontStyle: "italic" }}>Loading...</p></Card>;
 
   const alive = players.filter((p) => p.alive);
+  // Everyone who could be a target at all right now: living, and not on the
+  // acting faction's own side (shielded or not).
+  const pool = defaultEligibleTargets(players, tr.roles, tr.shielded, faction, { excludeShielded: false });
   const defaultTargets = defaultEligibleTargets(players, tr.roles, tr.shielded, faction, { excludeShielded });
-  const targets = selectedTargets ?? defaultTargets;
+  // A hand-picked list is only a set of names, so it can outlive the people in
+  // it — filter it against the live pool so a player who has since died (and
+  // has no chip left to untoggle) can never be carried into a vote.
+  const targets = (selectedTargets ?? defaultTargets).filter((n) => pool.includes(n));
   const label = factionLabel(faction);
   const color = faction === "traitor-red" ? "#c45c3c" : "#c9a84c";
 
   const toggleTarget = (name) => setSelectedTargets((prev) => {
-    const base = prev ?? defaultTargets;
+    const base = (prev ?? defaultTargets).filter((n) => pool.includes(n));
     return base.includes(name) ? base.filter((n) => n !== name) : [...base, name];
   });
 
@@ -82,8 +106,8 @@ function FactionPanel({ gameId, players, tr, faction, factionTraitors }) {
     const state = {
       active: true, status: "open", round: tr.round, openedAt: Date.now(), closedAt: null,
       faction, eligibleVoters: factionTraitors.map((p) => p.display_name), eligibleTargets: targets,
-      // True when the host hand-picked targets; shield changes then leave the
-      // list alone — see refreshOpenMurderVotes in lib/murderVoteData.js.
+      // True when the host hand-picked targets; reconcileEligibleTargets then
+      // keeps their choices and only drops people who are no longer valid.
       customTargets: selectedTargets !== null,
       // The Scarlet Dagger is offered only if the host wants it this vote AND
       // it hasn't been spent — the spent flag lives in host-only state.
@@ -95,6 +119,8 @@ function FactionPanel({ gameId, players, tr, faction, factionTraitors }) {
     };
     await traitorStorageSet(gameId, storageKey, state);
     setMv(state);
+    // Each vote starts from the defaults — hand-picks were for THIS vote only.
+    setSelectedTargets(null);
     await hostStorageUpdate(gameId, STORAGE_KEY_TRAITOR_ROLES, (fresh) => {
       if (!fresh) return null;
       fresh.log = [{ text: `🗡️ ${label} Traitors' murder vote opened${state.scarletDaggerAvailable ? " (Scarlet Dagger offered)" : ""}.`, round: fresh.round, time: new Date().toLocaleTimeString() }, ...fresh.log];
