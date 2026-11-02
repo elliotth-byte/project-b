@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Btn, Card } from "./traitorsUi";
 import AutoFitText from "./AutoFitText";
+import GoldenDaggerHost from "./GoldenDaggerHost";
 import { supabase } from "../lib/supabaseClient";
 import { storageGet, storageSet, storageUpdate, storageDelete, subscribeGameState } from "../lib/gameStorage";
 import {
@@ -13,6 +14,7 @@ import PostToSlack from "./PostToSlack";
 import { recordElimination } from "../lib/seasonPlacement";
 import { GROUP_CHAT_KEY } from "../lib/chatData";
 import { applyTraitorsRoundInactivity, decayTraitorsStrikesIfDue } from "../lib/traitorsInactivity";
+import { subscribeGoldenDagger, clearGoldenVote } from "../lib/goldenDagger";
 
 // ─── Roundtable: Host Control ───
 //
@@ -25,9 +27,17 @@ import { applyTraitorsRoundInactivity, decayTraitorsStrikesIfDue } from "../lib/
 // Slack integration itself gets converted). The suspenseful reveal ordering
 // logic itself is unchanged from the original — it just plays out in the
 // browser instead of being scripted for Slack.
+//
+// Golden Dagger: the one player (if any) holding it can cast a second,
+// extra vote this round — see components/GoldenDaggerHost.jsx. That vote
+// lives on the golden_daggers row, NOT in the shared votes map, so vote
+// counts, inactivity strikes and the History matrix that read the shared
+// map are untouched. It's merged in below (`voteRows`) only for the tally,
+// the dramatic reveal, the Slack vote-reveal text and the banish.
 export default function RoundtableHost({ gameId, players, settings }) {
   const [roundInfo, setRoundInfo] = useState(null);
   const [votes, setVotes] = useState(null);
+  const [dagger, setDagger] = useState(null);
   const [loading, setLoading] = useState(true);
   const [revealOrder, setRevealOrder] = useState(null);
   const [revealIndex, setRevealIndex] = useState(-1);
@@ -71,6 +81,12 @@ export default function RoundtableHost({ gameId, players, settings }) {
     return unsubscribe;
   }, [gameId, round]);
 
+  // The Golden Dagger (host can always read it — see sql/add-golden-dagger.sql)
+  useEffect(() => {
+    const unsubscribe = subscribeGoldenDagger(gameId, setDagger);
+    return unsubscribe;
+  }, [gameId]);
+
   const openVoting = async () => {
     await storageSet(gameId, STORAGE_KEY_ROUND_INFO, {
       round,
@@ -97,9 +113,18 @@ export default function RoundtableHost({ gameId, players, settings }) {
     });
   };
 
-  const voteRows = votes
+  // Regular votes (one per player) from the shared map, plus — if the
+  // dagger's holder is alive and has cast an extra vote THIS round — that
+  // one extra row. A vote left over from an earlier round (vote_round !=
+  // round) is stale and ignored.
+  const regularRows = votes
     ? Object.entries(votes).map(([voterName, v]) => ({ voterName, targetName: v.target, reason: v.reason }))
     : [];
+  const goldenHolder = dagger ? players.find((p) => p.id === dagger.player_id) : null;
+  const goldenRow = dagger?.vote_target && dagger.vote_round === round && goldenHolder?.alive
+    ? { voterName: `${goldenHolder.display_name} (Golden Dagger)`, targetName: dagger.vote_target, reason: dagger.vote_reason || "", golden: true }
+    : null;
+  const voteRows = goldenRow ? [...regularRows, goldenRow] : regularRows;
   const tally = computeVoteTally(voteRows);
   const rankedTargets = Object.entries(tally).sort((a, b) => b[1] - a[1]);
   const leadingTarget = rankedTargets[0]?.[0];
@@ -145,13 +170,17 @@ export default function RoundtableHost({ gameId, players, settings }) {
   const nextRound = async () => {
     // Archive this round's votes before clearing them — otherwise there's
     // no record left once the round advances, and the History tab's vote
-    // matrix would only ever be able to show the current round.
+    // matrix would only ever be able to show the current round. The golden
+    // vote is kept OUT of that per-voter matrix (one cell per voter) and
+    // recorded alongside it instead.
     if (voteRows.length > 0) {
       await storageUpdate(gameId, STORAGE_KEY_VOTE_HISTORY, (fresh) => {
         const list = fresh || [];
         const votesMap = {};
-        voteRows.forEach((r) => { votesMap[r.voterName] = { target: r.targetName, reason: r.reason }; });
-        return [...list, { round, votes: votesMap, banished: leadingTarget || null }];
+        regularRows.forEach((r) => { votesMap[r.voterName] = { target: r.targetName, reason: r.reason }; });
+        const entry = { round, votes: votesMap, banished: leadingTarget || null };
+        if (goldenRow) entry.goldenVote = { voter: goldenHolder.display_name, target: goldenRow.targetName, reason: goldenRow.reason };
+        return [...list, entry];
       });
     }
 
@@ -176,6 +205,8 @@ export default function RoundtableHost({ gameId, players, settings }) {
     }
 
     await storageDelete(gameId, VOTES_KEY_PREFIX + round);
+    // The dagger itself stays with its holder; only this round's extra vote goes.
+    if (dagger?.vote_target) await clearGoldenVote(gameId);
     await storageSet(gameId, STORAGE_KEY_ROUND_INFO, {
       round: round + 1,
       votingOpen: false,
@@ -209,6 +240,7 @@ export default function RoundtableHost({ gameId, players, settings }) {
   const clearVotes = async () => {
     dirtyRef.current.clear();
     await storageSet(gameId, VOTES_KEY_PREFIX + round, {});
+    if (dagger?.vote_target) await clearGoldenVote(gameId);
     setDrafts({});
   };
 
@@ -231,10 +263,14 @@ export default function RoundtableHost({ gameId, players, settings }) {
         <PostToSlack gameId={gameId} icon="⚖️" label="Roundtable Announcement" text={roundtableAnnouncementScript(round)} />
       </div>
 
+      <div style={{ marginTop: 12 }}>
+        <GoldenDaggerHost gameId={gameId} players={players} dagger={dagger} round={round} onChange={setDagger} />
+      </div>
+
       {roundInfo && (
         <>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#a09080", textTransform: "uppercase", letterSpacing: 1, margin: "16px 0 10px" }}>
-            Votes: {voteRows.length}/{alive.length} in
+            Votes: {regularRows.length}/{alive.length} in{goldenRow ? " + 🏆 golden vote" : ""}
           </div>
 
           {/* Manual Vote Entry — live view of every voter's pick + reasoning,
@@ -278,6 +314,13 @@ export default function RoundtableHost({ gameId, players, settings }) {
               );
             })}
             {alive.length === 0 && <p style={{ color: "#706050", fontSize: 12, fontStyle: "italic" }}>No living players.</p>}
+            {goldenRow && (
+              <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "#e0b84c", borderTop: "1px dashed #e0b84c55", paddingTop: 6 }}>
+                <span style={{ width: 90, fontWeight: 700, flexShrink: 0 }}>🏆 {goldenHolder.display_name}</span>
+                <span style={{ flex: "0 0 120px" }}>→ {goldenRow.targetName}</span>
+                <span style={{ flex: 1, minWidth: 0, color: "#a09080", fontStyle: "italic" }}>{goldenRow.reason || "no reason given"}</span>
+              </div>
+            )}
           </div>
           <Btn small variant="ghost" onClick={clearVotes}>Clear Votes</Btn>
 
