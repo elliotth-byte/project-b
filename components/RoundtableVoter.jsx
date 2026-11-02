@@ -3,11 +3,24 @@ import { notifyHostEvent } from "../lib/hostPushNotifications";
 import { Card } from "./traitorsUi";
 import { storageGet, storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { STORAGE_KEY_ROUND_INFO, VOTES_KEY_PREFIX } from "../lib/roundtableData";
+import GoldenDaggerVoter from "./GoldenDaggerVoter";
 
 // ─── Roundtable: Player View ───
 // See the scope note in RoundtableHost.jsx — this covers casting a vote,
 // not the full traitor/murder game state.
-export default function RoundtableVoter({ gameId, playerName }) {
+//
+// The Golden Dagger card renders for the single player who holds the dagger
+// and nothing for anyone else — see components/GoldenDaggerVoter.jsx.
+export default function RoundtableVoter(props) {
+  return (
+    <>
+      <RoundtableVoteCard {...props} />
+      <GoldenDaggerVoter gameId={props.gameId} playerName={props.playerName} />
+    </>
+  );
+}
+
+function RoundtableVoteCard({ gameId, playerName }) {
   const [roundInfo, setRoundInfo] = useState(null);
   const [vote, setVote] = useState("");
   const [reason, setReason] = useState("");
