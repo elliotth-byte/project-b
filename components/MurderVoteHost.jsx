@@ -78,6 +78,9 @@ function FactionPanel({ gameId, players, tr, faction, factionTraitors }) {
     const state = {
       active: true, status: "open", round: tr.round, openedAt: Date.now(), closedAt: null,
       faction, eligibleVoters: factionTraitors.map((p) => p.display_name), eligibleTargets: targets,
+      // True when the host hand-picked targets; shield changes then leave the
+      // list alone — see refreshOpenMurderVotes in lib/murderVoteData.js.
+      customTargets: selectedTargets !== null,
       excludeShielded, allowVoteChanges, revealVotesToTraitors: false, revealTallyToTraitors: false,
       votingRule, majorityBasis: "eligible_voters",
       votes: {}, result: { targetName: null, ruleSatisfied: false, tied: false, tiedTargets: [], voteCounts: {}, appliedAt: null },
