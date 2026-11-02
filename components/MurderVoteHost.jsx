@@ -4,10 +4,12 @@ import { traitorStorageSet, traitorStorageUpdate, traitorStorageDelete, subscrib
 import { hostStorageUpdate } from "../lib/hostStorage";
 import { hidePendingVictims } from "../lib/pendingMurders";
 import { STORAGE_KEY_TRAITOR_ROLES, factionLabel } from "../lib/traitorData";
-import { murderVoteKey, calculateMurderVoteResult, defaultEligibleTargets } from "../lib/murderVoteData";
-import { murderScript } from "../lib/slackScripts";
+import { murderVoteKey, calculateMurderVoteResult, calculateScarletDaggerResult, defaultEligibleTargets, withdrawScarletDagger } from "../lib/murderVoteData";
+import { murderScript, doubleMurderScript } from "../lib/slackScripts";
 import { notifyPlayersRoundChange } from "../lib/pushNotifications";
 import PostToSlack from "./PostToSlack";
+
+const SCARLET = "#d6334a";
 
 // ─── Traitors' Murder Vote: Host Control ───
 // Reworked to run per-faction: if both Red and Black Traitors are alive,
@@ -51,6 +53,8 @@ function FactionPanel({ gameId, players, tr, faction, factionTraitors }) {
   const [allowVoteChanges, setAllowVoteChanges] = useState(true);
   const [votingRule, setVotingRule] = useState("plurality");
   const [manualTarget, setManualTarget] = useState("");
+  const [manualSecond, setManualSecond] = useState("");
+  const [offerScarletDagger, setOfferScarletDagger] = useState(true);
   const [announcement, setAnnouncement] = useState(null);
 
   useEffect(() => {
@@ -81,6 +85,9 @@ function FactionPanel({ gameId, players, tr, faction, factionTraitors }) {
       // True when the host hand-picked targets; shield changes then leave the
       // list alone — see refreshOpenMurderVotes in lib/murderVoteData.js.
       customTargets: selectedTargets !== null,
+      // The Scarlet Dagger is offered only if the host wants it this vote AND
+      // it hasn't been spent — the spent flag lives in host-only state.
+      scarletDaggerAvailable: offerScarletDagger && !tr.scarletDaggerUsed,
       excludeShielded, allowVoteChanges, revealVotesToTraitors: false, revealTallyToTraitors: false,
       votingRule, majorityBasis: "eligible_voters",
       votes: {}, result: { targetName: null, ruleSatisfied: false, tied: false, tiedTargets: [], voteCounts: {}, appliedAt: null },
@@ -90,7 +97,7 @@ function FactionPanel({ gameId, players, tr, faction, factionTraitors }) {
     setMv(state);
     await hostStorageUpdate(gameId, STORAGE_KEY_TRAITOR_ROLES, (fresh) => {
       if (!fresh) return null;
-      fresh.log = [{ text: `🗡️ ${label} Traitors' murder vote opened.`, round: fresh.round, time: new Date().toLocaleTimeString() }, ...fresh.log];
+      fresh.log = [{ text: `🗡️ ${label} Traitors' murder vote opened${state.scarletDaggerAvailable ? " (Scarlet Dagger offered)" : ""}.`, round: fresh.round, time: new Date().toLocaleTimeString() }, ...fresh.log];
       return fresh;
     });
     // Targeted at just this faction's own traitors — see
@@ -117,6 +124,8 @@ function FactionPanel({ gameId, players, tr, faction, factionTraitors }) {
     await traitorStorageDelete(gameId, storageKey);
     setMv(null);
     setSelectedTargets(null);
+    setManualTarget("");
+    setManualSecond("");
     setAnnouncement(null);
   };
 
@@ -162,6 +171,72 @@ function FactionPanel({ gameId, players, tr, faction, factionTraitors }) {
     if (mvRes.ok) setMv(mvRes.value);
   };
 
+  // ─── Scarlet Dagger: apply a double murder ───
+  // Same pending-murder pipeline as a normal murder (both victims stay hidden
+  // until Afternoon Tea; placement is recorded one after the other at reveal),
+  // plus marking the dagger spent. The spent check and the write happen in ONE
+  // hostStorageUpdate, so two open votes can never both use it.
+  const applyDoubleMurder = async (firstName, secondName, voteCarried) => {
+    if (!firstName || !secondName || firstName === secondName) return;
+    if (tr.scarletDaggerUsed) { alert("The Scarlet Dagger has already been used."); return; }
+    const shieldedHit = [firstName, secondName].filter((n) => tr.shielded?.[n]);
+    if (shieldedHit.length > 0 && !confirm(`${shieldedHit.join(" and ")} ${shieldedHit.length === 1 ? "is" : "are"} currently shielded. Murder anyway?`)) return;
+    if (!voteCarried && !confirm("The Traitors did not vote to draw the Scarlet Dagger. Use it anyway as host?")) return;
+    if (!confirm(`🩸 Draw the Scarlet Dagger: ${firstName} + ${secondName}?\n\nThe dagger is single-use — it is gone after this.`)) return;
+
+    const elimType = faction === "traitor-black" ? "murdered_black" : "murdered";
+    let alreadySpent = false;
+    const res = await hostStorageUpdate(gameId, STORAGE_KEY_TRAITOR_ROLES, (fresh) => {
+      if (!fresh) return null;
+      if (fresh.scarletDaggerUsed) { alreadySpent = true; return null; }
+      [firstName, secondName].forEach((name, i) => {
+        const target = players.find((p) => p.display_name === name);
+        fresh.eliminations = [...fresh.eliminations, { name, role: fresh.roles[name], type: "Murdered", round: fresh.round, placement: alive.length - i, killedBy: faction, scarletDagger: true }];
+        fresh.shielded[name] = false;
+        if (target && !(fresh.pendingMurders || []).some((m) => m.name === name)) {
+          fresh.pendingMurders = [...(fresh.pendingMurders || []), { id: target.id, name, elimType, recordPlacement: true, at: Date.now() }];
+        }
+      });
+      fresh.scarletDaggerUsed = true;
+      fresh.scarletDaggerUsedRound = fresh.round;
+      fresh.log = [{ text: `🩸 The Scarlet Dagger was drawn — ${firstName} and ${secondName} were murdered by the ${label} Traitors (hidden until Afternoon Tea)`, round: fresh.round, time: new Date().toLocaleTimeString() }, ...fresh.log];
+      return fresh;
+    });
+    if (!res.ok) {
+      alert(alreadySpent
+        ? "The Scarlet Dagger was already used — no murders were applied."
+        : "Couldn't apply the double murder. Nothing was changed — try again.");
+      return;
+    }
+
+    const shieldedNames = Object.keys(res.value.shielded).filter((n) => res.value.shielded[n]);
+    setAnnouncement(doubleMurderScript([firstName, secondName], shieldedNames));
+
+    const mvRes = await traitorStorageUpdate(gameId, storageKey, (fresh) => {
+      if (!fresh) return null;
+      fresh.status = "applied";
+      fresh.result = { ...fresh.result, targetName: firstName, secondTargetName: secondName, doubleMurder: true, appliedAt: Date.now() };
+      fresh.history = [...(fresh.history || []), { round: fresh.round, openedAt: fresh.openedAt, closedAt: fresh.closedAt, votes: fresh.votes, result: fresh.result, appliedAt: Date.now() }];
+      return fresh;
+    });
+    if (mvRes.ok) setMv(mvRes.value);
+    // The dagger is gone — stop offering it on any other vote still open.
+    await withdrawScarletDagger(gameId, traitorStorageUpdate);
+  };
+
+  // Escape hatch for host mistakes (e.g. the wrong pair was applied). The
+  // dagger is meant to be single-use, so this asks first and logs it.
+  const restoreScarletDagger = async () => {
+    if (!confirm("Restore the Scarlet Dagger?\n\nOnly do this to undo a mistake — it is meant to be single-use.")) return;
+    await hostStorageUpdate(gameId, STORAGE_KEY_TRAITOR_ROLES, (fresh) => {
+      if (!fresh) return null;
+      fresh.scarletDaggerUsed = false;
+      fresh.scarletDaggerUsedRound = null;
+      fresh.log = [{ text: "🩸 The Scarlet Dagger was restored by the host.", round: fresh.round, time: new Date().toLocaleTimeString() }, ...fresh.log];
+      return fresh;
+    });
+  };
+
   const archiveVote = async () => {
     const res = await traitorStorageUpdate(gameId, storageKey, (fresh) => {
       if (!fresh) return null;
@@ -173,6 +248,13 @@ function FactionPanel({ gameId, players, tr, faction, factionTraitors }) {
 
   const voted = mv ? factionTraitors.filter((p) => mv.votes?.[p.display_name]) : [];
   const result = mv?.result;
+
+  // Scarlet Dagger, derived live from the votes. firstPick is whoever the
+  // normal vote chose (or the host picked by hand); the dagger's second
+  // victim can't be that same player.
+  const firstPick = manualTarget || (result?.targetName && !result?.tied ? result.targetName : "");
+  const dagger = mv?.scarletDaggerAvailable && !tr.scarletDaggerUsed ? calculateScarletDaggerResult(mv, firstPick || null) : null;
+  const secondPick = (manualSecond && manualSecond !== firstPick ? manualSecond : "") || dagger?.secondTarget || "";
 
   return (
     <Card style={{ borderColor: `${color}55` }}>
@@ -225,6 +307,20 @@ function FactionPanel({ gameId, players, tr, faction, factionTraitors }) {
             </label>
           </div>
 
+          <div style={{ marginBottom: 10 }}>
+            {tr.scarletDaggerUsed ? (
+              <p style={{ fontSize: 12, color: SCARLET, margin: 0 }}>
+                🩸 The Scarlet Dagger has been spent{tr.scarletDaggerUsedRound ? ` (Round ${tr.scarletDaggerUsedRound})` : ""}.{" "}
+                <button onClick={restoreScarletDagger} style={{ background: "none", border: "none", padding: 0, color: "#a09080", fontSize: 11, textDecoration: "underline", cursor: "pointer" }}>Restore</button>
+              </p>
+            ) : (
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: SCARLET, cursor: "pointer" }}>
+                <input type="checkbox" checked={offerScarletDagger} onChange={(e) => setOfferScarletDagger(e.target.checked)} />
+                🩸 Offer the Scarlet Dagger this vote (single use — a double murder)
+              </label>
+            )}
+          </div>
+
           <Btn onClick={openVote} disabled={targets.length === 0}>Open {label} Murder Vote</Btn>
         </div>
       )}
@@ -233,7 +329,9 @@ function FactionPanel({ gameId, players, tr, faction, factionTraitors }) {
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
             <Badge color={mv.status === "open" ? "#7a9a5c" : mv.status === "applied" ? "#c9a84c" : "#c45c3c"}>{mv.status}</Badge>
-            <span style={{ fontSize: 11, color: "#706050" }}>Rule: {mv.votingRule}</span>
+            <span style={{ fontSize: 11, color: "#706050" }}>
+              Rule: {mv.votingRule}{mv.scarletDaggerAvailable ? <span style={{ color: SCARLET }}> · 🩸 dagger offered</span> : null}
+            </span>
           </div>
 
           <p style={{ fontSize: 12, color: "#a09080", margin: "0 0 8px" }}>Votes submitted: {voted.length}/{factionTraitors.length}</p>
@@ -244,7 +342,15 @@ function FactionPanel({ gameId, players, tr, faction, factionTraitors }) {
               return (
                 <div key={p.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 8px", background: "#0a1020", borderRadius: 6 }}>
                   <span style={{ color: "#f0e6d3" }}>{p.display_name}</span>
-                  <span style={{ color: v ? color : "#706050" }}>{v ? `${v.targetName} · ${new Date(v.submittedAt).toLocaleTimeString()}` : "Not submitted"}</span>
+                  <span style={{ color: v ? color : "#706050" }}>
+                    {v ? (
+                      <>
+                        {v.targetName}
+                        {v.useDagger ? <span style={{ color: SCARLET }}> + 🩸 {v.secondTargetName}</span> : null}
+                        {` · ${new Date(v.submittedAt).toLocaleTimeString()}`}
+                      </>
+                    ) : "Not submitted"}
+                  </span>
                 </div>
               );
             })}
@@ -278,7 +384,43 @@ function FactionPanel({ gameId, players, tr, faction, factionTraitors }) {
                 </select>
                 {manualTarget && <Btn small variant="danger" onClick={() => applyMurder(manualTarget)}>Apply: {manualTarget}</Btn>}
               </div>
+
+              {dagger && (
+                <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid #253550" }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, margin: "0 0 6px", color: dagger.passed ? SCARLET : "#706050" }}>
+                    🩸 Scarlet Dagger — {dagger.yes}/{dagger.eligibleCount} voted to draw it (need {dagger.required})
+                    {dagger.passed ? " · ACTIVATED" : mv.votingRule === "host_decides" ? " · host decides" : " · not activated"}
+                  </p>
+                  {Object.keys(dagger.secondCounts).length > 0 && (
+                    <div style={{ marginBottom: 6 }}>
+                      <div style={{ fontSize: 11, color: "#a09080", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 }}>Second victim</div>
+                      {Object.entries(dagger.secondCounts).sort((a, b) => b[1] - a[1]).map(([name, count]) => (
+                        <div key={name} style={{ fontSize: 12, color: dagger.secondTiedTargets.includes(name) && dagger.secondTied ? "#c45c3c" : "#a09080" }}>{name} — {count}</div>
+                      ))}
+                    </div>
+                  )}
+                  {dagger.secondTied && <p style={{ fontSize: 11, color: "#c45c3c", margin: "0 0 6px" }}>Tie for second victim between {dagger.secondTiedTargets.join(", ")} — choose below.</p>}
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                    <select value={manualSecond} onChange={(e) => setManualSecond(e.target.value)} style={{ background: "#132038", border: "1px solid #253550", borderRadius: 6, color: "#f0e6d3", fontSize: 12, padding: "5px 8px" }}>
+                      <option value="">{dagger.secondTarget ? `Second victim: ${dagger.secondTarget}` : "Choose second victim..."}</option>
+                      {mv.eligibleTargets.filter((n) => n !== firstPick).map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                    {firstPick && secondPick && (
+                      <Btn small variant="danger" onClick={() => applyDoubleMurder(firstPick, secondPick, dagger.passed)}>
+                        🩸 Apply Double Murder: {firstPick} + {secondPick}
+                      </Btn>
+                    )}
+                  </div>
+                  {!firstPick && <p style={{ fontSize: 11, color: "#706050", margin: "6px 0 0" }}>Settle the first victim above (or resolve the tie) to enable the double murder.</p>}
+                </div>
+              )}
             </div>
+          )}
+
+          {mv.status === "applied" && mv.result?.doubleMurder && (
+            <p style={{ fontSize: 12, color: SCARLET, margin: "0 0 8px" }}>
+              🩸 Scarlet Dagger drawn: <strong>{mv.result.targetName}</strong> + <strong>{mv.result.secondTargetName}</strong>
+            </p>
           )}
 
           {mv.status === "applied" && announcement && (
@@ -286,7 +428,7 @@ function FactionPanel({ gameId, players, tr, faction, factionTraitors }) {
               <p style={{ fontSize: 12, color: "#c9a84c", margin: "0 0 6px", fontStyle: "italic" }}>
                 🤫 Hidden from players until the ☕ Afternoon Tea arrivals finish (Traitor Roles panel). Post this announcement after tea, or it'll spoil the reveal.
               </p>
-              <PostToSlack gameId={gameId} icon="💀" label={`${label} Murder Announcement`} text={announcement} />
+              <PostToSlack gameId={gameId} icon={mv.result?.doubleMurder ? "🩸" : "💀"} label={mv.result?.doubleMurder ? `${label} Double Murder Announcement` : `${label} Murder Announcement`} text={announcement} />
             </div>
           )}
 
