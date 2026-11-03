@@ -150,6 +150,13 @@ export default function ZombieHost({ gameId, alive, allPlayers = [], shieldedNam
   const c = zombieCounts(st);
   const pendingCount = (st.pending || []).length;
 
+  // Who hasn't touched anyone yet this round — advance() turns any human in
+  // this list into a zombie, so this is the host's "about to be infected by
+  // default" view. Host-only; players never see it.
+  const touchedNow = new Set();
+  (st.touches || []).filter((t) => t.round === st.round).forEach((t) => { touchedNow.add(t.a); touchedNow.add(t.b); });
+  const notYetTouched = (st.participants || st.players.map((p) => p.name)).filter((n) => !touchedNow.has(n));
+
   return (
     <Card style={{ borderColor: "rgba(196,92,60,0.3)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
@@ -163,9 +170,17 @@ export default function ZombieHost({ gameId, alive, allPlayers = [], shieldedNam
           </strong>
         </div>
       ) : (
-        <p style={{ fontSize: 13, color: "#a09080", margin: "0 0 10px" }}>
-          Humans: <strong style={{ color: "#7a9a5c" }}>{c.humans}</strong> · Zombies: <strong style={{ color: "#c45c3c" }}>{c.zombies}</strong> · Touches this round: {(st.touches || []).filter((t) => t.round === st.round).length} · Pending requests: {pendingCount}
-        </p>
+        <>
+          <p style={{ fontSize: 13, color: "#a09080", margin: "0 0 10px" }}>
+            Humans: <strong style={{ color: "#7a9a5c" }}>{c.humans}</strong> · Zombies: <strong style={{ color: "#c45c3c" }}>{c.zombies}</strong> · Touches this round: {(st.touches || []).filter((t) => t.round === st.round).length} · Pending requests: {pendingCount}
+          </p>
+          <div style={{ fontSize: 12, color: "#a09080", marginBottom: 10 }}>
+            {pendingCount > 0 && (
+              <div>Waiting: {st.pending.map((p) => `${p.from} → ${p.to}`).join(" · ")}</div>
+            )}
+            <div>Hasn't touched yet this round ({notYetTouched.length}): {notYetTouched.join(", ") || "everyone has"}</div>
+          </div>
+        </>
       )}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 10 }}>
         {st.players.map((p) => (
