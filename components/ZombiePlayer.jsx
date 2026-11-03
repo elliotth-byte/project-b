@@ -71,6 +71,16 @@ export default function ZombiePlayer({ gameId, playerName }) {
   const myOutgoing = (st.pending || []).find((p) => p.from === playerName);
   const myIncoming = (st.pending || []).filter((p) => p.to === playerName);
 
+  // Per-round log of who I've touched. Deliberately reads only who/when —
+  // never t.result — so it can't leak status.
+  const touchesByRound = {};
+  (st.touches || []).forEach((t) => {
+    if (t.a !== playerName && t.b !== playerName) return;
+    const other = t.a === playerName ? t.b : t.a;
+    (touchesByRound[t.round] = touchesByRound[t.round] || []).push(other);
+  });
+  const stillAvailable = others.filter((p) => !haveTouched(st, playerName, p.name));
+
   const requestTouch = async (targetName) => {
     const res = await storageUpdate(gameId, STORAGE_KEY_ZOMBIE, (fresh) => {
       if (!fresh || fresh.winner) return null;
@@ -177,6 +187,24 @@ export default function ZombiePlayer({ gameId, playerName }) {
               ))}
             </div>
           )}
+
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 11, color: "#a09080", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Your touches</div>
+            {Array.from({ length: st.round }, (_, i) => i + 1).map((rd) => {
+              const names = touchesByRound[rd] || [];
+              const current = rd === st.round;
+              return (
+                <div key={rd} style={{ fontSize: 12, padding: "2px 0", color: current ? "#f0e6d3" : "#706050" }}>
+                  Round {rd}: {names.length ? names.join(", ") : "none yet"}
+                  {current && myOutgoing && <span style={{ color: "#c9a84c" }}> · waiting on {myOutgoing.to}</span>}
+                  {current && myIncoming.length > 0 && <span style={{ color: "#c9a84c" }}> · {myIncoming.map((q) => q.from).join(", ")} asked to touch you</span>}
+                </div>
+              );
+            })}
+            <div style={{ fontSize: 11, color: "#706050", marginTop: 4 }}>
+              Still available to touch: {stillAvailable.length ? stillAvailable.map((p) => p.name).join(", ") : "nobody left"}
+            </div>
+          </div>
 
           <p style={{ fontSize: 12, color: "#a09080", margin: "0 0 6px", fontStyle: "italic" }}>
             Touching needs both of you to agree. Request a touch, and you'll each score or something else may happen — you won't be told which.
