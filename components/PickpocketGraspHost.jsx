@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Btn, Card, PauseResumeControls } from "./traitorsUi";
-import { storageSet, storageDelete, subscribeGameState } from "../lib/gameStorage";
+import { storageSet, storageUpdate, storageDelete, subscribeGameState } from "../lib/gameStorage";
 import { pauseChallenge, resumeChallenge } from "../lib/pauseResume";
 import { STORAGE_KEY_PICKPOCKET, PICKPOCKET_ROUND_COUNT, generateDeck } from "../lib/pickpocketGraspData";
 import { DEFAULT_PARTICIPATION, computeParticipants } from "../lib/challengeParticipants";
@@ -30,7 +30,7 @@ export default function PickpocketGraspHost({ gameId, alive, allPlayers = [], sh
     const { participants, spectators } = computeParticipants(participation, { alive, allPlayers, shieldedNames, returnedNames });
     const state = {
       active: true, createdAt: Date.now(),
-      deck: generateDeck(PICKPOCKET_ROUND_COUNT), times: {},
+      deck: generateDeck(PICKPOCKET_ROUND_COUNT), times: {}, attempts: {},
       players: participants.map((p) => ({ id: p.id, name: p.name })),
       participants: participants.map((p) => p.name), spectators: spectators.map((p) => p.name),
     };
@@ -45,6 +45,24 @@ export default function PickpocketGraspHost({ gameId, alive, allPlayers = [], sh
   const clear = async () => { await storageDelete(gameId, STORAGE_KEY_PICKPOCKET); setSt(null); };
   const pause = async () => { const r = await pauseChallenge(gameId, STORAGE_KEY_PICKPOCKET); if (r.ok) setSt(r.value); };
   const resume = async () => { const r = await resumeChallenge(gameId, STORAGE_KEY_PICKPOCKET); if (r.ok) setSt(r.value); };
+
+  // Wipes ONE player's recorded time and bumps their `attempt` number.
+  // The player view scopes its rules gate, local run state and durable
+  // clock to createdAt:attempt, so that player gets the rules screen
+  // again and a brand-new clock on "Go" — nobody else is touched. Any
+  // submit still in flight from the old attempt is rejected player-side.
+  const resetScore = async (name) => {
+    if (typeof window !== "undefined" && !window.confirm(`Reset ${name}'s time? They'll get to play again from the start.`)) return;
+    const res = await storageUpdate(gameId, STORAGE_KEY_PICKPOCKET, (fresh) => {
+      if (!fresh) return null;
+      const times = { ...(fresh.times || {}) };
+      delete times[name];
+      const attempts = { ...(fresh.attempts || {}) };
+      attempts[name] = (attempts[name] || 0) + 1;
+      return { ...fresh, times, attempts };
+    });
+    if (res?.value) setSt(res.value);
+  };
 
   if (loading) return <Card><p style={{ color: "#706050", fontStyle: "italic" }}>Loading...</p></Card>;
 
@@ -80,8 +98,9 @@ export default function PickpocketGraspHost({ gameId, alive, allPlayers = [], sh
       ) : (
         <div style={{ display: "grid", gap: 3 }}>
           {sortedTimes.map(([name, time], i) => (
-            <div key={name} style={{ fontSize: 12, color: i === 0 ? "#c9a84c" : "#a09080", padding: "3px 0" }}>
-              {i === 0 ? "🏆" : `${i + 1}.`} {name} — {(time / 1000).toFixed(2)}s
+            <div key={name} style={{ fontSize: 12, color: i === 0 ? "#c9a84c" : "#a09080", padding: "3px 0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+              <span>{i === 0 ? "🏆" : `${i + 1}.`} {name} — {(time / 1000).toFixed(2)}s</span>
+              <Btn variant="ghost" small onClick={() => resetScore(name)}>Reset</Btn>
             </div>
           ))}
         </div>
