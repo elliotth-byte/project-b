@@ -6,6 +6,7 @@ import {
   STORAGE_KEY_ICEBREAKER, subscribeIcebreakerPresubmit, setIcebreakerPresubmitOpen,
 } from "../lib/icebreakerData";
 import { DEFAULT_PARTICIPATION, computeParticipants } from "../lib/challengeParticipants";
+import { logChallengeResult } from "../lib/challengeHistory";
 import ParticipantPicker from "./ParticipantPicker";
 import ArchiveResultsButton from "./ArchiveResultsButton";
 
@@ -24,6 +25,7 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
   const [editingA, setEditingA] = useState(null); // `${owner}::${questionOwner}` currently being edited
   const [aDraft, setADraft] = useState("");
   const [presubmit, setPresubmit] = useState(null);
+  const [removeName, setRemoveName] = useState("");
 
   useEffect(() => {
     setLoading(true);
@@ -124,6 +126,71 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
     });
     if (res.ok) setSt(res.value);
     setEditingA(null);
+  };
+
+  // Pull one player out of a round that's already underway. They're moved
+  // to spectators (so their own view flips to the "you're spectating" card)
+  // and every trace of them as a *player* is scrubbed: their answer set,
+  // their guess, their anonymous set (unless they were already identified
+  // and out — that stays so the reveal history reads correctly).
+  // Their *question* is only removed before the guessing phase; once
+  // guessing has started the question is already in play and visible to
+  // everyone, so it stays and just loses its owner as a player.
+  // If removing them leaves exactly one unidentified player in guessing,
+  // that player is declared the winner, same as a correct guess would.
+  const removePlayer = async (name) => {
+    if (!name) return;
+    const ok = typeof window === "undefined" || window.confirm(`Remove ${name} from the Icebreaker? This can't be undone.`);
+    if (!ok) return;
+    let declaredWinner = false;
+    const res = await storageUpdate(gameId, STORAGE_KEY_ICEBREAKER, (fresh) => {
+      if (!fresh || !fresh.players.some((p) => p.name === name)) return null;
+      const hadWinner = !!fresh.winner;
+      const wasOut = (fresh.eliminated || []).includes(name);
+
+      fresh.players = fresh.players.filter((p) => p.name !== name);
+      fresh.participants = fresh.players.map((p) => p.name);
+      fresh.spectators = (fresh.spectators || []).includes(name) ? fresh.spectators : [...(fresh.spectators || []), name];
+
+      // Their own answers + their own guess
+      const { [name]: _dropAnswers, ...restAnswers } = fresh.answers || {};
+      fresh.answers = restAnswers;
+      const { [name]: _dropGuess, ...restGuesses } = fresh.guesses || {};
+      fresh.guesses = restGuesses;
+
+      // Their anonymous set (kept if they were already identified/out)
+      if (!wasOut) {
+        fresh.anonymousSets = (fresh.anonymousSets || []).filter((s) => s.owner !== name);
+        fresh.eliminated = (fresh.eliminated || []).filter((n) => n !== name);
+      }
+
+      // Their question — only before guessing starts
+      if (fresh.phase !== "guessing") {
+        const { [name]: _dropQ, ...restQuestions } = fresh.questions || {};
+        fresh.questions = restQuestions;
+        fresh.revealedQuestions = (fresh.revealedQuestions || []).filter((n) => n !== name);
+        const stripped = {};
+        Object.keys(fresh.answers).forEach((o) => {
+          const { [name]: _dropA, ...rest } = fresh.answers[o] || {};
+          stripped[o] = rest;
+        });
+        fresh.answers = stripped;
+      }
+
+      if (fresh.phase === "guessing" && !hadWinner) {
+        const remain = fresh.players.filter((p) => !fresh.eliminated.includes(p.name));
+        if (remain.length === 1) {
+          fresh.winner = remain[0].name;
+          declaredWinner = true;
+        }
+      }
+      return fresh;
+    });
+    if (res.ok) {
+      setSt(res.value);
+      setRemoveName("");
+      if (declaredWinner && res.value.winner) logChallengeResult(gameId, { challenge: "Icebreaker", winners: [res.value.winner] });
+    }
   };
 
   const clear = async () => { await storageDelete(gameId, STORAGE_KEY_ICEBREAKER); setSt(null); };
@@ -266,6 +333,23 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
           {st.anonymousSets.map((s) => <div key={s.setId}>{s.setId}{st.eliminated.includes(s.owner) ? ` → ${s.owner} (out)` : ""}</div>)}
         </div>
       )}
+
+      {/* Remove a player mid-round (see removePlayer above). */}
+      {!st.winner && st.players.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", margin: "8px 0", paddingTop: 8, borderTop: "1px solid #253550" }}>
+          <select
+            value={removeName} onChange={(e) => setRemoveName(e.target.value)}
+            style={{ background: "#0a1020", border: "1px solid #253550", borderRadius: 6, padding: "4px 8px", color: "#f0e6d3", fontSize: 12 }}
+          >
+            <option value="">Remove a player…</option>
+            {st.players.map((p) => (
+              <option key={p.id} value={p.name}>{p.name}{st.eliminated.includes(p.name) ? " (out)" : ""}</option>
+            ))}
+          </select>
+          <Btn small variant="danger" onClick={() => removePlayer(removeName)} disabled={!removeName}>Remove</Btn>
+        </div>
+      )}
+
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <Btn variant="ghost" small onClick={clear}>Clear</Btn>
         <PauseResumeControls paused={!!st.paused} onPause={pause} onResume={resume} />
