@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Btn, Card, PausedBanner } from "./traitorsUi";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { STORAGE_KEY_ICEBREAKER } from "../lib/icebreakerData";
+import { useIcebreakerAutoReveal, useNowWhile, formatCountdown } from "../lib/icebreakerAutoReveal";
 import { logChallengeResult } from "../lib/challengeHistory";
 import { TRAITORS_GAME_REGISTRY } from "../lib/traitorsMiniGames";
 import TraitorsRulesGate from "./games/TraitorsRulesGate";
@@ -18,6 +19,12 @@ export default function IcebreakerPlayer({ gameId, playerName }) {
     const unsubscribe = subscribeGameState(gameId, STORAGE_KEY_ICEBREAKER, setSt);
     return unsubscribe;
   }, [gameId]);
+
+  // Any open view can apply a due hourly reveal (see
+  // lib/icebreakerAutoReveal.js), so reveals still land on time if the
+  // host's console isn't open. Must stay above the early returns below.
+  useIcebreakerAutoReveal(gameId, st);
+  const tickNow = useNowWhile(st?.nextRevealAt);
 
   if (!st || !st.active) return null;
   if (st.paused) return <PausedBanner icon="❄️" title="Icebreaker" />;
@@ -137,6 +144,11 @@ export default function IcebreakerPlayer({ gameId, playerName }) {
             <p style={{ fontSize: 12, color: "#a09080", margin: "0 0 6px", fontStyle: "italic" }}>
               Revealed questions: {st.revealedQuestions.length}. Study the answer sets and guess an owner.
             </p>
+            {st.nextRevealAt && (
+              <p style={{ fontSize: 11, color: "#706050", margin: "0 0 6px", fontStyle: "italic" }}>
+                Next question reveals in {formatCountdown(st.nextRevealAt - tickNow)}.
+              </p>
+            )}
             {st.anonymousSets.map((set) => (
               <div key={set.setId} style={{ background: "#0a1020", borderRadius: 8, padding: 8, marginBottom: 6, border: guessSet === set.setId ? "1px solid #c9a84c" : "1px solid #253550" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
