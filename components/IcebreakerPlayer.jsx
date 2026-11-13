@@ -3,6 +3,7 @@ import { Btn, Card, PausedBanner } from "./traitorsUi";
 import { storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { STORAGE_KEY_ICEBREAKER } from "../lib/icebreakerData";
 import { useIcebreakerAutoReveal, useNowWhile, formatCountdown } from "../lib/icebreakerAutoReveal";
+import { guessLockInfo } from "../lib/icebreakerGuessLock";
 import { logChallengeResult } from "../lib/challengeHistory";
 import { TRAITORS_GAME_REGISTRY } from "../lib/traitorsMiniGames";
 import TraitorsRulesGate from "./games/TraitorsRulesGate";
@@ -24,7 +25,9 @@ export default function IcebreakerPlayer({ gameId, playerName }) {
   // lib/icebreakerAutoReveal.js), so reveals still land on time if the
   // host's console isn't open. Must stay above the early returns below.
   useIcebreakerAutoReveal(gameId, st);
-  const tickNow = useNowWhile(st?.nextRevealAt);
+  // Ticks while there's a reveal countdown to show, or a wrong-guess
+  // lockout that could expire on its own.
+  const tickNow = useNowWhile(st?.nextRevealAt || st?.guesses?.[playerName]?.time);
 
   if (!st || !st.active) return null;
   if (st.paused) return <PausedBanner icon="❄️" title="Icebreaker" />;
@@ -69,14 +72,34 @@ export default function IcebreakerPlayer({ gameId, playerName }) {
     if (res.ok) setSt(res.value);
   };
 
+  // A wrong guess only locks the player out until the next question is
+  // revealed (see lib/icebreakerGuessLock.js). A correct guess never does.
   const myGuess = st.guesses?.[playerName];
+  const lock = guessLockInfo(st, playerName, tickNow);
+  const allRevealed = questionOwners.length <= st.revealedQuestions.length;
+  const lockMsg = allRevealed
+    ? `Locked out — you can guess again in ${formatCountdown((lock.until || 0) - tickNow)}.`
+    : `Locked out until the next question reveals${lock.until ? ` (in ${formatCountdown(lock.until - tickNow)})` : ""}.`;
+
   const submitGuess = async () => {
-    if (!guessSet || !guessOwner || myGuess) return;
+    if (!guessSet || !guessOwner || lock.locked) return;
     const res = await storageUpdate(gameId, STORAGE_KEY_ICEBREAKER, (fresh) => {
-      if (!fresh || fresh.guesses?.[playerName]) return null;
+      if (!fresh || fresh.winner) return null;
+      if (fresh.eliminated.includes(playerName)) return null;
+      // Re-check against fresh state so two quick taps (or a stale screen)
+      // can't slip a second guess past the lockout.
+      if (guessLockInfo(fresh, playerName, Date.now()).locked) return null;
       const set = fresh.anonymousSets.find((s) => s.setId === guessSet);
-      const correct = set && set.owner === guessOwner;
-      fresh.guesses = { ...(fresh.guesses || {}), [playerName]: { setId: guessSet, guessedOwner: guessOwner, correct, time: Date.now() } };
+      if (!set || fresh.eliminated.includes(set.owner)) return null;
+      const correct = set.owner === guessOwner;
+      const entry = {
+        player: playerName, setId: guessSet, guessedOwner: guessOwner, correct,
+        time: Date.now(), revealCount: (fresh.revealedQuestions || []).length,
+      };
+      // `guesses` keeps each player's latest guess (drives the lockout);
+      // `guessLog` is the full history the host sees.
+      fresh.guesses = { ...(fresh.guesses || {}), [playerName]: entry };
+      fresh.guessLog = [...(fresh.guessLog || []), entry];
       if (correct) {
         set.fullyRevealed = true;
         if (!fresh.eliminated.includes(set.owner)) fresh.eliminated.push(set.owner);
@@ -87,6 +110,8 @@ export default function IcebreakerPlayer({ gameId, playerName }) {
     });
     if (res.ok) {
       setSt(res.value);
+      setGuessSet("");
+      setGuessOwner("");
       if (res.value.winner) logChallengeResult(gameId, { challenge: "Icebreaker", winners: [res.value.winner] });
     }
   };
@@ -142,7 +167,7 @@ export default function IcebreakerPlayer({ gameId, playerName }) {
         ) : (
           <div>
             <p style={{ fontSize: 12, color: "#a09080", margin: "0 0 6px", fontStyle: "italic" }}>
-              Revealed questions: {st.revealedQuestions.length}. Study the answer sets and guess an owner.
+              Revealed questions: {st.revealedQuestions.length}. Study the answer sets and guess an owner. A wrong guess locks you out until the next question is revealed.
             </p>
             {st.nextRevealAt && (
               <p style={{ fontSize: 11, color: "#706050", margin: "0 0 6px", fontStyle: "italic" }}>
@@ -155,7 +180,7 @@ export default function IcebreakerPlayer({ gameId, playerName }) {
                   <span style={{ fontSize: 13, fontWeight: 600, color: st.eliminated.includes(set.owner) ? "#706050" : "#f0e6d3" }}>
                     Set {set.setId.replace("s", "#")}{st.eliminated.includes(set.owner) ? ` — ${set.owner}` : ""}
                   </span>
-                  {!st.eliminated.includes(set.owner) && (
+                  {!st.eliminated.includes(set.owner) && !lock.locked && (
                     <button onClick={() => setGuessSet(set.setId)} style={{ fontSize: 11, background: "transparent", border: "1px solid #253550", borderRadius: 5, color: "#a09080", cursor: "pointer", padding: "2px 8px" }}>select</button>
                   )}
                 </div>
@@ -167,7 +192,22 @@ export default function IcebreakerPlayer({ gameId, playerName }) {
                 {st.revealedQuestions.length === 0 && <span style={{ fontSize: 11, color: "#706050", fontStyle: "italic" }}>No questions revealed yet.</span>}
               </div>
             ))}
-            {!myGuess ? (
+            {myGuess && (
+              myGuess.correct ? (
+                <p style={{ fontSize: 12, color: "#7a9a5c", marginTop: 6 }}>
+                  Last guess: {myGuess.guessedOwner} — Correct!
+                </p>
+              ) : lock.locked ? (
+                <p style={{ fontSize: 12, color: "#c45c3c", marginTop: 6 }}>
+                  Guessed {myGuess.guessedOwner}: Wrong. {lockMsg}
+                </p>
+              ) : (
+                <p style={{ fontSize: 12, color: "#c9a84c", marginTop: 6 }}>
+                  Your last guess ({myGuess.guessedOwner}) was wrong, but a new question is out — you can guess again.
+                </p>
+              )
+            )}
+            {!lock.locked && (
               <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
                 <select value={guessOwner} onChange={(e) => setGuessOwner(e.target.value)} style={{ flex: 1, background: "#0a1020", border: "1px solid #253550", borderRadius: 6, padding: "6px 8px", color: "#f0e6d3", fontSize: 12 }}>
                   <option value="">Owner of Set {guessSet ? guessSet.replace("s", "#") : "?"}...</option>
@@ -175,10 +215,6 @@ export default function IcebreakerPlayer({ gameId, playerName }) {
                 </select>
                 <Btn small onClick={submitGuess} disabled={!guessSet || !guessOwner}>Guess</Btn>
               </div>
-            ) : (
-              <p style={{ fontSize: 12, color: myGuess.correct ? "#7a9a5c" : "#c45c3c", marginTop: 6 }}>
-                Guessed {myGuess.guessedOwner}: {myGuess.correct ? "Correct!" : "Wrong. No guesses left."}
-              </p>
             )}
           </div>
         )
