@@ -83,6 +83,14 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
         .map((p, i) => ({ setId: `s${i}`, owner: p.name, answers: fresh.answers[p.name], fullyRevealed: false }))
         .sort(() => Math.random() - 0.5);
       fresh.phase = "guessing";
+      // Seed the guessing phase with one randomly chosen question already
+      // revealed. Each player only gets a single guess, so starting with
+      // nothing visible would just make early guesses a coin flip and
+      // leave everyone waiting on the host's first manual reveal.
+      const qOwners = Object.keys(fresh.questions || {});
+      if (qOwners.length && !(fresh.revealedQuestions || []).length) {
+        fresh.revealedQuestions = [qOwners[Math.floor(Math.random() * qOwners.length)]];
+      }
       return fresh;
     });
     if (res.ok) setSt(res.value);
