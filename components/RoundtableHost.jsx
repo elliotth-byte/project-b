@@ -46,12 +46,15 @@ import {
 // is banished, the host can open a vote among everyone still standing
 // (players vote from components/EndGameVoteVoter.jsx; see
 // lib/endGameVote.js + sql/add-endgame-vote.sql). Like the show, End Game
-// only wins if EVERY living player votes for it. Closing the vote
-// publishes the result to players and shows the host who voted what; the
-// host then proceeds with whichever button the result points to. The host
-// can also skip the vote entirely and just pick "Banish Again" / "End
-// Game" directly. Either way, End Game archives this round and opens a
-// winner picker (same declareWinner() as the Admin tab's Declare Winner).
+// only wins if EVERY living player votes for it. The host sees each
+// player's choice live as it comes in; players don't see anyone's choice
+// until the last living player votes — at which point the server closes
+// the vote itself and publishes the result and every choice to everyone.
+// The host can also close it early (publishing whoever's voted so far).
+// The host then proceeds with whichever button the result points to, or
+// can skip the vote entirely and pick "Banish Again" / "End Game"
+// directly. Either way, End Game archives this round and opens a winner
+// picker (same declareWinner() as the Admin tab's Declare Winner).
 export default function RoundtableHost({ gameId, players, settings }) {
   const [roundInfo, setRoundInfo] = useState(null);
   const [votes, setVotes] = useState(null);
@@ -130,7 +133,7 @@ export default function RoundtableHost({ gameId, players, settings }) {
   }, [gameId]);
 
   // End Game vote: public open/result state + (host-only, by RLS) every
-  // player's vote row. See lib/endGameVote.js.
+  // player's vote row, live. See lib/endGameVote.js.
   useEffect(() => {
     const unsubscribe = subscribeEndGameState(gameId, setEgState);
     return unsubscribe;
@@ -204,6 +207,7 @@ export default function RoundtableHost({ gameId, players, settings }) {
   const egRows = egVotes.filter((v) => v.round_key === roundKey && finalistIds.has(v.player_id));
   const eg = computeEndGameResult(finalists, egRows);
   const egChoiceLabel = (id) => (eg.byId[id] === "end" ? "🏁 End Game" : eg.byId[id] === "banish" ? "⚔️ Banish Again" : "— no vote");
+  const egChoiceColor = (id) => (eg.byId[id] === "end" ? "#e0b84c" : eg.byId[id] === "banish" ? "#c45c3c" : "#706050");
 
   const openEgVote = async () => {
     if (!roundKey || egBusy) return;
@@ -212,11 +216,16 @@ export default function RoundtableHost({ gameId, players, settings }) {
     setEgBusy(false);
   };
 
-  // Publishes the result + counts (never who voted what) to players.
+  // Early close from the host. (When the last living player votes, the
+  // server closes and publishes by itself — see cast_endgame_vote.)
+  // Publishes the result, counts and every choice cast so far, keyed by
+  // display name, to players.
   const closeEgVote = async () => {
     if (!roundKey || egBusy) return;
     setEgBusy(true);
-    await closeEndGameVote(gameId, roundKey, eg.result, { end: eg.end.length, banish: eg.banish.length, missing: eg.missing.length });
+    const choices = {};
+    finalists.forEach((p) => { if (eg.byId[p.id]) choices[p.display_name] = eg.byId[p.id]; });
+    await closeEndGameVote(gameId, roundKey, eg.result, { end: eg.end.length, banish: eg.banish.length, missing: eg.missing.length }, choices);
     setEgBusy(false);
   };
 
@@ -571,7 +580,7 @@ export default function RoundtableHost({ gameId, players, settings }) {
                         🗳️ Let the Players Vote: End Game or Banish Again
                       </Btn>
                       <p style={{ color: "#706050", fontSize: 11.5, margin: "8px 0 0", fontStyle: "italic" }}>
-                        Everyone still standing votes in secret from their own screen. The game only ends if all {finalists.length} vote End Game — one Banish Again (or a missing vote) means another banish.
+                        Everyone still standing votes from their own screen. You'll see each choice as it's made; players see everyone's choice once all {finalists.length} have voted. The game only ends if all {finalists.length} vote End Game — one Banish Again (or a missing vote) means another banish.
                       </p>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
                         <span style={{ color: "#706050", fontSize: 11.5 }}>Or just decide yourself:</span>
@@ -583,28 +592,33 @@ export default function RoundtableHost({ gameId, players, settings }) {
                     </div>
                   )}
 
-                  {/* Stage 2 — vote open: who's voted (not what) */}
+                  {/* Stage 2 — vote open: host sees every choice live */}
                   {egValid && egState.open && (
                     <div>
                       <p style={{ color: "#e0b84c", fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>
                         🗳️ End Game vote open — {finalists.length - eg.missing.length}/{finalists.length} in
                       </p>
-                      <div style={{ display: "grid", gap: 4, marginBottom: 10 }}>
+                      <div style={{ display: "grid", gap: 4, marginBottom: 8 }}>
                         {finalists.map((p) => (
                           <div key={p.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, background: "#0a1020", borderRadius: 6, padding: "5px 10px" }}>
                             <span style={{ color: "#f0e6d3" }}>{p.display_name}</span>
-                            <span style={{ color: eg.byId[p.id] ? "#7a9a5c" : "#706050" }}>{eg.byId[p.id] ? "✓ voted" : "waiting…"}</span>
+                            <span style={{ color: egChoiceColor(p.id), fontWeight: eg.byId[p.id] ? 700 : 400 }}>
+                              {eg.byId[p.id] ? egChoiceLabel(p.id) : "waiting…"}
+                            </span>
                           </div>
                         ))}
                       </div>
+                      <p style={{ color: "#706050", fontSize: 11.5, margin: "0 0 10px", fontStyle: "italic" }}>
+                        Only you can see these. Players can change their vote until the last one's in — then the vote closes by itself and everyone sees every choice.
+                      </p>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <Btn onClick={closeEgVote} disabled={egBusy}>Close Vote &amp; Reveal Result</Btn>
+                        <Btn small variant="ghost" onClick={closeEgVote} disabled={egBusy}>Close Early &amp; Reveal Now</Btn>
                         <Btn small variant="ghost" onClick={cancelEgVote} disabled={egBusy}>Cancel Vote</Btn>
                       </div>
                     </div>
                   )}
 
-                  {/* Stage 3 — closed: result + who voted what (host only) */}
+                  {/* Stage 3 — closed: result + choices (players see these too now) */}
                   {egValid && !egState.open && (
                     <div>
                       <p style={{ color: egState.result === "end" ? "#e0b84c" : "#c45c3c", fontSize: 14, fontWeight: 700, margin: "0 0 4px" }}>
@@ -612,15 +626,20 @@ export default function RoundtableHost({ gameId, players, settings }) {
                       </p>
                       <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 8px" }}>
                         End Game: {egState.counts?.end ?? 0} · Banish Again: {egState.counts?.banish ?? 0}
-                        {egState.counts?.missing > 0 ? ` · No vote: ${egState.counts.missing}` : ""} — players can see these counts, not who voted what.
+                        {egState.counts?.missing > 0 ? ` · No vote: ${egState.counts.missing}` : ""} — revealed to all players{egState.auto ? " automatically once everyone voted" : ""}.
                       </p>
                       <div style={{ display: "grid", gap: 4, marginBottom: 10 }}>
-                        {finalists.map((p) => (
-                          <div key={p.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, background: "#0a1020", borderRadius: 6, padding: "5px 10px" }}>
-                            <span style={{ color: "#f0e6d3" }}>{p.display_name}</span>
-                            <span style={{ color: eg.byId[p.id] === "end" ? "#e0b84c" : eg.byId[p.id] === "banish" ? "#c45c3c" : "#706050" }}>{egChoiceLabel(p.id)}</span>
-                          </div>
-                        ))}
+                        {finalists.map((p) => {
+                          const published = egState.choices?.[p.display_name];
+                          const label = published === "end" ? "🏁 End Game" : published === "banish" ? "⚔️ Banish Again" : "— no vote";
+                          const color = published === "end" ? "#e0b84c" : published === "banish" ? "#c45c3c" : "#706050";
+                          return (
+                            <div key={p.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, background: "#0a1020", borderRadius: 6, padding: "5px 10px" }}>
+                              <span style={{ color: "#f0e6d3" }}>{p.display_name}</span>
+                              <span style={{ color }}>{label}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                         {egState.result === "end" ? (
