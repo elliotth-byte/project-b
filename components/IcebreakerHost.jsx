@@ -28,6 +28,7 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
   const [aDraft, setADraft] = useState("");
   const [presubmit, setPresubmit] = useState(null);
   const [removeName, setRemoveName] = useState("");
+  const [reinstateName, setReinstateName] = useState("");
 
   useEffect(() => {
     setLoading(true);
@@ -174,6 +175,32 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
     });
     if (res.ok) setSt(res.value);
     setEditingA(null);
+  };
+
+  // Put an identified player back in the game. Their answer set goes back to
+  // anonymous (no name shown on it), and whichever correct guess identified
+  // them is marked "voided" in the log so the history still reads honestly.
+  // The guesser isn't penalized — a correct guess never locks anyone out, so
+  // they can simply guess again. Not offered once a winner has been declared
+  // (that result has already been logged to challenge history).
+  const reinstatePlayer = async (name) => {
+    if (!name) return;
+    const ok = typeof window === "undefined" || window.confirm(`Reinstate ${name}? Their answer set goes back to anonymous and the guess that identified them is voided.`);
+    if (!ok) return;
+    const res = await storageUpdate(gameId, STORAGE_KEY_ICEBREAKER, (fresh) => {
+      if (!fresh || fresh.winner || !(fresh.eliminated || []).includes(name)) return null;
+      fresh.eliminated = fresh.eliminated.filter((n) => n !== name);
+      fresh.anonymousSets = (fresh.anonymousSets || []).map((s) => (s.owner === name ? { ...s, fullyRevealed: false } : s));
+      const setIds = new Set(fresh.anonymousSets.filter((s) => s.owner === name).map((s) => s.setId));
+      const voidIfIdentifying = (g) => (g && g.correct && g.guessedOwner === name && setIds.has(g.setId) ? { ...g, voided: true } : g);
+      if (fresh.guessLog) fresh.guessLog = fresh.guessLog.map(voidIfIdentifying);
+      fresh.guesses = Object.fromEntries(Object.entries(fresh.guesses || {}).map(([k, g]) => [k, voidIfIdentifying(g)]));
+      return fresh;
+    });
+    if (res.ok) {
+      setSt(res.value);
+      setReinstateName("");
+    }
   };
 
   // Pull one player out of a round that's already underway. They're moved
@@ -435,6 +462,19 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
             <p style={{ fontSize: 10, color: "#706050", margin: "4px 0 0", fontStyle: "italic" }}>
               ✓ can guess · 🔒 locked until the next reveal · 💀 identified
             </p>
+            {/* Put an identified player back in (see reinstatePlayer above). */}
+            {!st.winner && st.eliminated.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+                <select
+                  value={reinstateName} onChange={(e) => setReinstateName(e.target.value)}
+                  style={{ background: "#0a1020", border: "1px solid #253550", borderRadius: 6, padding: "4px 8px", color: "#f0e6d3", fontSize: 12 }}
+                >
+                  <option value="">Reinstate a player…</option>
+                  {st.eliminated.map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+                <Btn small variant="ghost" onClick={() => reinstatePlayer(reinstateName)} disabled={!reinstateName}>Reinstate</Btn>
+              </div>
+            )}
           </div>
 
           <div style={{ marginBottom: 8 }}>
@@ -452,7 +492,11 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
                     </span>{" "}
                     <span style={{ color: "#f0e6d3" }}>{g.player}</span> guessed set {String(g.setId || "").replace("s", "#")} is{" "}
                     <span style={{ color: "#f0e6d3" }}>{g.guessedOwner}</span> —{" "}
-                    <span style={{ color: g.correct ? "#7a9a5c" : "#c45c3c" }}>{g.correct ? "✓ correct" : "✗ wrong"}</span>
+                    {g.voided ? (
+                      <span style={{ color: "#706050" }}>↩ voided (reinstated)</span>
+                    ) : (
+                      <span style={{ color: g.correct ? "#7a9a5c" : "#c45c3c" }}>{g.correct ? "✓ correct" : "✗ wrong"}</span>
+                    )}
                   </div>
                 ))}
               </div>
