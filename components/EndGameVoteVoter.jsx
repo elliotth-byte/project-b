@@ -14,10 +14,15 @@ const SERIF = "'Palatino Linotype', Palatino, Georgia, serif";
 // Appears under the Roundtable tab once the host opens an End Game vote
 // after a banish. Everyone still standing picks "End Game" or "Banish
 // Again" — like the show, the game only ends if EVERY living player picks
-// End Game. Individual choices stay private (the endgame_votes table is
+// End Game.
+//
+// While the vote is open, choices are private (the endgame_votes table is
 // only readable by the host and the voter's own account — see
-// sql/add-endgame-vote.sql); once the host closes the vote, everyone just
-// sees the result and the counts.
+// sql/add-endgame-vote.sql). The moment the last living player votes, the
+// server closes the vote and publishes the result plus EVERY player's
+// choice, and this card flips to showing all of it to everyone at once.
+// (If the host closes the vote early, the same thing happens with whoever
+// voted so far.)
 //
 // Casting goes through cast_endgame_vote, which re-checks on the server
 // that the caller is a living, approved player and that a vote for this
@@ -74,10 +79,11 @@ export default function EndGameVoteVoter({ gameId, playerName }) {
     </>
   );
 
-  // ── Closed: show the published result ──
+  // ── Closed: show the published result + everyone's choice ──
   if (!egState.open) {
     if (!egState.result) return null;
     const c = egState.counts || {};
+    const choices = Object.entries(egState.choices || {});
     return (
       <Card style={cardStyle}>
         {heading}
@@ -90,10 +96,24 @@ export default function EndGameVoteVoter({ gameId, playerName }) {
             Not unanimous — someone must be banished again.
           </p>
         )}
-        <p style={{ color: "#a09080", fontSize: 13, textAlign: "center", margin: 0 }}>
+        <p style={{ color: "#a09080", fontSize: 13, textAlign: "center", margin: choices.length ? "0 0 12px" : 0 }}>
           End Game: {c.end ?? 0} · Banish Again: {c.banish ?? 0}
           {c.missing > 0 ? ` · No vote: ${c.missing}` : ""}
         </p>
+        {choices.length > 0 && (
+          <div style={{ display: "grid", gap: 4 }}>
+            {choices.map(([name, ch]) => (
+              <div key={name} style={{
+                display: "flex", justifyContent: "space-between", fontSize: 13,
+                background: "#0a1020", borderRadius: 6, padding: "6px 12px",
+                fontWeight: name === playerName ? 700 : 400,
+              }}>
+                <span style={{ color: "#f0e6d3" }}>{name}{name === playerName ? " (you)" : ""}</span>
+                <span style={{ color: ch === "end" ? GOLD : RED }}>{ch === "end" ? "🏁 End Game" : "⚔️ Banish Again"}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
     );
   }
@@ -130,7 +150,7 @@ export default function EndGameVoteVoter({ gameId, playerName }) {
           </strong>
         </p>
         <p style={{ color: "#706050", fontSize: 12, textAlign: "center", margin: "0 0 12px" }}>
-          Your vote is secret. The host will reveal the result when everyone's in.
+          Choices stay secret until everyone has voted — then they're all revealed at once. You can change yours until then.
         </p>
         <div style={{ textAlign: "center" }}>
           <button onClick={startEdit} style={{
@@ -151,7 +171,7 @@ export default function EndGameVoteVoter({ gameId, playerName }) {
     <Card style={cardStyle}>
       {heading}
       <p style={{ color: "#a09080", fontSize: 13, textAlign: "center", margin: "0 0 14px", fontStyle: "italic" }}>
-        Voting as <strong style={{ color: "#c9a84c" }}>{playerName}</strong> — in secret.
+        Voting as <strong style={{ color: "#c9a84c" }}>{playerName}</strong> — everyone's choice is revealed once all have voted.
       </p>
       <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
         {options.map((o) => (
