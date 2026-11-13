@@ -4,6 +4,7 @@ import { Card } from "./traitorsUi";
 import { storageGet, storageUpdate, subscribeGameState } from "../lib/gameStorage";
 import { STORAGE_KEY_ROUND_INFO, VOTES_KEY_PREFIX } from "../lib/roundtableData";
 import GoldenDaggerVoter from "./GoldenDaggerVoter";
+import EndGameVoteVoter from "./EndGameVoteVoter";
 
 // ─── Roundtable: Player View ───
 // See the scope note in RoundtableHost.jsx — this covers casting a vote,
@@ -11,9 +12,14 @@ import GoldenDaggerVoter from "./GoldenDaggerVoter";
 //
 // The Golden Dagger card renders for the single player who holds the dagger
 // and nothing for anyone else — see components/GoldenDaggerVoter.jsx.
+//
+// The End Game vs Banish Again card renders for everyone still standing,
+// but only once the host opens that vote after a banish — see
+// components/EndGameVoteVoter.jsx.
 export default function RoundtableVoter(props) {
   return (
     <>
+      <EndGameVoteVoter gameId={props.gameId} playerName={props.playerName} />
       <RoundtableVoteCard {...props} />
       <GoldenDaggerVoter gameId={props.gameId} playerName={props.playerName} />
     </>
