@@ -6,6 +6,7 @@ import {
   STORAGE_KEY_ICEBREAKER, subscribeIcebreakerPresubmit, setIcebreakerPresubmitOpen,
 } from "../lib/icebreakerData";
 import { REVEAL_INTERVAL_MS, useIcebreakerAutoReveal, useNowWhile, formatCountdown } from "../lib/icebreakerAutoReveal";
+import { guessLockInfo } from "../lib/icebreakerGuessLock";
 import { DEFAULT_PARTICIPATION, computeParticipants } from "../lib/challengeParticipants";
 import { logChallengeResult } from "../lib/challengeHistory";
 import ParticipantPicker from "./ParticipantPicker";
@@ -64,7 +65,7 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
       players: participants.map((p) => ({ id: p.id, name: p.name, avatarUrl: p.avatarUrl })),
       participants: participants.map((p) => p.name), spectators: spectators.map((p) => p.name),
       questions: preseeded, answers: {}, anonymousSets: [], revealedQuestions: [],
-      eliminated: [], guesses: {}, lastRevealAt: {}, winner: null,
+      eliminated: [], guesses: {}, guessLog: [], lastRevealAt: {}, winner: null,
     };
     await storageSet(gameId, STORAGE_KEY_ICEBREAKER, state);
     setSt(state);
@@ -91,9 +92,8 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
         .sort(() => Math.random() - 0.5);
       fresh.phase = "guessing";
       // Seed the guessing phase with one randomly chosen question already
-      // revealed. Each player only gets a single guess, so starting with
-      // nothing visible would just make early guesses a coin flip and
-      // leave everyone waiting on the first reveal.
+      // revealed. Guessing blind would just be a coin flip and leave
+      // everyone waiting on the first reveal.
       const qOwners = Object.keys(fresh.questions || {});
       if (qOwners.length && !(fresh.revealedQuestions || []).length) {
         fresh.revealedQuestions = [qOwners[Math.floor(Math.random() * qOwners.length)]];
@@ -179,7 +179,7 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
   // Pull one player out of a round that's already underway. They're moved
   // to spectators (so their own view flips to the "you're spectating" card)
   // and every trace of them as a *player* is scrubbed: their answer set,
-  // their guess, their anonymous set (unless they were already identified
+  // their guesses, their anonymous set (unless they were already identified
   // and out — that stays so the reveal history reads correctly).
   // Their *question* is only removed before the guessing phase; once
   // guessing has started the question is already in play and visible to
@@ -200,11 +200,12 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
       fresh.participants = fresh.players.map((p) => p.name);
       fresh.spectators = (fresh.spectators || []).includes(name) ? fresh.spectators : [...(fresh.spectators || []), name];
 
-      // Their own answers + their own guess
+      // Their own answers + their own guesses
       const { [name]: _dropAnswers, ...restAnswers } = fresh.answers || {};
       fresh.answers = restAnswers;
       const { [name]: _dropGuess, ...restGuesses } = fresh.guesses || {};
       fresh.guesses = restGuesses;
+      if (fresh.guessLog) fresh.guessLog = fresh.guessLog.filter((g) => g.player !== name);
 
       // Their anonymous set (kept if they were already identified/out)
       if (!wasOut) {
@@ -259,7 +260,7 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
       <ChallengeSetupCard
         icon="❄️" title="Icebreaker" onStart={start} startLabel="Start Icebreaker"
         disabled={computeParticipants(participation, { alive, allPlayers, shieldedNames, returnedNames }).participants.length < 2}
-        blurb="Players submit a favorite icebreaker question, then everyone answers all of them. Answer sets are anonymized; one question is revealed up front and the rest follow one per hour. Guess who's who — last unidentified player wins."
+        blurb="Players submit a favorite icebreaker question, then everyone answers all of them. Answer sets are anonymized; one question is revealed up front and the rest follow one per hour. Guess who's who — a wrong guess locks you out until the next reveal. Last unidentified player wins."
       >
         <ParticipantPicker
           alive={alive} allPlayers={allPlayers} shieldedNames={shieldedNames} returnedNames={returnedNames}
@@ -282,6 +283,14 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
   const remaining = st.players.filter((p) => !st.eliminated.includes(p.name));
   const questionOwners = Object.keys(st.questions);
   const unrevealed = questionOwners.length - st.revealedQuestions.length;
+
+  // Full guess history for the host. Rounds that started before the log
+  // existed only have each player's latest guess in `guesses`, so fall back
+  // to that for them.
+  const guessLog = (st.guessLog || Object.entries(st.guesses || {}).map(([player, g]) => ({ player, ...g })))
+    .slice()
+    .sort((a, b) => (a.time || 0) - (b.time || 0));
+  const nowMs = Date.now();
 
   return (
     <Card style={{ borderColor: "rgba(74,122,196,0.3)" }}>
@@ -401,9 +410,59 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
       )}
 
       {st.phase === "guessing" && (
-        <div style={{ fontSize: 11, color: "#706050", marginBottom: 8 }}>
-          {st.anonymousSets.map((s) => <div key={s.setId}>{s.setId}{st.eliminated.includes(s.owner) ? ` → ${s.owner} (out)` : ""}</div>)}
-        </div>
+        <>
+          {/* Who's still in, who's out, and who can guess right now. */}
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 11, color: "#a09080", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+              Players — {remaining.length} left
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              {st.players.map((p) => {
+                const out = st.eliminated.includes(p.name);
+                const lock = guessLockInfo(st, p.name, nowMs);
+                const color = out ? "#706050" : lock.locked ? "#c45c3c" : "#7a9a5c";
+                const bg = out ? "rgba(112,96,80,0.15)" : lock.locked ? "rgba(196,92,60,0.1)" : "rgba(122,154,92,0.15)";
+                return (
+                  <span key={p.id} style={{
+                    fontSize: 11, padding: "3px 8px", borderRadius: 12, background: bg, color,
+                    border: `1px solid ${color}55`, textDecoration: out ? "line-through" : "none",
+                  }}>
+                    {out ? "💀" : lock.locked ? "🔒" : "✓"} {p.name}
+                  </span>
+                );
+              })}
+            </div>
+            <p style={{ fontSize: 10, color: "#706050", margin: "4px 0 0", fontStyle: "italic" }}>
+              ✓ can guess · 🔒 locked until the next reveal · 💀 identified
+            </p>
+          </div>
+
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 11, color: "#a09080", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+              Guess log ({guessLog.length})
+            </div>
+            {guessLog.length === 0 ? (
+              <p style={{ fontSize: 11, color: "#706050", margin: 0, fontStyle: "italic" }}>No guesses yet.</p>
+            ) : (
+              <div style={{ maxHeight: 160, overflowY: "auto", background: "#0a1020", borderRadius: 6, padding: "6px 8px" }}>
+                {guessLog.slice().reverse().map((g, i) => (
+                  <div key={`${g.player}-${g.time}-${i}`} style={{ fontSize: 11, color: "#a09080", marginBottom: 2 }}>
+                    <span style={{ color: "#706050" }}>
+                      {g.time ? new Date(g.time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "—"}
+                    </span>{" "}
+                    <span style={{ color: "#f0e6d3" }}>{g.player}</span> guessed set {String(g.setId || "").replace("s", "#")} is{" "}
+                    <span style={{ color: "#f0e6d3" }}>{g.guessedOwner}</span> —{" "}
+                    <span style={{ color: g.correct ? "#7a9a5c" : "#c45c3c" }}>{g.correct ? "✓ correct" : "✗ wrong"}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ fontSize: 11, color: "#706050", marginBottom: 8 }}>
+            {st.anonymousSets.map((s) => <div key={s.setId}>{s.setId}{st.eliminated.includes(s.owner) ? ` → ${s.owner} (out)` : ""}</div>)}
+          </div>
+        </>
       )}
 
       {/* Remove a player mid-round (see removePlayer above). */}
