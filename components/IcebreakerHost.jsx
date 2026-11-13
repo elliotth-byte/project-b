@@ -5,6 +5,7 @@ import { pauseChallenge, resumeChallenge } from "../lib/pauseResume";
 import {
   STORAGE_KEY_ICEBREAKER, subscribeIcebreakerPresubmit, setIcebreakerPresubmitOpen,
 } from "../lib/icebreakerData";
+import { REVEAL_INTERVAL_MS, useIcebreakerAutoReveal, useNowWhile, formatCountdown } from "../lib/icebreakerAutoReveal";
 import { DEFAULT_PARTICIPATION, computeParticipants } from "../lib/challengeParticipants";
 import { logChallengeResult } from "../lib/challengeHistory";
 import ParticipantPicker from "./ParticipantPicker";
@@ -40,6 +41,12 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
     const unsubscribe = subscribeIcebreakerPresubmit(gameId, setPresubmit);
     return unsubscribe;
   }, [gameId]);
+
+  // Timed reveals: once a schedule is set (nextRevealAt in the game state),
+  // any open view — this one or a player's — applies each reveal as it
+  // comes due. See lib/icebreakerAutoReveal.js.
+  useIcebreakerAutoReveal(gameId, st);
+  const tickNow = useNowWhile(st?.nextRevealAt);
 
   const start = async () => {
     const { participants, spectators } = computeParticipants(participation, { alive, allPlayers, shieldedNames, returnedNames });
@@ -86,11 +93,15 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
       // Seed the guessing phase with one randomly chosen question already
       // revealed. Each player only gets a single guess, so starting with
       // nothing visible would just make early guesses a coin flip and
-      // leave everyone waiting on the host's first manual reveal.
+      // leave everyone waiting on the first reveal.
       const qOwners = Object.keys(fresh.questions || {});
       if (qOwners.length && !(fresh.revealedQuestions || []).length) {
         fresh.revealedQuestions = [qOwners[Math.floor(Math.random() * qOwners.length)]];
       }
+      // The rest come out on a timer, one per hour. The host can stop or
+      // restart this from the panel.
+      fresh.revealIntervalMs = REVEAL_INTERVAL_MS;
+      fresh.nextRevealAt = qOwners.length > (fresh.revealedQuestions || []).length ? Date.now() + REVEAL_INTERVAL_MS : null;
       return fresh;
     });
     if (res.ok) setSt(res.value);
@@ -102,6 +113,35 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
       const qOwners = Object.keys(fresh.questions).filter((q) => !fresh.revealedQuestions.includes(q));
       if (!qOwners.length) return null;
       fresh.revealedQuestions.push(qOwners[Math.floor(Math.random() * qOwners.length)]);
+      // A manual reveal restarts the hourly clock (if one is running), so
+      // the next automatic one is a full interval after this one.
+      if (fresh.nextRevealAt) {
+        fresh.nextRevealAt = qOwners.length > 1 ? Date.now() + (fresh.revealIntervalMs || REVEAL_INTERVAL_MS) : null;
+      }
+      return fresh;
+    });
+    if (res.ok) setSt(res.value);
+  };
+
+  // Turn the hourly schedule on (e.g. for a round that was already in
+  // guessing before this existed) — first automatic reveal is one full
+  // interval from now.
+  const startAutoReveal = async () => {
+    const res = await storageUpdate(gameId, STORAGE_KEY_ICEBREAKER, (fresh) => {
+      if (!fresh || fresh.phase !== "guessing") return null;
+      const left = Object.keys(fresh.questions || {}).filter((q) => !(fresh.revealedQuestions || []).includes(q)).length;
+      if (!left) return null;
+      fresh.revealIntervalMs = REVEAL_INTERVAL_MS;
+      fresh.nextRevealAt = Date.now() + REVEAL_INTERVAL_MS;
+      return fresh;
+    });
+    if (res.ok) setSt(res.value);
+  };
+
+  const stopAutoReveal = async () => {
+    const res = await storageUpdate(gameId, STORAGE_KEY_ICEBREAKER, (fresh) => {
+      if (!fresh || !fresh.nextRevealAt) return null;
+      fresh.nextRevealAt = null;
       return fresh;
     });
     if (res.ok) setSt(res.value);
@@ -203,7 +243,14 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
 
   const clear = async () => { await storageDelete(gameId, STORAGE_KEY_ICEBREAKER); setSt(null); };
   const pause = async () => { const r = await pauseChallenge(gameId, STORAGE_KEY_ICEBREAKER); if (r.ok) setSt(r.value); };
-  const resume = async () => { const r = await resumeChallenge(gameId, STORAGE_KEY_ICEBREAKER); if (r.ok) setSt(r.value); };
+  // Shift the next scheduled reveal forward by however long the round was
+  // paused, so time spent paused doesn't count toward the hour.
+  const resume = async () => {
+    const r = await resumeChallenge(gameId, STORAGE_KEY_ICEBREAKER, (fresh, pausedAt, now) => {
+      if (fresh.nextRevealAt) fresh.nextRevealAt += Math.max(0, now - pausedAt);
+    });
+    if (r.ok) setSt(r.value);
+  };
 
   if (loading) return <Card><p style={{ color: "#706050", fontStyle: "italic" }}>Loading...</p></Card>;
 
@@ -212,7 +259,7 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
       <ChallengeSetupCard
         icon="❄️" title="Icebreaker" onStart={start} startLabel="Start Icebreaker"
         disabled={computeParticipants(participation, { alive, allPlayers, shieldedNames, returnedNames }).participants.length < 2}
-        blurb="Players submit a favorite icebreaker question, then everyone answers all of them. Answer sets are anonymized; reveal one question's answers at a time. Guess who's who — last unidentified player wins."
+        blurb="Players submit a favorite icebreaker question, then everyone answers all of them. Answer sets are anonymized; one question is revealed up front and the rest follow one per hour. Guess who's who — last unidentified player wins."
       >
         <ParticipantPicker
           alive={alive} allPlayers={allPlayers} shieldedNames={shieldedNames} returnedNames={returnedNames}
@@ -234,6 +281,7 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
 
   const remaining = st.players.filter((p) => !st.eliminated.includes(p.name));
   const questionOwners = Object.keys(st.questions);
+  const unrevealed = questionOwners.length - st.revealedQuestions.length;
 
   return (
     <Card style={{ borderColor: "rgba(74,122,196,0.3)" }}>
@@ -247,10 +295,26 @@ export default function IcebreakerHost({ gameId, alive, allPlayers = [], shielde
         {st.phase === "answers" && `Answer sets in: ${Object.keys(st.answers).length}/${st.players.length}`}
         {st.phase === "guessing" && `Remaining: ${remaining.length} · Questions revealed: ${st.revealedQuestions.length}/${Object.keys(st.questions).length}`}
       </p>
+      {st.phase === "guessing" && !st.winner && (
+        <p style={{ fontSize: 11, color: "#706050", margin: "0 0 8px", fontStyle: "italic" }}>
+          {st.nextRevealAt
+            ? (st.paused
+              ? "Auto-reveal is on hold while the round is paused."
+              : `Next question auto-reveals in ${formatCountdown(st.nextRevealAt - tickNow)}, then one every hour.`)
+            : unrevealed > 0
+              ? "Auto-reveal is off — reveal manually or start the hourly timer."
+              : "All questions revealed."}
+        </p>
+      )}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
         {st.phase === "questions" && <Btn small onClick={openAnswers}>Open Answer Phase →</Btn>}
         {st.phase === "answers" && <Btn small onClick={startGuessing}>Start Guessing Phase →</Btn>}
         {st.phase === "guessing" && <Btn small onClick={revealQuestion}>Reveal a Question</Btn>}
+        {st.phase === "guessing" && !st.winner && (
+          st.nextRevealAt
+            ? <Btn small variant="ghost" onClick={stopAutoReveal}>Stop auto-reveal</Btn>
+            : (unrevealed > 0 ? <Btn small variant="ghost" onClick={startAutoReveal}>Start hourly auto-reveal</Btn> : null)
+        )}
         <Btn small variant="ghost" onClick={() => setShowSubmissions((v) => !v)}>
           {showSubmissions ? "Hide Submissions" : "👁 View & Edit Submissions"}
         </Btn>
