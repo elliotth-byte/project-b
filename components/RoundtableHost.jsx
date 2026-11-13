@@ -189,6 +189,10 @@ export default function RoundtableHost({ gameId, players, settings }) {
   const rankedTargets = Object.entries(tally).sort((a, b) => b[1] - a[1]);
   const leadingTarget = rankedTargets[0]?.[0];
 
+  // Defined up here (not next to startReveal below) because roundSettled
+  // reads it — a const used before its declaration is a ReferenceError.
+  const revealDone = revealOrder && revealIndex >= revealOrder.length - 1;
+
   // Whoever's left once this round's banish has landed — the pool the
   // End Game vote and winner picker draw from. Filtering by name (not
   // just `alive`) matches nextRound's own survivors, and covers the brief
@@ -276,7 +280,6 @@ export default function RoundtableHost({ gameId, players, settings }) {
 
   const revealNext = () => setRevealIndex((i) => Math.min(i + 1, (revealOrder?.length || 1) - 1));
   const revealAll = () => setRevealIndex((revealOrder?.length || 1) - 1);
-  const revealDone = revealOrder && revealIndex >= revealOrder.length - 1;
 
   const banish = async () => {
     if (!leadingTarget) return;
