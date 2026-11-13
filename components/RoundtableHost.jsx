@@ -18,6 +18,10 @@ import { subscribeGoldenDagger, clearGoldenVote } from "../lib/goldenDagger";
 import { subscribeHostState } from "../lib/hostStorage";
 import { STORAGE_KEY_TRAITOR_ROLES } from "../lib/traitorData";
 import { declareWinner, subscribeTraitorsFinale } from "../lib/traitorsFinale";
+import {
+  openEndGameVote, closeEndGameVote, cancelEndGameVote, computeEndGameResult,
+  subscribeEndGameState, subscribeEndGameVotes,
+} from "../lib/endGameVote";
 
 // ─── Roundtable: Host Control ───
 //
@@ -39,10 +43,15 @@ import { declareWinner, subscribeTraitorsFinale } from "../lib/traitorsFinale";
 // the dramatic reveal, the Slack vote-reveal text and the banish.
 //
 // End Game vs Banish Again: once a round's reveal is done and the leader
-// is banished, the host picks between "Banish Again" (advance to the next
-// Roundtable, exactly what "Advance" used to do) and "End Game" (archive
-// this round, then pick the winner right here — same declareWinner() the
-// Admin tab's "Declare Winner" card uses, see lib/traitorsFinale.js).
+// is banished, the host can open a vote among everyone still standing
+// (players vote from components/EndGameVoteVoter.jsx; see
+// lib/endGameVote.js + sql/add-endgame-vote.sql). Like the show, End Game
+// only wins if EVERY living player votes for it. Closing the vote
+// publishes the result to players and shows the host who voted what; the
+// host then proceeds with whichever button the result points to. The host
+// can also skip the vote entirely and just pick "Banish Again" / "End
+// Game" directly. Either way, End Game archives this round and opens a
+// winner picker (same declareWinner() as the Admin tab's Declare Winner).
 export default function RoundtableHost({ gameId, players, settings }) {
   const [roundInfo, setRoundInfo] = useState(null);
   const [votes, setVotes] = useState(null);
@@ -57,6 +66,9 @@ export default function RoundtableHost({ gameId, players, settings }) {
   const [endingGame, setEndingGame] = useState(false);
   const [selectedWinnerId, setSelectedWinnerId] = useState("");
   const [declaring, setDeclaring] = useState(false);
+  const [egState, setEgState] = useState(null);
+  const [egVotes, setEgVotes] = useState([]);
+  const [egBusy, setEgBusy] = useState(false);
 
   // Local editable drafts for the "Manual Vote Entry" table below. Synced
   // from the live `votes` state whenever it changes, EXCEPT for any voter
@@ -117,6 +129,17 @@ export default function RoundtableHost({ gameId, players, settings }) {
     return unsubscribe;
   }, [gameId]);
 
+  // End Game vote: public open/result state + (host-only, by RLS) every
+  // player's vote row. See lib/endGameVote.js.
+  useEffect(() => {
+    const unsubscribe = subscribeEndGameState(gameId, setEgState);
+    return unsubscribe;
+  }, [gameId]);
+  useEffect(() => {
+    const unsubscribe = subscribeEndGameVotes(gameId, setEgVotes);
+    return unsubscribe;
+  }, [gameId]);
+
   const openVoting = async () => {
     await storageSet(gameId, STORAGE_KEY_ROUND_INFO, {
       round,
@@ -124,7 +147,9 @@ export default function RoundtableHost({ gameId, players, settings }) {
       players: alive.map((p) => ({ id: p.id, name: p.display_name })),
       // Only meaningful for the inactivity system below — see its own
       // comment on why it needs a "since when" to check chat activity
-      // against. Harmless/unread by anything else that reads roundInfo.
+      // against. Also doubles as the End Game vote's `roundKey` (see
+      // lib/endGameVote.js): reopening voting gives it a fresh one, which
+      // is what retires any End Game vote from before.
       startedAt: Date.now(),
     });
     setRevealOrder(null);
@@ -160,15 +185,47 @@ export default function RoundtableHost({ gameId, players, settings }) {
   const leadingTarget = rankedTargets[0]?.[0];
 
   // Whoever's left once this round's banish has landed — the pool the
-  // End Game winner picker draws from. Filtering by name (not just
-  // `alive`) matches nextRound's own survivors, and covers the brief
+  // End Game vote and winner picker draw from. Filtering by name (not
+  // just `alive`) matches nextRound's own survivors, and covers the brief
   // window where the banish has been written but `players` hasn't
   // caught up via realtime yet.
   const finalists = alive.filter((p) => p.display_name !== leadingTarget);
   const traitorsLeft = tr ? finalists.filter((p) => String(tr.roles?.[p.display_name] || "").startsWith("traitor")) : [];
   // End Game is gated on the leader actually being out in the database,
-  // so the host can't end the game with the banish still pending.
+  // so the host can't end the game (or open the vote) with the banish
+  // still pending.
   const leaderOut = !leadingTarget || players.some((p) => p.display_name === leadingTarget && !p.alive);
+
+  // End Game vote for the round that's live right now. Anything with a
+  // different roundKey (an earlier round, a previous season) is stale.
+  const roundKey = roundInfo?.startedAt;
+  const egValid = !!(egState && roundKey && egState.roundKey === roundKey);
+  const finalistIds = new Set(finalists.map((p) => p.id));
+  const egRows = egVotes.filter((v) => v.round_key === roundKey && finalistIds.has(v.player_id));
+  const eg = computeEndGameResult(finalists, egRows);
+  const egChoiceLabel = (id) => (eg.byId[id] === "end" ? "🏁 End Game" : eg.byId[id] === "banish" ? "⚔️ Banish Again" : "— no vote");
+
+  const openEgVote = async () => {
+    if (!roundKey || egBusy) return;
+    setEgBusy(true);
+    await openEndGameVote(gameId, roundKey);
+    setEgBusy(false);
+  };
+
+  // Publishes the result + counts (never who voted what) to players.
+  const closeEgVote = async () => {
+    if (!roundKey || egBusy) return;
+    setEgBusy(true);
+    await closeEndGameVote(gameId, roundKey, eg.result, { end: eg.end.length, banish: eg.banish.length, missing: eg.missing.length });
+    setEgBusy(false);
+  };
+
+  const cancelEgVote = async () => {
+    if (egBusy) return;
+    setEgBusy(true);
+    await cancelEndGameVote(gameId);
+    setEgBusy(false);
+  };
 
   const startReveal = () => {
     const order = buildDramaticVoteOrder(voteRows);
@@ -213,10 +270,13 @@ export default function RoundtableHost({ gameId, players, settings }) {
   // round advances, and the History tab's vote matrix would only ever be
   // able to show the current round. The golden vote is kept OUT of that
   // per-voter matrix (one cell per voter) and recorded alongside it.
+  // Idempotent per round: a second call (e.g. End Game clicked again after
+  // a page refresh) finds the round already archived and does nothing.
   const archiveRound = async () => {
     if (voteRows.length === 0) return;
     await storageUpdate(gameId, STORAGE_KEY_VOTE_HISTORY, (fresh) => {
       const list = fresh || [];
+      if (list.some((e) => e.round === round)) return null;
       const votesMap = {};
       regularRows.forEach((r) => { votesMap[r.voterName] = { target: r.targetName, reason: r.reason }; });
       const entry = { round, votes: votesMap, banished: leadingTarget || null };
@@ -252,6 +312,8 @@ export default function RoundtableHost({ gameId, players, settings }) {
     await storageDelete(gameId, VOTES_KEY_PREFIX + round);
     // The dagger itself stays with its holder; only this round's extra vote goes.
     if (dagger?.vote_target) await clearGoldenVote(gameId);
+    // The new startedAt below is also what retires this round's End Game
+    // vote (its roundKey no longer matches) — nothing to clear for it.
     await storageSet(gameId, STORAGE_KEY_ROUND_INFO, {
       round: round + 1,
       votingOpen: false,
@@ -495,16 +557,88 @@ export default function RoundtableHost({ gameId, players, settings }) {
                   <p style={{ color: "#a09080", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, margin: "0 0 8px" }}>
                     What happens next?
                   </p>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <Btn variant="ghost" onClick={nextRound}>Banish Again → Round {round + 1}</Btn>
-                    <Btn variant="danger" onClick={endGame} disabled={!leaderOut || endingGame}>
-                      {endingGame ? "Ending..." : "End Game"}
-                    </Btn>
-                  </div>
+
                   {!leaderOut && (
-                    <p style={{ color: "#706050", fontSize: 11, margin: "8px 0 0", fontStyle: "italic" }}>
-                      Banish {leadingTarget} first to enable End Game.
+                    <p style={{ color: "#706050", fontSize: 11, margin: "0 0 8px", fontStyle: "italic" }}>
+                      Banish {leadingTarget} first — the End Game vote and End Game button unlock once they're out.
                     </p>
+                  )}
+
+                  {/* Stage 1 — no End Game vote for this round yet */}
+                  {!egValid && (
+                    <div>
+                      <Btn onClick={openEgVote} disabled={!leaderOut || finalists.length < 2 || !roundKey || egBusy}>
+                        🗳️ Let the Players Vote: End Game or Banish Again
+                      </Btn>
+                      <p style={{ color: "#706050", fontSize: 11.5, margin: "8px 0 0", fontStyle: "italic" }}>
+                        Everyone still standing votes in secret from their own screen. The game only ends if all {finalists.length} vote End Game — one Banish Again (or a missing vote) means another banish.
+                      </p>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
+                        <span style={{ color: "#706050", fontSize: 11.5 }}>Or just decide yourself:</span>
+                        <Btn small variant="ghost" onClick={nextRound}>Banish Again → Round {round + 1}</Btn>
+                        <Btn small variant="danger" onClick={endGame} disabled={!leaderOut || endingGame}>
+                          {endingGame ? "Ending..." : "End Game"}
+                        </Btn>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Stage 2 — vote open: who's voted (not what) */}
+                  {egValid && egState.open && (
+                    <div>
+                      <p style={{ color: "#e0b84c", fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>
+                        🗳️ End Game vote open — {finalists.length - eg.missing.length}/{finalists.length} in
+                      </p>
+                      <div style={{ display: "grid", gap: 4, marginBottom: 10 }}>
+                        {finalists.map((p) => (
+                          <div key={p.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, background: "#0a1020", borderRadius: 6, padding: "5px 10px" }}>
+                            <span style={{ color: "#f0e6d3" }}>{p.display_name}</span>
+                            <span style={{ color: eg.byId[p.id] ? "#7a9a5c" : "#706050" }}>{eg.byId[p.id] ? "✓ voted" : "waiting…"}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <Btn onClick={closeEgVote} disabled={egBusy}>Close Vote &amp; Reveal Result</Btn>
+                        <Btn small variant="ghost" onClick={cancelEgVote} disabled={egBusy}>Cancel Vote</Btn>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Stage 3 — closed: result + who voted what (host only) */}
+                  {egValid && !egState.open && (
+                    <div>
+                      <p style={{ color: egState.result === "end" ? "#e0b84c" : "#c45c3c", fontSize: 14, fontWeight: 700, margin: "0 0 4px" }}>
+                        {egState.result === "end" ? "🏁 Unanimous — End Game" : "⚔️ Not unanimous — Banish Again"}
+                      </p>
+                      <p style={{ color: "#a09080", fontSize: 12, margin: "0 0 8px" }}>
+                        End Game: {egState.counts?.end ?? 0} · Banish Again: {egState.counts?.banish ?? 0}
+                        {egState.counts?.missing > 0 ? ` · No vote: ${egState.counts.missing}` : ""} — players can see these counts, not who voted what.
+                      </p>
+                      <div style={{ display: "grid", gap: 4, marginBottom: 10 }}>
+                        {finalists.map((p) => (
+                          <div key={p.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, background: "#0a1020", borderRadius: 6, padding: "5px 10px" }}>
+                            <span style={{ color: "#f0e6d3" }}>{p.display_name}</span>
+                            <span style={{ color: eg.byId[p.id] === "end" ? "#e0b84c" : eg.byId[p.id] === "banish" ? "#c45c3c" : "#706050" }}>{egChoiceLabel(p.id)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                        {egState.result === "end" ? (
+                          <>
+                            <Btn variant="danger" onClick={endGame} disabled={!leaderOut || endingGame}>
+                              {endingGame ? "Ending..." : "End Game"}
+                            </Btn>
+                            <Btn small variant="ghost" onClick={nextRound}>Banish Again → Round {round + 1} instead</Btn>
+                          </>
+                        ) : (
+                          <>
+                            <Btn variant="ghost" onClick={nextRound}>Banish Again → Round {round + 1}</Btn>
+                            <Btn small variant="danger" onClick={endGame} disabled={!leaderOut || endingGame}>End Game anyway</Btn>
+                          </>
+                        )}
+                        <Btn small variant="ghost" onClick={openEgVote} disabled={egBusy}>Reopen Vote</Btn>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
